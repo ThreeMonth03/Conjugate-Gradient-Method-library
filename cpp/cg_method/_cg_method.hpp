@@ -7,6 +7,13 @@
 
 class linear_CG{
     public:
+        linear_CG(Matrix A, Matrix b, Matrix x,double epsilon, double epoch);
+        void solve();
+        Matrix get_x();
+        Matrix get_res();
+        Matrix get_delta();
+        Matrix get_D();
+
     private:
         Matrix A;
         Matrix b;
@@ -17,6 +24,7 @@ class linear_CG{
         double epsilon;
         double beta;
         double chi;
+        double epoch = 100000;
 }
 
 #endif

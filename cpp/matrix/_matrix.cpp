@@ -1,5 +1,3 @@
-
-
 #include "_matrix.hpp"
 
 Matrix::Matrix(size_t nrow, size_t ncol) : m_nrow(nrow), m_ncol(ncol)
@@ -22,10 +20,9 @@ Matrix::Matrix(Matrix const &mat) : m_nrow(mat.m_nrow), m_ncol(mat.m_ncol)
 
 Matrix::Matrix(size_t nrow, size_t ncol, std::vector<double> const & vec) : m_nrow(nrow), m_ncol(ncol)
 {
-    //if (vec.size() != nrow * ncol)
-    //{
-    //    throw std::out_of_range("Matrix::Matrix(): vector size differs from matrix size");
-    //}
+    if (vec.size() != nrow * ncol){
+        throw std::out_of_range("Matrix::Matrix(): vector size differs from matrix size");
+    }
         reset_buffer(nrow, ncol);
         (*this) = vec;
 
@@ -56,10 +53,9 @@ Matrix & Matrix::operator=(Matrix && other){
 
 Matrix & Matrix::operator=(std::vector<double> const & vec)
 {
-    //if (size() != vec.size())
-    //{
-    //    throw std::out_of_range("number of elements mismatch");
-    //}
+    if (size() != vec.size()){
+        throw std::out_of_range("number of elements mismatch");
+    }
     size_t k = 0;
     for (size_t i=0; i<m_nrow; ++i)
     {
@@ -90,9 +86,9 @@ Matrix & Matrix::operator=(Matrix const & other)
 }
 
 Matrix Matrix::operator+(Matrix const & other){
-    //if(( nrow() != other.nrow()) || ( ncol() != other.ncol())){
-    //    throw std::out_of_range("Number of elements mismatch.");
-    //}    
+    if(( nrow() != other.nrow()) || ( ncol() != other.ncol())){
+        throw std::out_of_range("Number of elements mismatch.");
+    }    
     Matrix temp(m_nrow, m_ncol);
     for(size_t i = 0 ; i < m_nrow; ++i){
         for(size_t j = 0; j < m_ncol; ++j){
@@ -103,9 +99,9 @@ Matrix Matrix::operator+(Matrix const & other){
 }
 
 Matrix Matrix::operator-(Matrix const & other){
-    //if(( nrow() != other.nrow()) || ( ncol() != other.ncol())){
-    //    throw std::out_of_range("Number of elements mismatch.");
-    //}    
+    if(( nrow() != other.nrow()) || ( ncol() != other.ncol())){
+        throw std::out_of_range("Number of elements mismatch.");
+    }    
     Matrix temp(m_nrow, m_ncol);
     for(size_t i = 0 ; i < m_nrow; ++i){
         for(size_t j = 0; j < m_ncol; ++j){
@@ -192,20 +188,18 @@ bool Matrix::operator==(Matrix const & mat) const
 
 double  Matrix::operator() (size_t row, size_t col) const
 {
-    //if (row >= m_nrow || col >= m_ncol)
-    //{
-    //    throw std::out_of_range("Matrix::operator(): index out of range");
-    //}
+    if (row >= m_nrow || col >= m_ncol){
+        throw std::out_of_range("Matrix::operator(): index out of range");
+    }
 
     return m_buffer[index(row, col)];
 }
 
 double & Matrix::operator() (size_t row, size_t col)
 {
-    //if (row >= m_nrow || col >= m_ncol)
-    //{
-    //    throw std::out_of_range("Matrix::operator(): index out of range");
-    //}
+    if (row >= m_nrow || col >= m_ncol){
+        throw std::out_of_range("Matrix::operator(): index out of range");
+    }
 
     return m_buffer[index(row, col)];
 }
@@ -296,12 +290,10 @@ Matrix multiply_naive(Matrix const& mat1, Matrix const& mat2)
     {
         for (size_t k=0; k<ret.ncol(); ++k)
         {
-            //double v = 0;
             for (size_t i=0; i<ret.ncol(); ++i)
             {
                 ret(i,k) += mat1(i,j) * mat2(j,k);
             }
-            //ret(i,k) = v;
         }
     }
 
@@ -310,7 +302,7 @@ Matrix multiply_naive(Matrix const& mat1, Matrix const& mat2)
 
 namespace py = pybind11;
 
-PYBIND11_MODULE(_matrix, m){
+PYBIND11_MODULE(_cgpy, m){
     py::class_<Matrix>(m,"Matrix")
         .def(py::init<size_t, size_t>())
         .def(py::init<size_t, size_t, std::vector<double> const &>())

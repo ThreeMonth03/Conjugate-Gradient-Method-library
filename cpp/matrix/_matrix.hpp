@@ -54,9 +54,4 @@ std::ostream & operator << (std::ostream & ostr, Matrix const & mat);
 Matrix multiply_tile(Matrix const& mat1, Matrix const& mat2, size_t tsize);
 Matrix multiply_naive(Matrix const& mat1, Matrix const& mat2);
 
-// Matrix operator*(Matrix const & mat1, Matrix const & mat2);
-// std::ostream & operator<<(std::ostream & os, std::vector<double> const & vec);
-// std::vector<double> operator*(Matrix const & mat, std::vector<double> const & vec);
-
-
 #endif

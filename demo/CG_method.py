@@ -1,12 +1,12 @@
 import numpy as np
 
-def linear_CG(x, A, b, epsilon):
+def linear_CG(x, A, b, epsilon, epoch=100000):
     res = A.dot(x) - b # Initialize the residual
     delta = -res # Initialize the descent direction
     count = 0    
     while True:
         
-        if np.linalg.norm(res) <= epsilon:
+        if (np.linalg.norm(res) <= epsilon) or (count >= epoch):
             return x # Return the minimizer x* and the function value f(x*)
         
         D = A.dot(delta)

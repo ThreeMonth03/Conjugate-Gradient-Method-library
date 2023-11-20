@@ -1,13 +1,13 @@
 import pytest
 import math
-import _matrix
+import _cgpy
 import time
 
 def performance_comp(matrix_size = 1024, epoch = 10):
     size = matrix_size
     total_epoch = epoch
-    mat1 = _matrix.Matrix(size, size)
-    mat2 = _matrix.Matrix(size, size)
+    mat1 = _cgpy.Matrix(size, size)
+    mat2 = _cgpy.Matrix(size, size)
     for i in range(size):
         for j in range(size):
             mat1[i,j] = 1.0
@@ -21,14 +21,14 @@ def performance_comp(matrix_size = 1024, epoch = 10):
             total = 0
             if(idx == 0):
                 start = time.process_time()
-                mattemp = _matrix.multiply_naive(mat1, mat2)
+                mattemp = _cgpy.multiply_naive(mat1, mat2)
                 end = time.process_time()
                 total = end - start
                 naive_total_time += total
 
             if(idx == 1):
                 start = time.process_time()
-                mattemp = _matrix.multiply_tile(mat1, mat2, 64)
+                mattemp = _cgpy.multiply_tile(mat1, mat2, 64)
                 end = time.process_time()
                 total = end - start
                 tile_total_time += total
