@@ -66,7 +66,7 @@ def test_matrix_neg():
     assert(np_mat_neg.shape == np_flatten_mat2.shape)
     assert(np.isclose(np_mat_neg, np_flatten_mat2).all)
 
-'''
+
 def test_matmul():
     np_mat1 = np.random.rand(1000, 1000)
     np_mat2 = np.random.rand(1000, 1000)
@@ -103,4 +103,3 @@ def test_mul():
     np_mat_mul = np.array(mat_mul.tolist())
     assert(np_mat_mul.shape == np_flatten_mat2.shape)
     assert(np.isclose(np_mat_mul, np_flatten_mat2).all)
-'''
