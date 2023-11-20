@@ -2,20 +2,22 @@
 
 #include "_matrix.hpp"
 
-void Matrix::reset_buffer(size_t nrow, size_t ncol){
-    if (m_buffer) { delete[] m_buffer; }
-        const size_t nelement = nrow * ncol;
-    if (nelement) { m_buffer = new double[nelement]; }
-    else          { m_buffer = nullptr; }
-        m_nrow = nrow;
-        m_ncol = ncol;
-}
-
 Matrix::Matrix(size_t nrow, size_t ncol) : m_nrow(nrow), m_ncol(ncol)
 {
     size_t nelement = nrow * ncol;
     reset_buffer(nrow, ncol);
     memset(m_buffer, 0, nelement * sizeof(double));
+}
+
+Matrix::Matrix(Matrix const &mat) : m_nrow(mat.m_nrow), m_ncol(mat.m_ncol)
+{
+    reset_buffer(mat.m_nrow, mat.m_ncol);
+    for (size_t i=0; i<m_nrow; ++i){
+        for (size_t j=0; j<m_ncol; ++j)
+        {
+            (*this)(i,j) = mat(i,j);
+        }
+    }
 }
 
 Matrix::Matrix(size_t nrow, size_t ncol, std::vector<double> const & vec) : m_nrow(nrow), m_ncol(ncol)
@@ -29,6 +31,19 @@ Matrix::Matrix(size_t nrow, size_t ncol, std::vector<double> const & vec) : m_nr
 
 }
 
+Matrix::~Matrix()
+{
+    reset_buffer(0, 0);
+}
+
+Matrix::Matrix(Matrix && other)
+  : m_nrow(other.m_nrow), m_ncol(other.m_ncol)
+{
+    reset_buffer(0, 0);
+    std::swap(m_nrow, other.m_nrow);
+    std::swap(m_ncol, other.m_ncol);
+    std::swap(m_buffer, other.m_buffer);
+}
 
 Matrix & Matrix::operator=(Matrix && other){
         if (this == &other) { return *this; }
@@ -57,17 +72,6 @@ Matrix & Matrix::operator=(std::vector<double> const & vec)
     return *this;
 }
 
-Matrix::Matrix(Matrix const &mat) : m_nrow(mat.m_nrow), m_ncol(mat.m_ncol)
-{
-    reset_buffer(mat.m_nrow, mat.m_ncol);
-    for (size_t i=0; i<m_nrow; ++i){
-        for (size_t j=0; j<m_ncol; ++j)
-        {
-            (*this)(i,j) = mat(i,j);
-        }
-    }
-}
-
 Matrix & Matrix::operator=(Matrix const & other)
 {
     if (this == &other) { return *this; }
@@ -85,16 +89,6 @@ Matrix & Matrix::operator=(Matrix const & other)
     return *this;
 }
 
-Matrix::Matrix(Matrix && other)
-  : m_nrow(other.m_nrow), m_ncol(other.m_ncol)
-{
-    reset_buffer(0, 0);
-    std::swap(m_nrow, other.m_nrow);
-    std::swap(m_ncol, other.m_ncol);
-    std::swap(m_buffer, other.m_buffer);
-}
-
-
 Matrix Matrix::operator+(Matrix const & other){
     //if(( nrow() != other.nrow()) || ( ncol() != other.ncol())){
     //    throw std::out_of_range("Number of elements mismatch.");
@@ -103,6 +97,81 @@ Matrix Matrix::operator+(Matrix const & other){
     for(size_t i = 0 ; i < m_nrow; ++i){
         for(size_t j = 0; j < m_ncol; ++j){
             temp(i,j) = (*this)(i,j) + other(i,j);
+        }
+    }
+    return temp;
+}
+
+Matrix Matrix::operator-(Matrix const & other){
+    //if(( nrow() != other.nrow()) || ( ncol() != other.ncol())){
+    //    throw std::out_of_range("Number of elements mismatch.");
+    //}    
+    Matrix temp(m_nrow, m_ncol);
+    for(size_t i = 0 ; i < m_nrow; ++i){
+        for(size_t j = 0; j < m_ncol; ++j){
+            temp(i,j) = (*this)(i,j) - other(i,j);
+        }
+    }
+    return temp;
+}
+
+Matrix Matrix::operator-(){
+    Matrix temp(m_nrow, m_ncol);
+    for(size_t i = 0 ; i < m_nrow; ++i){
+        for(size_t j = 0; j < m_ncol; ++j){
+            temp(i,j) = -(*this)(i,j);
+        }
+    }
+    return temp;
+}
+
+Matrix Matrix::operator*(Matrix const & mat){
+    if ((*this).ncol() != mat.nrow())
+    {
+        throw std::out_of_range(
+            "the number of first matrix column "
+            "differs from that of second matrix row");
+    }
+
+    Matrix result((*this).nrow(), mat.ncol());
+    size_t tsize = 32;
+    size_t max_i = (*this).nrow();
+    size_t max_j = mat.ncol();
+    size_t max_k = (*this).ncol();
+
+    for (size_t i = 0; i < max_i; i += tsize)
+    {
+        for (size_t j = 0; j < max_j; j += tsize)
+        {
+            for (size_t k = 0; k < max_k; k += tsize)
+            {
+                size_t upper_i = std::min(i + tsize, max_i);
+                size_t upper_j = std::min(j + tsize, max_j);
+                size_t upper_k = std::min(k + tsize, max_k);
+                for (size_t ii = i; ii < upper_i ; ++ii)
+                {
+                    for (size_t jj = j; jj < upper_j ; ++jj) 
+		            {
+		    	        double sum = .0;
+                        for (size_t kk = k; kk < upper_k; ++kk)
+                        {
+                            sum += (*this)(ii, kk) * mat(kk, jj);
+                        }
+			            result(ii, jj) += sum;
+                    }
+                }
+            }
+        }
+    }
+
+    return result;
+}
+
+Matrix Matrix::operator*(double const & other){
+    Matrix temp(m_nrow, m_ncol);
+    for(size_t i = 0 ; i < m_nrow; ++i){
+        for(size_t j = 0; j < m_ncol; ++j){
+            temp(i,j) = (*this)(i,j) * other;
         }
     }
     return temp;
@@ -121,26 +190,7 @@ bool Matrix::operator==(Matrix const & mat) const
     return true;
 }
 
-std::ostream & operator << (std::ostream & ostr, Matrix const & mat)
-{
-    for (size_t i=0; i<mat.nrow(); ++i)
-    {
-        ostr << std::endl << " ";
-        for (size_t j=0; j<mat.ncol(); ++j)
-        {
-            ostr << " " << std::setw(2) << mat(i, j);
-        }
-    }
-
-    return ostr;
-}
-
-Matrix::~Matrix()
-{
-    reset_buffer(0, 0);
-}
-
-double   Matrix::operator() (size_t row, size_t col) const
+double  Matrix::operator() (size_t row, size_t col) const
 {
     //if (row >= m_nrow || col >= m_ncol)
     //{
@@ -164,6 +214,29 @@ double* Matrix::data() const { return m_buffer; }
 
 size_t Matrix::nrow() const { return m_nrow; }
 size_t Matrix::ncol() const { return m_ncol; }
+
+void Matrix::reset_buffer(size_t nrow, size_t ncol){
+    if (m_buffer) { delete[] m_buffer; }
+        const size_t nelement = nrow * ncol;
+    if (nelement) { m_buffer = new double[nelement]; }
+    else          { m_buffer = nullptr; }
+        m_nrow = nrow;
+        m_ncol = ncol;
+}
+
+std::ostream & operator << (std::ostream & ostr, Matrix const & mat)
+{
+    for (size_t i=0; i<mat.nrow(); ++i)
+    {
+        ostr << std::endl << " ";
+        for (size_t j=0; j<mat.ncol(); ++j)
+        {
+            ostr << " " << std::setw(2) << mat(i, j);
+        }
+    }
+
+    return ostr;
+}
 
 Matrix multiply_tile(Matrix const& mat1, Matrix const& mat2, size_t tsize)
 {
@@ -245,13 +318,21 @@ PYBIND11_MODULE(_matrix, m){
         .def("__getitem__", [](Matrix &mat, std::pair<size_t, size_t> index) -> double{
 	        return mat(index.first, index.second);
 	    })
+        .def("__repr__", [](Matrix &mat) -> std::vector<double>{
+	        return mat.buffer_vector();
+	    })
 	    .def("__setitem__", [](Matrix &mat, std::pair<size_t, size_t> index, double val){
 		    mat(index.first, index.second) = val;
 	    })
         .def("__eq__", &Matrix::operator==)
         .def("__add__", &Matrix::operator+)
+        .def("__sub__", static_cast<Matrix (Matrix::*)(Matrix const &)>(&Matrix::operator-))
+        .def("__neg__", static_cast<Matrix (Matrix::*)()>(&Matrix::operator-))
+        .def("__mul__", static_cast<Matrix (Matrix::*)(double const &)>(&Matrix::operator*))
+        .def("__matmul__", static_cast<Matrix (Matrix::*)(Matrix const &)>(&Matrix::operator*))
         .def_property_readonly("nrow", &Matrix::nrow)
         .def_property_readonly("ncol", &Matrix::ncol)
+        .def("tolist", &Matrix::buffer_vector)
         ;
     m.def("multiply_naive", &multiply_naive);
     m.def("multiply_tile", &multiply_tile);

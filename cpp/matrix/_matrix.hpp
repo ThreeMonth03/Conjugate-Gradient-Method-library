@@ -18,13 +18,18 @@ public:
     Matrix(size_t nrow, size_t ncol, std::vector<double> const & vec);
     ~Matrix();
     Matrix(Matrix && other);
-    Matrix & operator=(Matrix const & mat);
-    Matrix operator+(Matrix const & other);
-    Matrix & operator=(Matrix && other);
     Matrix & operator=(std::vector<double> const & vec);
+    Matrix & operator=(Matrix const & mat);
+    Matrix & operator=(Matrix && other);
+    Matrix operator+(Matrix const & other);
+    Matrix operator-(Matrix const & other);
+    Matrix operator-();
+    Matrix operator*(Matrix const & other);
+    Matrix operator*(double const & other);
+    bool operator==(Matrix const & mat) const;
     double   operator() (size_t row, size_t col) const;
     double & operator() (size_t row, size_t col);
-    bool operator==(Matrix const & mat) const;
+
 
     double * data() const;
     size_t nrow() const;
@@ -44,7 +49,7 @@ private:
     double * m_buffer = nullptr;
 };
 
-
+std::ostream & operator << (std::ostream & ostr, Matrix const & mat);
 
 Matrix multiply_tile(Matrix const& mat1, Matrix const& mat2, size_t tsize);
 Matrix multiply_naive(Matrix const& mat1, Matrix const& mat2);
