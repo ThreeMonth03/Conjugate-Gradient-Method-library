@@ -25,7 +25,12 @@ Matrix::Matrix(size_t nrow, size_t ncol, std::vector<double> const & vec) : m_nr
     }
         reset_buffer(nrow, ncol);
         (*this) = vec;
+}
 
+Matrix::Matrix(std::vector<std::vector<double>> const & vec) : m_nrow(vec.size()), m_ncol(vec[0].size())
+{
+    reset_buffer(m_nrow, m_ncol);
+    (*this) = vec;
 }
 
 Matrix::~Matrix()
@@ -63,6 +68,21 @@ Matrix & Matrix::operator=(std::vector<double> const & vec)
         {
             (*this)(i,j) = vec[k];
             ++k;
+        }
+    }
+    return *this;
+}
+
+Matrix & Matrix::operator=(std::vector<std::vector<double>> const & vec2d)
+{
+    if (m_nrow != vec2d.size() || m_ncol != vec2d[0].size()){
+        throw std::out_of_range("number of elements mismatch");
+    }
+    for (size_t i=0; i<m_nrow; ++i)
+    {
+        for (size_t j=0; j<m_ncol; ++j)
+        {
+            (*this)(i,j) = vec2d[i][j];
         }
     }
     return *this;
@@ -342,6 +362,7 @@ PYBIND11_MODULE(_cgpy, m){
         .def(py::init<size_t, size_t>())
         .def(py::init<size_t, size_t, std::vector<double> const &>())
         .def(py::init<Matrix const&>())
+        .def(py::init<std::vector<std::vector<double>> const &>())
         .def("__getitem__", [](Matrix &mat, std::pair<size_t, size_t> index) -> double{
 	        return mat(index.first, index.second);
 	    })
@@ -361,6 +382,7 @@ PYBIND11_MODULE(_cgpy, m){
         .def_property_readonly("nrow", &Matrix::nrow)
         .def_property_readonly("ncol", &Matrix::ncol)
         .def("tolist", &Matrix::buffer_vector)
+        .def("tolist2d", &Matrix::buffer_vector2d)
         ;
     m.def("multiply_naive", &multiply_naive);
     m.def("multiply_tile", &multiply_tile);

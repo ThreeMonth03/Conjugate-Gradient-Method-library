@@ -26,132 +26,129 @@ def test_matrix_func():
     assert(np_mat4.shape == np_mat1_flatten.shape)
     assert((np_mat4 == np_mat1_flatten).all)
 
+    mat5 = _cgpy.Matrix(np_mat1)
+    np_mat5 = np.array(mat5.tolist2d())
+    assert(np_mat5.shape == np_mat1.shape)
+    assert((np_mat5 == np_mat1).all)
+
 def test_matrix_add():
     np_mat1 = np.random.rand(1000, 1000)
     np_mat2 = np.random.rand(1000, 1000)
     np_mat3 = np_mat1 + np_mat2
-    np_flatten_mat3 = np_mat3.flatten()
 
-    mat1 = _cgpy.Matrix(np_mat1.shape[0], np_mat1.shape[1], np_mat1.flatten())
-    mat2 = _cgpy.Matrix(np_mat2.shape[0], np_mat2.shape[1], np_mat2.flatten())
+    mat1 = _cgpy.Matrix(np_mat1)
+    mat2 = _cgpy.Matrix(np_mat2)
     mat_add = mat1 + mat2
-    np_mat_add = np.array(mat_add.tolist())
+    np_mat_add = np.array(mat_add.tolist2d())
 
-    assert(np_mat_add.shape == np_flatten_mat3.shape)
-    assert(np.isclose(np_mat_add, np_flatten_mat3).all)
+    assert(np_mat_add.shape == np_mat3.shape)
+    assert(np.isclose(np_mat_add, np_mat3).all)
 
 def test_matrix_sub():
     np_mat1 = np.random.rand(1000, 1000)
     np_mat2 = np.random.rand(1000, 1000)
     np_mat3 = np_mat1 - np_mat2
-    np_flatten_mat3 = np_mat3.flatten()
 
-    mat1 = _cgpy.Matrix(np_mat1.shape[0], np_mat1.shape[1], np_mat1.flatten())
-    mat2 = _cgpy.Matrix(np_mat2.shape[0], np_mat2.shape[1], np_mat2.flatten())
+    mat1 = _cgpy.Matrix(np_mat1)
+    mat2 = _cgpy.Matrix(np_mat2)
     mat_add = mat1 - mat2
-    np_mat_add = np.array(mat_add.tolist())
+    np_mat_add = np.array(mat_add.tolist2d())
 
-    assert(np_mat_add.shape == np_flatten_mat3.shape)
-    assert(np.isclose(np_mat_add, np_flatten_mat3).all)
+    assert(np_mat_add.shape == np_mat3.shape)
+    assert(np.isclose(np_mat_add, np_mat3).all)
 
 def test_matrix_neg():
     np_mat1 = np.random.rand(1000, 1000)
     np_mat2 = -np_mat1
-    np_flatten_mat2 = np_mat2.flatten()
 
-    mat1 = _cgpy.Matrix(np_mat1.shape[0], np_mat1.shape[1], np_mat1.flatten())
+    mat1 = _cgpy.Matrix(np_mat1)
     mat_neg = -mat1
-    np_mat_neg = np.array(mat_neg.tolist())
+    np_mat_neg = np.array(mat_neg.tolist2d())
 
-    assert(np_mat_neg.shape == np_flatten_mat2.shape)
-    assert(np.isclose(np_mat_neg, np_flatten_mat2).all)
+    assert(np_mat_neg.shape == np_mat2.shape)
+    assert(np.isclose(np_mat_neg, np_mat2).all)
 
 
 def test_matrix_matmul():
     np_mat1 = np.random.rand(1000, 1000)
     np_mat2 = np.random.rand(1000, 1000)
     np_mat3 = np_mat1.dot(np_mat2)
-    np_flatten_mat3 = np_mat3.flatten()
 
-    mat1 = _cgpy.Matrix(np_mat1.shape[0], np_mat1.shape[1], np_mat1.flatten())
-    mat2 = _cgpy.Matrix(np_mat2.shape[0], np_mat2.shape[1], np_mat2.flatten())
+    mat1 = _cgpy.Matrix(np_mat1)
+    mat2 = _cgpy.Matrix(np_mat2)
 
     mat_dot = mat1 @ mat2
     mat_naive = _cgpy.multiply_naive(mat1, mat2)
     mat_tile = _cgpy.multiply_tile(mat1, mat2, 32)
    
-    np_mat_dot = np.array(mat_dot.tolist())
-    np_mat_naive = np.array(mat_naive.tolist())
-    np_mat_tile = np.array(mat_tile.tolist())
+    np_mat_dot = np.array(mat_dot.tolist2d())
+    np_mat_naive = np.array(mat_naive.tolist2d())
+    np_mat_tile = np.array(mat_tile.tolist2d())
     
-    assert(np_mat_dot.shape == np_flatten_mat3.shape)
-    assert(np_mat_naive.shape == np_flatten_mat3.shape)
-    assert(np_mat_tile.shape == np_flatten_mat3.shape)
+    assert(np_mat_dot.shape == np_mat3.shape)
+    assert(np_mat_naive.shape == np_mat3.shape)
+    assert(np_mat_tile.shape == np_mat3.shape)
 
-    assert(np.isclose(np_mat_dot, np_flatten_mat3).all)
-    assert(np.isclose(np_mat_naive, np_flatten_mat3).all)
-    assert(np.isclose(np_mat_tile, np_flatten_mat3).all) 
+    assert(np.isclose(np_mat_dot, np_mat3).all)
+    assert(np.isclose(np_mat_naive, np_mat3).all)
+    assert(np.isclose(np_mat_tile, np_mat3).all) 
 
 def test_matrix_matmul_broadcast():
     ## 1d array dot 1d array
-    np_mat1 = np.random.rand(1000, 1)
-    np_mat1 = np_mat1.T
+    np_mat1 = np.random.rand(1,1000)
     np_mat2 = np.random.rand(1000, 1)
     np_mat3 = np_mat1.dot(np_mat2)
-    np_flatten_mat3 = np_mat3.flatten()
-    assert(np_flatten_mat3.shape == (1,))
-    mat1 = _cgpy.Matrix(np_mat1.shape[0], np_mat1.shape[1], np_mat1.flatten())
-    mat2 = _cgpy.Matrix(np_mat2.shape[0], np_mat2.shape[1], np_mat2.flatten())
+
+    assert(np_mat3.shape == (1,1))
+    mat1 = _cgpy.Matrix(np_mat1.T)
+    mat2 = _cgpy.Matrix(np_mat2)
 
     mat_dot = mat1 @ mat2
-    assert(np.isclose(mat_dot[0,0], np_flatten_mat3[0]))
+    assert(np.isclose(mat_dot.tolist2d(), np_mat3))
 #    assert(mat_dot[0,0] == np_flatten_mat3[0])
 
     #scalar dot 2d array
     np_mat1 = np.random.rand()
     np_mat2 = np.random.rand(1000, 1000)
     np_mat3 = np_mat1 * np_mat2
-    np_flatten_mat3 = np_mat3.flatten()
     np_mat1 = np.array([[np_mat1]])
-    assert(np_flatten_mat3.shape == (1000000,))
+    assert(np_mat3.shape == (1000, 1000))
 
-    mat1 = _cgpy.Matrix(np_mat1.shape[0], np_mat1.shape[1], np_mat1.flatten())
-    mat2 = _cgpy.Matrix(np_mat2.shape[0], np_mat2.shape[1], np_mat2.flatten())
+    mat1 = _cgpy.Matrix(np_mat1)
+    mat2 = _cgpy.Matrix(np_mat2)
     mat_dot = mat1 @ mat2
-    np_mat_dot = np.array(mat_dot.tolist())
-    assert(np_mat_dot.shape == np_flatten_mat3.shape)
-    assert(np.isclose(np_mat_dot, np_flatten_mat3).all)
+    np_mat_dot = np.array(mat_dot.tolist2d())
+    assert(np_mat_dot.shape == np_mat3.shape)
+    assert(np.isclose(np_mat_dot, np_mat3).all)
 
     #2d array dot scalar
     np_mat1 = np.random.rand(1000, 1000)
     np_mat2 = np.random.rand()
     np_mat3 = np_mat1 * np_mat2
-    np_flatten_mat3 = np_mat3.flatten()
     np_mat2 = np.array([[np_mat2]])
 
-    mat1 = _cgpy.Matrix(np_mat1.shape[0], np_mat1.shape[1], np_mat1.flatten())
-    mat2 = _cgpy.Matrix(np_mat2.shape[0], np_mat2.shape[1], np_mat2.flatten())
+    mat1 = _cgpy.Matrix(np_mat1)
+    mat2 = _cgpy.Matrix(np_mat2)
     mat_mul = mat1 @ mat2
-    np_mat_mul = np.array(mat_mul.tolist())
-    assert(np_mat_mul.shape == np_flatten_mat3.shape)
-    assert(np.isclose(np_mat_mul, np_flatten_mat3).all)
+    np_mat_mul = np.array(mat_mul.tolist2d())
+    assert(np_mat_mul.shape == np_mat3.shape)
+    assert(np.isclose(np_mat_mul, np_mat3).all)
 
 
 def test_matrix_mul():
     np_mat1 = np.random.rand(1000, 1000)
     scalar = np.random.rand()
     np_mat2 = np_mat1 * scalar
-    np_flatten_mat2 = np_mat2.flatten()
 
-    mat1 = _cgpy.Matrix(np_mat1.shape[0], np_mat1.shape[1], np_mat1.flatten())
+    mat1 = _cgpy.Matrix(np_mat1)
     mat_mul = mat1 * scalar
-    np_mat_mul = np.array(mat_mul.tolist())
-    assert(np_mat_mul.shape == np_flatten_mat2.shape)
-    assert(np.isclose(np_mat_mul, np_flatten_mat2).all)
+    np_mat_mul = np.array(mat_mul.tolist2d())
+    assert(np_mat_mul.shape == np_mat2.shape)
+    assert(np.isclose(np_mat_mul, np_mat2).all)
 
 def test_matrix_norm():
     np_mat1 = np.random.rand(1000, 1000)
     np_norm = np.linalg.norm(np_mat1)
-    mat1 = _cgpy.Matrix(np_mat1.shape[0], np_mat1.shape[1], np_mat1.flatten())
+    mat1 = _cgpy.Matrix(np_mat1)
     mat1_norm = mat1.norm()
     assert(np.isclose(np_norm, mat1_norm))
