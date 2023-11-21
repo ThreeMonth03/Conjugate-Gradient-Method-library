@@ -122,11 +122,33 @@ Matrix Matrix::operator-(){
 }
 
 Matrix Matrix::operator*(Matrix const & mat){
-    if ((*this).ncol() != mat.nrow())
-    {
-        throw std::out_of_range(
-            "the number of first matrix column "
-            "differs from that of second matrix row");
+
+    if( mat.nrow() == 1 && mat.ncol() == 1){
+        Matrix temp(m_nrow, m_ncol);
+        for(size_t i = 0 ; i < m_nrow; ++i){
+            for(size_t j = 0; j < m_ncol; ++j){
+                temp(i,j) = (*this)(i,j) * mat(0,0);
+            }
+        }
+        return temp;
+    }
+
+    if( (*this).nrow() == 1 && (*this).ncol() == 1){
+        Matrix temp(mat.nrow(), mat.ncol());
+        for(size_t i = 0 ; i < mat.nrow(); ++i){
+            for(size_t j = 0; j < mat.ncol(); ++j){
+                temp(i,j) = (*this)(0,0) * mat(i,j);
+            }
+        }
+        return temp;
+    }
+
+    if( (*this).ncol() == 1 && mat.ncol() == 1 && mat.nrow() != 1){
+        Matrix return_value(1,1);
+        for(size_t i = 0; i < (*this).nrow(); ++i){
+            return_value(0,0) += (*this)(i,0) * mat(i,0);
+        }
+        return return_value;
     }
 
     Matrix result((*this).nrow(), mat.ncol());

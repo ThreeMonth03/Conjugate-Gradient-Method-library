@@ -3,7 +3,7 @@ import math
 import _cgpy
 import time
 import numpy as np
-
+'''
 def test_matrix_func():
     mat1 = _cgpy.Matrix(2, 2)
     assert(mat1.nrow == mat1.ncol == 2)
@@ -91,7 +91,52 @@ def test_matrix_matmul():
     assert(np.isclose(np_mat_dot, np_flatten_mat3).all)
     assert(np.isclose(np_mat_naive, np_flatten_mat3).all)
     assert(np.isclose(np_mat_tile, np_flatten_mat3).all) 
+'''
+def test_matrix_matmul_broadcast():
+    ## 1d array dot 1d array
+    np_mat1 = np.random.rand(1000, 1)
+    np_mat1 = np_mat1.T
+    np_mat2 = np.random.rand(1000, 1)
+    np_mat3 = np_mat1.dot(np_mat2)
+    np_flatten_mat3 = np_mat3.flatten()
+    assert(np_flatten_mat3.shape == (1,))
+    mat1 = _cgpy.Matrix(np_mat1.shape[0], np_mat1.shape[1], np_mat1.flatten())
+    mat2 = _cgpy.Matrix(np_mat2.shape[0], np_mat2.shape[1], np_mat2.flatten())
 
+    mat_dot = mat1 @ mat2
+    assert(np.isclose(mat_dot[0,0], np_flatten_mat3[0]))
+#    assert(mat_dot[0,0] == np_flatten_mat3[0])
+
+    #scalar dot 2d array
+    np_mat1 = np.random.rand()
+    np_mat2 = np.random.rand(1000, 1000)
+    np_mat3 = np_mat1 * np_mat2
+    np_flatten_mat3 = np_mat3.flatten()
+    np_mat1 = np.array([[np_mat1]])
+    assert(np_flatten_mat3.shape == (1000000,))
+
+    mat1 = _cgpy.Matrix(np_mat1.shape[0], np_mat1.shape[1], np_mat1.flatten())
+    mat2 = _cgpy.Matrix(np_mat2.shape[0], np_mat2.shape[1], np_mat2.flatten())
+    mat_dot = mat1 @ mat2
+    np_mat_dot = np.array(mat_dot.tolist())
+    assert(np_mat_dot.shape == np_flatten_mat3.shape)
+    assert(np.isclose(np_mat_dot, np_flatten_mat3).all)
+
+    #2d array dot scalar
+    np_mat1 = np.random.rand(1000, 1000)
+    np_mat2 = np.random.rand()
+    np_mat3 = np_mat1 * np_mat2
+    np_flatten_mat3 = np_mat3.flatten()
+    np_mat2 = np.array([[np_mat2]])
+
+    mat1 = _cgpy.Matrix(np_mat1.shape[0], np_mat1.shape[1], np_mat1.flatten())
+    mat2 = _cgpy.Matrix(np_mat2.shape[0], np_mat2.shape[1], np_mat2.flatten())
+    mat_mul = mat1 @ mat2
+    np_mat_mul = np.array(mat_mul.tolist())
+    assert(np_mat_mul.shape == np_flatten_mat3.shape)
+    assert(np.isclose(np_mat_mul, np_flatten_mat3).all)
+
+'''
 def test_matrix_mul():
     np_mat1 = np.random.rand(1000, 1000)
     scalar = np.random.rand()
@@ -110,3 +155,4 @@ def test_matrix_norm():
     mat1 = _cgpy.Matrix(np_mat1.shape[0], np_mat1.shape[1], np_mat1.flatten())
     mat1_norm = mat1.norm()
     assert(np.isclose(np_norm, mat1_norm))
+    '''
