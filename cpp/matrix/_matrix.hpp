@@ -16,6 +16,7 @@ public:
     Matrix(size_t nrow, size_t ncol);
     Matrix(const Matrix &mat);
     Matrix(size_t nrow, size_t ncol, std::vector<double> const & vec);
+    Matrix(std::vector<double> const & vec);
     Matrix(std::vector<std::vector<double>> const & vec2d);
     ~Matrix();
     Matrix(Matrix && other);

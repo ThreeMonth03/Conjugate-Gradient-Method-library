@@ -28,10 +28,10 @@ class linear_CG{
         Matrix res;
         Matrix delta;
         Matrix D;
-        double epsilon = 1e-10;
+        double epsilon = 5e-7;
         double beta = 0;
         double chi = 0;
-        double epoch = 100000;
+        double epoch = 10000000;
 };
 
 #endif

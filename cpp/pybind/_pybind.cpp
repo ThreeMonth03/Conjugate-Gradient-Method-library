@@ -11,6 +11,7 @@ PYBIND11_MODULE(_cgpy, m){
     py::class_<Matrix>(m,"Matrix")
         .def(py::init<size_t, size_t>())
         .def(py::init<size_t, size_t, std::vector<double> const &>())
+        .def(py::init<std::vector<double> const &>())
         .def(py::init<Matrix const&>())
         .def(py::init<std::vector<std::vector<double>> const &>())
         .def("__getitem__", [](Matrix &mat, std::pair<size_t, size_t> index) -> double{

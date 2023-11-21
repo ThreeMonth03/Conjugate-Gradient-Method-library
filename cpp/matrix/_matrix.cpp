@@ -27,6 +27,12 @@ Matrix::Matrix(size_t nrow, size_t ncol, std::vector<double> const & vec) : m_nr
         (*this) = vec;
 }
 
+Matrix::Matrix(std::vector<double> const & vec) : m_nrow(vec.size()), m_ncol(1)
+{
+    reset_buffer(vec.size(), 1);
+    (*this) = vec;
+}
+
 Matrix::Matrix(std::vector<std::vector<double>> const & vec) : m_nrow(vec.size()), m_ncol(vec[0].size())
 {
     reset_buffer(m_nrow, m_ncol);
