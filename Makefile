@@ -5,7 +5,7 @@ PYBINCLUDE = $(shell python3-config --includes) $(shell python3 -m pybind11 --in
 
 #Includes
 MODULE_SHARE_OBJS = cpp/_cgpy$(shell python3-config --extension-suffix)
-MODULE_TARGET = cpp/matrix/_matrix.o
+MODULE_TARGET = cpp/matrix/_matrix.o cpp/cg_method/_cg_method.o
 
 #PATH
 MODULE_SHARE_OBJS_DIR = $(shell pwd)/cpp
