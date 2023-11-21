@@ -103,3 +103,10 @@ def test_matrix_mul():
     np_mat_mul = np.array(mat_mul.tolist())
     assert(np_mat_mul.shape == np_flatten_mat2.shape)
     assert(np.isclose(np_mat_mul, np_flatten_mat2).all)
+
+def test_matrix_norm():
+    np_mat1 = np.random.rand(1000, 1000)
+    np_norm = np.linalg.norm(np_mat1)
+    mat1 = _cgpy.Matrix(np_mat1.shape[0], np_mat1.shape[1], np_mat1.flatten())
+    mat1_norm = mat1.norm()
+    assert(np.isclose(np_norm, mat1_norm))

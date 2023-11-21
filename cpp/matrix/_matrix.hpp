@@ -9,6 +9,7 @@
 #include <pybind11/stl.h>
 #include <utility>
 #include <algorithm>
+#include <cmath>
 
 class Matrix {
 
@@ -29,8 +30,8 @@ public:
     bool operator==(Matrix const & mat) const;
     double   operator() (size_t row, size_t col) const;
     double & operator() (size_t row, size_t col);
-
-
+    double norm();
+    
     double * data() const;
     size_t nrow() const;
     size_t ncol() const;

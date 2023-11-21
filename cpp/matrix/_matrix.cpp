@@ -204,6 +204,19 @@ double & Matrix::operator() (size_t row, size_t col)
     return m_buffer[index(row, col)];
 }
 
+double Matrix::norm()
+{
+    double sum = 0.0;
+    for (size_t i=0; i<m_nrow; ++i)
+    {
+        for (size_t j=0; j<m_ncol; ++j)
+        {
+            sum += (*this)(i,j) * (*this)(i,j);
+        }
+    }
+    return sqrt(sum);
+}
+
 double* Matrix::data() const { return m_buffer; }
 
 size_t Matrix::nrow() const { return m_nrow; }
@@ -322,6 +335,7 @@ PYBIND11_MODULE(_cgpy, m){
         .def("__neg__", static_cast<Matrix (Matrix::*)()>(&Matrix::operator-))
         .def("__mul__", static_cast<Matrix (Matrix::*)(double const &)>(&Matrix::operator*))
         .def("__matmul__", static_cast<Matrix (Matrix::*)(Matrix const &)>(&Matrix::operator*))
+        .def("norm", &Matrix::norm)
         .def_property_readonly("nrow", &Matrix::nrow)
         .def_property_readonly("ncol", &Matrix::ncol)
         .def("tolist", &Matrix::buffer_vector)
