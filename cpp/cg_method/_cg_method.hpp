@@ -1,8 +1,6 @@
 #ifndef __CG_METHOD_HPP__
 #define __CG_METHOD_HPP__
 
-#include <pybind11/pybind11.h>
-#include <pybind11/stl.h>
 #include <vector>
 #include "../matrix/_matrix.hpp"
 
@@ -11,7 +9,7 @@ class linear_CG{
         linear_CG(Matrix A, Matrix b, Matrix x) : A(A), b(b), x(x) {};
         linear_CG(Matrix A, Matrix b, Matrix x, double epsilon) : A(A), b(b), x(x), epsilon(epsilon) {};
         linear_CG(Matrix A, Matrix b, Matrix x, double epsilon, double epoch) : A(A), b(b), x(x), epsilon(epsilon), epoch(epoch) {};
-        void solve();
+        Matrix solve();
         Matrix const & get_A() const{ return A; }
         Matrix       & set_A(){ return A; }
         Matrix const & get_b() const{ return b; }

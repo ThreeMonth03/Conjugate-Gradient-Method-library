@@ -5,11 +5,9 @@
 #include <iomanip>
 #include <vector>
 #include <stdexcept>
-#include <pybind11/pybind11.h>
-#include <pybind11/stl.h>
-#include <utility>
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 
 class Matrix {
 

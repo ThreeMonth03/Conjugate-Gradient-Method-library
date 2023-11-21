@@ -1,6 +1,6 @@
 #include "_cg_method.hpp"
 
-void linear_CG::solve(){
+Matrix linear_CG::solve(){
     res = A * x - b; //1d array
     delta = -res; //1d array
     for (int i = 0; i < epoch; ++i)
@@ -16,4 +16,5 @@ void linear_CG::solve(){
         chi = (res * D)(0, 0) / (delta * D)(0, 0); //scalar
         delta = delta * chi -  res; //1d array
     }
+    return x;
 }
