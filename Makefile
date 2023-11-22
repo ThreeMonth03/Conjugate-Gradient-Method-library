@@ -15,19 +15,25 @@ MODULE_SHARE_OBJS = $(MODULE_SHARE_OBJS_RLT_DIR)/_cgpy$(shell python3-config --e
 PYBIND_TARGET = $(MODULE_SHARE_OBJS_RLT_DIR)/pybind/_pybind.o
 TARGET = $(CPP_FILE:.cpp=.o)
 
+#dependency
+deps = $(TARGET:.o=.d)
+FLAGS_DEP = -MMD -MP
+
+
 #Makefile
 .PHONY: all demo test clean
+default: all
 
 all: clean $(MODULE_SHARE_OBJS)
 
 $(MODULE_SHARE_OBJS): $(TARGET)
 	$(CXX) $(FLAGS) $^ -o $@
 
-$(filter-out $(PYBIND_TARGET), $(TARGET)): %.o : %.cpp %.hpp
-	$(CXX) $(FLAGS) $(PYBINCLUDE)  -c $< -o $@
+$(filter-out $(PYBIND_TARGET), $(TARGET)): %.o : %.cpp
+	$(CXX) $(FLAGS) $(FLAGS_DEP) $(PYBINCLUDE)  -c $< -o $@
 
 $(PYBIND_TARGET): %.o : %.cpp
-	$(CXX) $(FLAGS) $(PYBINCLUDE)  -c $< -o $@
+	$(CXX) $(FLAGS) $(FLAGS_DEP) $(PYBINCLUDE)  -c $< -o $@
 
 demo: $(MODULE_SHARE_OBJS)
 #	mkdir -p demo/results
@@ -41,6 +47,10 @@ test: $(MODULE_SHARE_OBJS)
 clean:
 	rm -rf *.so cpp/*.so cpp/*/*.so
 	rm -rf cpp/*/*.o
-	rm -rf cpp/*/__pycache__ tests/__pycache__
-	rm -rf .pytest_cache tests/.pytest_cache demo/.pytest_cache
+	rm -rf */__pycache__ cpp/*/__pycache__
+	rm -rf .pytest_cache */.pytest_cache
 	rm -rf demo/results
+	rm -rf cpp/*/*.d
+
+#dependency
+-include $(deps)
