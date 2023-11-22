@@ -17,8 +17,7 @@ TARGET = $(CPP_FILE:.cpp=.o)
 
 #dependency
 DEPS = $(TARGET:.o=.d)
-
-
+-include $(DEPS)
 
 #Makefile
 .PHONY: all demo test clean
@@ -49,6 +48,3 @@ clean:
 	rm -rf .pytest_cache */.pytest_cache
 	rm -rf demo/results
 	rm -rf cpp/*/*.d
-
-#dependency
--include $(DEPS)
