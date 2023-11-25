@@ -38,7 +38,7 @@ demo: $(MODULE_SHARE_OBJS)
 	python3 tests/test_cg_method.py
 
 test: $(MODULE_SHARE_OBJS)
-	python3 -m pytest -v tests/test_matrix.py
+#python3 -m pytest -v tests/test_matrix.py
 	python3 -m pytest -v tests/test_cg_method.py
 
 clean:

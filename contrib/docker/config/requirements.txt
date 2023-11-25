@@ -10,3 +10,4 @@ datasets==2.13.1
 tensorboard==2.13.0
 matplotlib
 pybind11
+autograd

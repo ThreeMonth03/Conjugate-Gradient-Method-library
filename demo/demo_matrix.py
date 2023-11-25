@@ -1,3 +1,15 @@
+import sys
+import os
+# Get the absolute path of the directory containing the .so file
+dir_path = os.path.dirname(os.path.abspath(__file__)) + "/../cpp"
+# Add the directory to the Python path
+sys.path.append(dir_path)
+# Get the absolute path of the directory containing the utils.py
+dir_path = os.path.dirname(os.path.abspath(__file__)) + "/../python"
+# Add the directory to the Python path
+sys.path.append(dir_path)
+
+
 import pytest
 import math
 import _cgpy
