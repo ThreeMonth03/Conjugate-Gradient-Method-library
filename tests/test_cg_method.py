@@ -22,7 +22,7 @@ def test_linear_cg():
     a = np.random.rand(100, 100)
     a = utils.generate_pos_def(100)
     a = utils.generate_symmetric(100)
-    while(np.linalg.cond(a) < 1000):
+    while(np.linalg.cond(a) < 10000):
         a = np.random.rand(100, 100)
         a = utils.generate_pos_def(100)
         a = utils.generate_symmetric(100)

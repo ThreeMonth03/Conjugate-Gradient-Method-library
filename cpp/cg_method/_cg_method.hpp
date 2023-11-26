@@ -3,6 +3,8 @@
 
 #include <vector>
 #include "../matrix/_matrix.hpp"
+#include <algorithm>
+#include <cmath>
 
 class linear_CG{
     public:
@@ -32,6 +34,14 @@ class linear_CG{
         double beta = 0;
         double chi = 0;
         double epoch = 10000000;
+};
+
+class nonlinear_CG{
+    public:
+        static Matrix Fletcher_Reeves_next_iteration(Matrix cur_Df, Matrix next_Df, Matrix delta);
+        static Matrix Polak_Ribiere_next_iteration(Matrix cur_Df, Matrix next_Df, Matrix delta);
+        static Matrix Hager_Zhang_next_iteration(Matrix cur_Df, Matrix next_Df, Matrix delta);
+        static Matrix Dai_Yuan_next_iteration(Matrix cur_Df, Matrix next_Df, Matrix delta);
 };
 
 #endif

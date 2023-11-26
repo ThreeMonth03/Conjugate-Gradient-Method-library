@@ -1,3 +1,10 @@
+import sys
+import os
+# Get the absolute path of the directory containing the .so file
+dir_path = os.path.dirname(os.path.abspath(__file__)) + "/../cpp"
+# Add the directory to the Python path
+sys.path.append(dir_path)
+
 import numpy as np
 from scipy.optimize import line_search
 from autograd import grad
@@ -55,58 +62,60 @@ def nonlinear_func_2(x): # Objective function
     x = np.array(x)
     return (np.sum(x**4))**0.5
 
-def nonlinear_CG(Xj, tol, alpha_1, alpha_2, f, Df, method = "Fletcher_Reeves"):
+def nonlinear_CG(X, tol, alpha_1, alpha_2, f, Df, method = "Fletcher_Reeves"):
+    method_dict = {
+                "Fletcher_Reeves": Fletcher_Reeves_next_iteration,\
+                "Polak_Ribiere": Polak_Ribiere_next_iteration,\
+                "Hager-Zhang": Hager_Zhang_next_iteration,\
+                "Dai-Yuan": Dai_Yuan_next_iteration,\
+    }
+
     NORM = np.linalg.norm
-    D = Df(Xj)
-    delta = -D 
+    next_Df = Df(X)
+    delta = - next_Df 
     
     while True:
-        start_point = Xj 
+        start_point = X
         beta = line_search(f=f, myfprime=Df, xk=start_point, pk=delta, c1=alpha_1, c2=alpha_2)[0] 
         if beta!=None:
-            X = Xj+ beta*delta 
+            next_X = X+ beta*delta 
         else:
-            return Xj, f(Xj)
-
-        if NORM(Df(X)) < tol:
             return X, f(X)
 
+        if NORM(Df(next_X)) < tol:
+            return next_X, f(next_X)
+
         else:
-            Xj = X
-            d = D
-            D = Df(Xj)
-            if(method == "Fletcher_Reeves"):
-                delta = Fletcher_Reeves_next_iteration(d, D, delta)
-            elif(method == "Polak_Ribiere"):
-                delta = Polak_Ribiere_next_iteration(d, D, delta)
-            elif(method == "Hager-Zhang"):
-                delta = Hager_Zhang_next_iteration(d, D, delta)
-            elif(method == "Dai-Yuan"):
-                delta = Dai_Yuan_next_iteration(d, D, delta)
+            X = next_X
+            cur_Df = next_Df
+            next_Df = Df(X)
+            if method in method_dict:
+                delta = method_dict[method](cur_Df, next_Df, delta)
             else:
                 raise AssertionError("method not supported")
-
-def Fletcher_Reeves_next_iteration(D, D_next, delta):
-    chi = np.linalg.norm(D_next)**2/np.linalg.norm(D)**2
-    delta = -D_next + chi*delta
+            
+def Fletcher_Reeves_next_iteration(cur_Df, next_Df, delta):
+    chi = np.linalg.norm(next_Df)**2/np.linalg.norm(cur_Df)**2
+    delta = -next_Df + chi*delta
     return delta
 
-def Polak_Ribiere_next_iteration(d, D, delta):
-    chi = (D-d).dot(D)/np.linalg.norm(d)**2 
+def Polak_Ribiere_next_iteration(cur_Df, next_Df, delta):
+    chi = (next_Df-cur_Df).dot(next_Df)/np.linalg.norm(cur_Df)**2 
     chi = max(0, chi) 
-    delta = -D + chi*delta 
+    delta = -next_Df + chi*delta 
     return delta
 
-def Hager_Zhang_next_iteration(d, D, delta):
+def Hager_Zhang_next_iteration(cur_Df, next_Df, delta):
+    Q = next_Df - cur_Df
     M = Q - 2*delta*NORM(Q)**2/(delta.dot(Q))
-    N = D/(delta.dot(Q))
-    chi = M.dot(N) # See line (19)
-    delta = -D + chi*delta
+    N = next_Df/(delta.dot(Q))
+    chi = M.dot(N)
+    delta = -next_Df + chi*delta
     return delta
 
-def Dai_Yuan_next_iteration(d, D, delta):
-    chi = np.linalg.norm(D)**2/delta.dot(D - d) # See line (16)
-    delta = -D + chi*delta
+def Dai_Yuan_next_iteration(cur_Df, next_Df, delta):
+    chi = np.linalg.norm(next_Df)**2/delta.dot(next_Df - cur_Df)
+    delta = -next_Df + chi*delta
     return delta
 
 if __name__ == '__main__':

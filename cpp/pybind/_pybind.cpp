@@ -41,6 +41,12 @@ PYBIND11_MODULE(_cgpy, m){
         .def(py::init<Matrix const &, Matrix const &, Matrix const &, double const &, double const &>())
         .def("solve", &linear_CG::solve)
         ;
+    py::class_<nonlinear_CG>(m, "nonlinear_CG")
+        .def_static("Fletcher_Reeves_next_iteration", &nonlinear_CG::Fletcher_Reeves_next_iteration)
+        .def_static("Polak_Ribiere_next_iteration", &nonlinear_CG::Polak_Ribiere_next_iteration)
+        .def_static("Hager_Zhang_next_iteration", &nonlinear_CG::Hager_Zhang_next_iteration)
+        .def_static("Dai_Yuan_next_iteration", &nonlinear_CG::Dai_Yuan_next_iteration)
+        ;
     m.def("multiply_naive", &multiply_naive);
     m.def("multiply_tile", &multiply_tile);
 }
