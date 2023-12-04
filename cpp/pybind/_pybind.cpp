@@ -35,6 +35,33 @@ PYBIND11_MODULE(_cgpy, m){
         .def("tolist", &Matrix::Naive_Matrix::buffer_vector)
         .def("tolist2d", &Matrix::Naive_Matrix::buffer_vector2d)
         ;
+    py::class_<Matrix::Accelerated_Matrix>(m_matrix,"Accelerated_Matrix")
+        .def(py::init<size_t, size_t>())
+        .def(py::init<size_t, size_t, std::vector<double> const &>())
+        .def(py::init<std::vector<double> const &>())
+        .def(py::init<Matrix::Accelerated_Matrix const&>())
+        .def(py::init<std::vector<std::vector<double>> const &>())
+        .def("__getitem__", [](Matrix::Accelerated_Matrix &mat, std::pair<size_t, size_t> index) -> double{
+	        return mat(index.first, index.second);
+	    })
+        .def("__repr__", [](Matrix::Accelerated_Matrix &mat) -> std::vector<double>{
+	        return mat.buffer_vector();
+	    })
+	    .def("__setitem__", [](Matrix::Accelerated_Matrix &mat, std::pair<size_t, size_t> index, double val){
+		    mat(index.first, index.second) = val;
+	    })
+        .def("__eq__", &Matrix::Accelerated_Matrix::operator==)
+        .def("__add__", &Matrix::Accelerated_Matrix::operator+)
+        .def("__sub__", static_cast<Matrix::Accelerated_Matrix (Matrix::Accelerated_Matrix::*)(Matrix::Accelerated_Matrix const &)>(&Matrix::Accelerated_Matrix::operator-))
+        .def("__neg__", static_cast<Matrix::Accelerated_Matrix (Matrix::Accelerated_Matrix::*)()>(&Matrix::Accelerated_Matrix::operator-))
+        .def("__mul__", static_cast<Matrix::Accelerated_Matrix (Matrix::Accelerated_Matrix::*)(double const &)>(&Matrix::Accelerated_Matrix::operator*))
+        .def("__matmul__", static_cast<Matrix::Accelerated_Matrix (Matrix::Accelerated_Matrix::*)(Matrix::Accelerated_Matrix const &)>(&Matrix::Accelerated_Matrix::operator*))
+        .def("norm", &Matrix::Accelerated_Matrix::norm)
+        .def_property_readonly("nrow", &Matrix::Accelerated_Matrix::nrow)
+        .def_property_readonly("ncol", &Matrix::Accelerated_Matrix::ncol)
+        .def("tolist", &Matrix::Accelerated_Matrix::buffer_vector)
+        .def("tolist2d", &Matrix::Accelerated_Matrix::buffer_vector2d)
+        ;    
 
     auto m_cg_method = m.def_submodule("CG");    
     py::class_<cg_method::linear_CG>(m_cg_method, "linear_CG")

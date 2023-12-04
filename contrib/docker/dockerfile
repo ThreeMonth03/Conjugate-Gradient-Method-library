@@ -14,7 +14,7 @@ RUN apt update && \
         git \
         fish 
 RUN apt-get update
-
+RUN apt-get install libomp-dev
 COPY config/ $PIP_CONF
 RUN pip install -r ${PIP_CONF}/requirements.txt
 RUN pip install -U pytest
