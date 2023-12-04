@@ -9,6 +9,8 @@ import numpy as np
 from scipy.optimize import line_search
 from autograd import grad
 import autograd.numpy as au
+from _cgpy import CG
+from _cgpy.Matrix import Naive_Matrix
 
 def is_pos_def(x):
     return np.all(np.linalg.eigvals(x) > 0)
@@ -21,7 +23,15 @@ def generate_symmetric(n):
     A = np.random.rand(n, n)
     return (A + A.T)/2
 
-def linear_CG(x, A, b, epsilon, epoch=10000000):
+def custom_linear_CG(x, a, b, epsilon = 5e-7, epoch=10000000):
+    mat_a = Naive_Matrix(a)
+    mat_b = Naive_Matrix(b)
+    mat_x = Naive_Matrix(x)
+    linear_cg_model = CG.linear_CG(mat_a, mat_b, mat_x, epsilon, epoch)
+    mat_x_min = linear_cg_model.solve()
+    return np.array(mat_x_min.tolist())
+
+def np_linear_CG(x, A, b, epsilon, epoch=10000000):
     res = A.dot(x) - b
     delta = -res 
     count = 0    

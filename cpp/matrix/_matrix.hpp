@@ -9,27 +9,29 @@
 #include <cmath>
 #include <cstring>
 
-class Matrix {
+namespace Matrix{
+
+class Naive_Matrix{
 
 public:
-    Matrix() = default;
-    Matrix(size_t nrow, size_t ncol);
-    Matrix(const Matrix &mat);
-    Matrix(size_t nrow, size_t ncol, std::vector<double> const & vec);
-    Matrix(std::vector<double> const & vec);
-    Matrix(std::vector<std::vector<double>> const & vec2d);
-    ~Matrix();
-    Matrix(Matrix && other);
-    Matrix & operator=(std::vector<double> const & vec);
-    Matrix & operator=(std::vector<std::vector<double>> const & vec2d);
-    Matrix & operator=(Matrix const & mat);
-    Matrix & operator=(Matrix && other);
-    Matrix operator+(Matrix const & other);
-    Matrix operator-(Matrix const & other);
-    Matrix operator-();
-    Matrix operator*(Matrix const & other);
-    Matrix operator*(double const & other);
-    bool operator==(Matrix const & mat) const;
+    Naive_Matrix() = default;
+    Naive_Matrix(size_t nrow, size_t ncol);
+    Naive_Matrix(const Naive_Matrix &mat);
+    Naive_Matrix(size_t nrow, size_t ncol, std::vector<double> const & vec);
+    Naive_Matrix(std::vector<double> const & vec);
+    Naive_Matrix(std::vector<std::vector<double>> const & vec2d);
+    ~Naive_Matrix();
+    Naive_Matrix(Naive_Matrix && other);
+    Naive_Matrix & operator=(std::vector<double> const & vec);
+    Naive_Matrix & operator=(std::vector<std::vector<double>> const & vec2d);
+    Naive_Matrix & operator=(Naive_Matrix const & mat);
+    Naive_Matrix & operator=(Naive_Matrix && other);
+    Naive_Matrix operator+(Naive_Matrix const & other);
+    Naive_Matrix operator-(Naive_Matrix const & other);
+    Naive_Matrix operator-();
+    Naive_Matrix operator*(Naive_Matrix const & other);
+    Naive_Matrix operator*(double const & other);
+    bool operator==(Naive_Matrix const & mat) const;
     double   operator() (size_t row, size_t col) const;
     double & operator() (size_t row, size_t col);
     double norm();
@@ -67,9 +69,11 @@ private:
     double * m_buffer = nullptr;
 };
 
-std::ostream & operator << (std::ostream & ostr, Matrix const & mat);
+std::ostream & operator << (std::ostream & ostr, Naive_Matrix const & mat);
 
-Matrix multiply_tile(Matrix const& mat1, Matrix const& mat2, size_t tsize);
-Matrix multiply_naive(Matrix const& mat1, Matrix const& mat2);
+Naive_Matrix multiply_tile(Naive_Matrix const& mat1, Naive_Matrix const& mat2, size_t tsize);
+Naive_Matrix multiply_naive(Naive_Matrix const& mat1, Naive_Matrix const& mat2);
+
+}
 
 #endif
