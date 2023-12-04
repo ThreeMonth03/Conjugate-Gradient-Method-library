@@ -1,5 +1,4 @@
-#include "_matrix.hpp"
-
+#include <_matrix.hpp>
 Matrix::Matrix(size_t nrow, size_t ncol) : m_nrow(nrow), m_ncol(ncol)
 {
     size_t nelement = nrow * ncol;

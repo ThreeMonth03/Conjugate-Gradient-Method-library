@@ -2,7 +2,7 @@
 #define __CG_METHOD_HPP__
 
 #include <vector>
-#include "../matrix/_matrix.hpp"
+#include <_matrix.hpp>
 #include <algorithm>
 #include <cmath>
 
