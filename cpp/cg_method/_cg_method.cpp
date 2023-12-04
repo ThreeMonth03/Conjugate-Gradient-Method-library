@@ -4,7 +4,10 @@
 
 namespace cg_method{
 
-Matrix::Naive_Matrix linear_CG::solve(){
+Matrix::Naive_Matrix linear_CG::solve_by_Naive_Matrix(Matrix::Naive_Matrix A, Matrix::Naive_Matrix b, Matrix::Naive_Matrix x){
+    Matrix::Naive_Matrix res;
+    Matrix::Naive_Matrix delta;
+    Matrix::Naive_Matrix D;
     res = A * x - b; //1d array
     delta = -res; //1d array
     for (int i = 0; i < epoch; ++i)

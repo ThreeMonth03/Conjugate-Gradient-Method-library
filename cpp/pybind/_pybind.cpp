@@ -38,10 +38,10 @@ PYBIND11_MODULE(_cgpy, m){
 
     auto m_cg_method = m.def_submodule("CG");    
     py::class_<cg_method::linear_CG>(m_cg_method, "linear_CG")
-        .def(py::init<Matrix::Naive_Matrix const &, Matrix::Naive_Matrix const &, Matrix::Naive_Matrix const &>())
-        .def(py::init<Matrix::Naive_Matrix const &, Matrix::Naive_Matrix const &, Matrix::Naive_Matrix const &, double const &>())
-        .def(py::init<Matrix::Naive_Matrix const &, Matrix::Naive_Matrix const &, Matrix::Naive_Matrix const &, double const &, double const &>())
-        .def("solve", &cg_method::linear_CG::solve)
+        .def(py::init<>())
+        .def(py::init<double const &>())
+        .def(py::init<double const &, double const &>())
+        .def("solve_by_Naive_Matrix", &cg_method::linear_CG::solve_by_Naive_Matrix)
         ;
     py::class_<cg_method::nonlinear_CG>(m_cg_method, "nonlinear_CG")
         .def_static("Fletcher_Reeves_next_iteration", &cg_method::nonlinear_CG::Fletcher_Reeves_next_iteration)

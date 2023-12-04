@@ -31,8 +31,8 @@ def custom_linear_CG(x, a, b, epsilon = 5e-7, epoch=10000000):
     mat_a = Naive_Matrix(a)
     mat_b = Naive_Matrix(b)
     mat_x = Naive_Matrix(x)
-    linear_cg_model = CG.linear_CG(mat_a, mat_b, mat_x, epsilon, epoch)
-    mat_x_min = linear_cg_model.solve()
+    linear_cg_model = CG.linear_CG(epsilon, epoch)
+    mat_x_min = linear_cg_model.solve_by_Naive_Matrix(mat_a, mat_b, mat_x)
     return np.array(mat_x_min.tolist())
 
 def np_linear_CG(x, A, b, epsilon, epoch=10000000):
@@ -80,7 +80,7 @@ def nonlinear_func_2(x):
     return (np.sum(x**4))**0.5
 
 def custom_nonlinear_CG(X, tol, alpha_1, alpha_2, f, Df, method = "Fletcher_Reeves"):
-    ## Solve the nonlinear system using conjugate gradient method by calling the numpy library
+    ## Solve the nonlinear system using conjugate gradient method by calling the c++ library
     method_dict = {
                 "Fletcher_Reeves": CG.nonlinear_CG.Fletcher_Reeves_next_iteration,\
                 "Polak_Ribiere": CG.nonlinear_CG.Polak_Ribiere_next_iteration,\
