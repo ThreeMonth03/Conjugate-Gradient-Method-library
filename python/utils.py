@@ -12,18 +12,22 @@ import autograd.numpy as au
 from _cgpy import CG
 from _cgpy.Matrix import Naive_Matrix
 
-def is_pos_def(x):
+def is_pos_def(x): 
+    ## Check if a matrix is positive definite
     return np.all(np.linalg.eigvals(x) > 0)
 
 def generate_pos_def(n):
+    ## Generate a random positive definite matrix
     A = np.random.rand(n, n)
     return A.dot(A.T)
 
 def generate_symmetric(n):
+    ## Generate a random symmetric matrix
     A = np.random.rand(n, n)
     return (A + A.T)/2
 
 def custom_linear_CG(x, a, b, epsilon = 5e-7, epoch=10000000):
+    ## Solve the linear system Ax = b using conjugate gradient method by calling the C++ library
     mat_a = Naive_Matrix(a)
     mat_b = Naive_Matrix(b)
     mat_x = Naive_Matrix(x)
@@ -32,6 +36,7 @@ def custom_linear_CG(x, a, b, epsilon = 5e-7, epoch=10000000):
     return np.array(mat_x_min.tolist())
 
 def np_linear_CG(x, A, b, epsilon, epoch=10000000):
+    ## Solve the linear system Ax = b using conjugate gradient method by calling the numpy library
     res = A.dot(x) - b
     delta = -res 
     count = 0    
@@ -65,14 +70,51 @@ def np_linear_CG(x, A, b, epsilon, epoch=10000000):
         #print("norm", np.linalg.norm(res))
         #print("------------------")
 
-def nonlinear_func_1(x): # Objective function
+def nonlinear_func_1(x):
+    ## The function is f(x) = x1^4 - 2*x1^2*x2 + x1^2 + x2^2 - 2*x1 + 1
     return x[0]**4 - 2*x[0]**2*x[1] + x[0]**2 + x[1]**2 - 2*x[0] + 1
 
-def nonlinear_func_2(x): # Objective function
+def nonlinear_func_2(x):
+    ## The function is f(x) = x1^4 + x2^4 + ... + xn^4
     x = np.array(x)
     return (np.sum(x**4))**0.5
 
-def nonlinear_CG(X, tol, alpha_1, alpha_2, f, Df, method = "Fletcher_Reeves"):
+def custom_nonlinear_CG(X, tol, alpha_1, alpha_2, f, Df, method = "Fletcher_Reeves"):
+    ## Solve the nonlinear system using conjugate gradient method by calling the numpy library
+    method_dict = {
+                "Fletcher_Reeves": CG.nonlinear_CG.Fletcher_Reeves_next_iteration,\
+                "Polak_Ribiere": CG.nonlinear_CG.Polak_Ribiere_next_iteration,\
+                "Hager-Zhang": CG.nonlinear_CG.Hager_Zhang_next_iteration,\
+                "Dai-Yuan": CG.nonlinear_CG.Dai_Yuan_next_iteration,\
+    }
+
+    NORM = np.linalg.norm
+    next_Df = Df(X)
+    delta = - next_Df 
+    
+    while True:
+        start_point = X
+        beta = line_search(f=f, myfprime=Df, xk=start_point, pk=delta, c1=alpha_1, c2=alpha_2)[0] 
+        if beta!=None:
+            next_X = X+ beta*delta 
+        else:
+            return X, f(X)
+
+        if NORM(Df(next_X)) < tol:
+            return next_X, f(next_X)
+
+        else:
+            X = next_X
+            cur_Df = next_Df
+            next_Df = Df(X)
+            if method in method_dict:
+                delta = method_dict[method](cur_Df, next_Df, delta)
+                delta = np.array(delta.tolist())
+            else:
+                raise AssertionError("method not supported")
+
+def np_nonlinear_CG(X, tol, alpha_1, alpha_2, f, Df, method = "Fletcher_Reeves"):
+    ## Solve the nonlinear system using conjugate gradient method by calling the numpy library
     method_dict = {
                 "Fletcher_Reeves": Fletcher_Reeves_next_iteration,\
                 "Polak_Ribiere": Polak_Ribiere_next_iteration,\
@@ -117,7 +159,7 @@ def Polak_Ribiere_next_iteration(cur_Df, next_Df, delta):
 
 def Hager_Zhang_next_iteration(cur_Df, next_Df, delta):
     Q = next_Df - cur_Df
-    M = Q - 2*delta*NORM(Q)**2/(delta.dot(Q))
+    M = Q - delta * (np.linalg.norm(Q)**2) * 2/(delta.dot(Q))
     N = next_Df/(delta.dot(Q))
     chi = M.dot(N)
     delta = -next_Df + chi*delta
