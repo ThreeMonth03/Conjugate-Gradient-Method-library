@@ -56,6 +56,8 @@ PYBIND11_MODULE(_cgpy, m){
         .def("__neg__", static_cast<Matrix::Accelerated_Matrix (Matrix::Accelerated_Matrix::*)()>(&Matrix::Accelerated_Matrix::operator-))
         .def("__mul__", static_cast<Matrix::Accelerated_Matrix (Matrix::Accelerated_Matrix::*)(double const &)>(&Matrix::Accelerated_Matrix::operator*))
         .def("__matmul__", static_cast<Matrix::Accelerated_Matrix (Matrix::Accelerated_Matrix::*)(Matrix::Accelerated_Matrix const &)>(&Matrix::Accelerated_Matrix::operator*))
+        .def("set_number_of_threads", &Matrix::Accelerated_Matrix::set_number_of_threads)
+        .def("get_number_of_threads", &Matrix::Accelerated_Matrix::get_number_of_threads)
         .def("norm", &Matrix::Accelerated_Matrix::norm)
         .def_property_readonly("nrow", &Matrix::Accelerated_Matrix::nrow)
         .def_property_readonly("ncol", &Matrix::Accelerated_Matrix::ncol)

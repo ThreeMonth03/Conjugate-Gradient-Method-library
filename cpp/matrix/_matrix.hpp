@@ -93,6 +93,9 @@ public:
     bool operator==(Accelerated_Matrix const & mat) const;
     double   operator() (size_t row, size_t col) const;
     double & operator() (size_t row, size_t col);
+    void set_number_of_threads(int nthreads);
+    int get_number_of_threads() const;
+
     double norm();
     
     double * data() const;

@@ -504,7 +504,7 @@ bool Accelerated_Matrix::operator==(Accelerated_Matrix const & mat) const
 {
     if (mat.m_ncol != m_ncol || mat.m_nrow != m_nrow) return false;
     bool check = true;
-    #pragma omp parallel for schedule(static) collapse(2) num_threads(number_of_threads)
+    #pragma omp parallel for schedule(static) collapse(2) reduction(&&:check) num_threads(number_of_threads)
     for (size_t i = 0; i < mat.m_nrow; ++i){
         for (size_t j = 0; j < mat.m_ncol; ++j){
             if(mat(i, j) != m_buffer[i*m_nrow+j]) check = false;
@@ -529,6 +529,14 @@ double & Accelerated_Matrix::operator() (size_t row, size_t col)
     }
 
     return m_buffer[index(row, col)];
+}
+
+void Accelerated_Matrix::set_number_of_threads(int nthreads){
+    number_of_threads = nthreads;
+}
+
+int Accelerated_Matrix::get_number_of_threads() const{
+    return number_of_threads;
 }
 
 double Accelerated_Matrix::norm()
