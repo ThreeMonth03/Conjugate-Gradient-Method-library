@@ -1,9 +1,9 @@
 #Flags
 CXX = g++
-FLAGS = -O3 -g -m64 -Wall -shared -std=c++11 -fPIC 
+FLAGS = -O3 -g -m64 -Wall -shared -std=c++11 -fPIC -fopenmp
 PYBINCLUDE = $(shell python3-config --includes) $(shell python3 -m pybind11 --includes)
 FLAGS_DEP = -MMD -MP
-DIRS := $(wildcard $(shell pwd)/cpp/*)
+DIRS = $(shell find $(shell pwd)/cpp/* -type d)
 CXXINCLUDE := $(patsubst %,-I %,$(DIRS))
 #PATH
 MODULE_SHARE_OBJS_RLT_DIR = cpp

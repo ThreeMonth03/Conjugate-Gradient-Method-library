@@ -2,6 +2,8 @@
 
 namespace Matrix{
 
+// Naive Matrix
+
 Naive_Matrix::Naive_Matrix(size_t nrow, size_t ncol) : m_nrow(nrow), m_ncol(ncol)
 {
     size_t nelement = nrow * ncol;
@@ -180,32 +182,14 @@ Naive_Matrix Naive_Matrix::operator*(Naive_Matrix const & mat){
     }
 
     Naive_Matrix result((*this).nrow(), mat.ncol());
-    size_t tsize = 32;
-    size_t max_i = (*this).nrow();
-    size_t max_j = mat.ncol();
-    size_t max_k = (*this).ncol();
 
-    for (size_t i = 0; i < max_i; i += tsize)
+    for (size_t j=0; j<mat.nrow(); ++j)
     {
-        for (size_t j = 0; j < max_j; j += tsize)
+        for (size_t k=0; k<result.ncol(); ++k)
         {
-            for (size_t k = 0; k < max_k; k += tsize)
+            for (size_t i=0; i<result.ncol(); ++i)
             {
-                size_t upper_i = std::min(i + tsize, max_i);
-                size_t upper_j = std::min(j + tsize, max_j);
-                size_t upper_k = std::min(k + tsize, max_k);
-                for (size_t ii = i; ii < upper_i ; ++ii)
-                {
-                    for (size_t jj = j; jj < upper_j ; ++jj) 
-		            {
-		    	        double sum = .0;
-                        for (size_t kk = k; kk < upper_k; ++kk)
-                        {
-                            sum += (*this)(ii, kk) * mat(kk, jj);
-                        }
-			            result(ii, jj) += sum;
-                    }
-                }
+                result(i,k) += (*this)(i,j) * mat(j,k);
             }
         }
     }
@@ -281,7 +265,7 @@ void Naive_Matrix::reset_buffer(size_t nrow, size_t ncol){
         m_ncol = ncol;
 }
 
-//Accelerated matrix
+// Accelerated Matrix
 
 Accelerated_Matrix::Accelerated_Matrix(size_t nrow, size_t ncol) : m_nrow(nrow), m_ncol(ncol)
 {
@@ -293,6 +277,7 @@ Accelerated_Matrix::Accelerated_Matrix(size_t nrow, size_t ncol) : m_nrow(nrow),
 Accelerated_Matrix::Accelerated_Matrix(Accelerated_Matrix const &mat) : m_nrow(mat.m_nrow), m_ncol(mat.m_ncol)
 {
     reset_buffer(mat.m_nrow, mat.m_ncol);
+    #pragma omp parallel for schedule(static) collapse(2) num_threads(number_of_threads)
     for (size_t i=0; i<m_nrow; ++i){
         for (size_t j=0; j<m_ncol; ++j)
         {
@@ -337,12 +322,12 @@ Accelerated_Matrix::Accelerated_Matrix(Accelerated_Matrix && other)
 }
 
 Accelerated_Matrix & Accelerated_Matrix::operator=(Accelerated_Matrix && other){
-        if (this == &other) { return *this; }
-        reset_buffer(0, 0);
-        std::swap(m_nrow, other.m_nrow);
-        std::swap(m_ncol, other.m_ncol);
-        std::swap(m_buffer, other.m_buffer);
-        return *this;
+    if (this == &other) { return *this; }
+    reset_buffer(0, 0);
+    std::swap(m_nrow, other.m_nrow);
+    std::swap(m_ncol, other.m_ncol);
+    std::swap(m_buffer, other.m_buffer);
+    return *this;
 }
 
 Accelerated_Matrix & Accelerated_Matrix::operator=(std::vector<double> const & vec)
@@ -350,13 +335,12 @@ Accelerated_Matrix & Accelerated_Matrix::operator=(std::vector<double> const & v
     if (size() != vec.size()){
         throw std::out_of_range("number of elements mismatch");
     }
-    size_t k = 0;
+    #pragma omp parallel for schedule(static) collapse(2) num_threads(number_of_threads)
     for (size_t i=0; i<m_nrow; ++i)
     {
         for (size_t j=0; j<m_ncol; ++j)
         {
-            (*this)(i,j) = vec[k];
-            ++k;
+            (*this)(i,j) = vec[i * m_ncol + j];
         }
     }
     return *this;
@@ -367,6 +351,7 @@ Accelerated_Matrix & Accelerated_Matrix::operator=(std::vector<std::vector<doubl
     if (m_nrow != vec2d.size() || m_ncol != vec2d[0].size()){
         throw std::out_of_range("number of elements mismatch");
     }
+    #pragma omp parallel for schedule(static) collapse(2) num_threads(number_of_threads)
     for (size_t i=0; i<m_nrow; ++i)
     {
         for (size_t j=0; j<m_ncol; ++j)
@@ -384,6 +369,7 @@ Accelerated_Matrix & Accelerated_Matrix::operator=(Accelerated_Matrix const & ot
     {
         reset_buffer(other.m_nrow, other.m_ncol);
     }
+    #pragma omp parallel for schedule(static) collapse(2) num_threads(number_of_threads)
     for (size_t i=0; i<m_nrow; ++i)
     {
         for (size_t j=0; j<m_ncol; ++j)
@@ -399,6 +385,7 @@ Accelerated_Matrix Accelerated_Matrix::operator+(Accelerated_Matrix const & othe
         throw std::out_of_range("Number of elements mismatch.");
     }    
     Accelerated_Matrix temp(m_nrow, m_ncol);
+    #pragma omp parallel for schedule(static) collapse(2) num_threads(number_of_threads)
     for(size_t i = 0 ; i < m_nrow; ++i){
         for(size_t j = 0; j < m_ncol; ++j){
             temp(i,j) = (*this)(i,j) + other(i,j);
@@ -412,6 +399,7 @@ Accelerated_Matrix Accelerated_Matrix::operator-(Accelerated_Matrix const & othe
         throw std::out_of_range("Number of elements mismatch.");
     }    
     Accelerated_Matrix temp(m_nrow, m_ncol);
+    #pragma omp parallel for schedule(static) collapse(2) num_threads(number_of_threads)
     for(size_t i = 0 ; i < m_nrow; ++i){
         for(size_t j = 0; j < m_ncol; ++j){
             temp(i,j) = (*this)(i,j) - other(i,j);
@@ -422,6 +410,7 @@ Accelerated_Matrix Accelerated_Matrix::operator-(Accelerated_Matrix const & othe
 
 Accelerated_Matrix Accelerated_Matrix::operator-(){
     Accelerated_Matrix temp(m_nrow, m_ncol);
+    #pragma omp parallel for schedule(static) collapse(2) num_threads(number_of_threads)
     for(size_t i = 0 ; i < m_nrow; ++i){
         for(size_t j = 0; j < m_ncol; ++j){
             temp(i,j) = -(*this)(i,j);
@@ -434,6 +423,7 @@ Accelerated_Matrix Accelerated_Matrix::operator*(Accelerated_Matrix const & mat)
 
     if( mat.nrow() == 1 && mat.ncol() == 1){
         Accelerated_Matrix temp(m_nrow, m_ncol);
+        #pragma omp parallel for schedule(static) collapse(2) num_threads(number_of_threads)
         for(size_t i = 0 ; i < m_nrow; ++i){
             for(size_t j = 0; j < m_ncol; ++j){
                 temp(i,j) = (*this)(i,j) * mat(0,0);
@@ -444,6 +434,7 @@ Accelerated_Matrix Accelerated_Matrix::operator*(Accelerated_Matrix const & mat)
 
     if( (*this).nrow() == 1 && (*this).ncol() == 1){
         Accelerated_Matrix temp(mat.nrow(), mat.ncol());
+        #pragma omp parallel for schedule(static) collapse(2) num_threads(number_of_threads)
         for(size_t i = 0 ; i < mat.nrow(); ++i){
             for(size_t j = 0; j < mat.ncol(); ++j){
                 temp(i,j) = (*this)(0,0) * mat(i,j);
@@ -454,9 +445,12 @@ Accelerated_Matrix Accelerated_Matrix::operator*(Accelerated_Matrix const & mat)
 
     if( (*this).ncol() == 1 && mat.ncol() == 1 && mat.nrow() != 1){
         Accelerated_Matrix return_value(1,1);
+        double sum = .0f;
+        #pragma omp parallel for schedule(static) reduction(+:sum) num_threads(number_of_threads)
         for(size_t i = 0; i < (*this).nrow(); ++i){
-            return_value(0,0) += (*this)(i,0) * mat(i,0);
+            sum += (*this)(i,0) * mat(i,0);
         }
+        return_value(0,0) = sum;
         return return_value;
     }
 
@@ -466,6 +460,7 @@ Accelerated_Matrix Accelerated_Matrix::operator*(Accelerated_Matrix const & mat)
     size_t max_j = mat.ncol();
     size_t max_k = (*this).ncol();
 
+    #pragma omp parallel for schedule(static) collapse(3) num_threads(number_of_threads)
     for (size_t i = 0; i < max_i; i += tsize)
     {
         for (size_t j = 0; j < max_j; j += tsize)
@@ -496,6 +491,7 @@ Accelerated_Matrix Accelerated_Matrix::operator*(Accelerated_Matrix const & mat)
 
 Accelerated_Matrix Accelerated_Matrix::operator*(double const & other){
     Accelerated_Matrix temp(m_nrow, m_ncol);
+    #pragma omp parallel for schedule(static) collapse(2) num_threads(number_of_threads)
     for(size_t i = 0 ; i < m_nrow; ++i){
         for(size_t j = 0; j < m_ncol; ++j){
             temp(i,j) = (*this)(i,j) * other;
@@ -507,17 +503,17 @@ Accelerated_Matrix Accelerated_Matrix::operator*(double const & other){
 bool Accelerated_Matrix::operator==(Accelerated_Matrix const & mat) const
 {
     if (mat.m_ncol != m_ncol || mat.m_nrow != m_nrow) return false;
-    for (size_t i = 0; i < mat.m_nrow; ++i)
-    {
-        for (size_t j = 0; j < mat.m_ncol; ++j)
-        {
-            if(mat(i, j) != m_buffer[i*m_nrow+j])return false;
+    bool check = true;
+    #pragma omp parallel for schedule(static) collapse(2) num_threads(number_of_threads)
+    for (size_t i = 0; i < mat.m_nrow; ++i){
+        for (size_t j = 0; j < mat.m_ncol; ++j){
+            if(mat(i, j) != m_buffer[i*m_nrow+j]) check = false;
         }
     }
-    return true;
+    return check;
 }
 
-double  Accelerated_Matrix::operator() (size_t row, size_t col) const
+double Accelerated_Matrix::operator() (size_t row, size_t col) const
 {
     if (row >= m_nrow || col >= m_ncol){
         throw std::out_of_range("Accelerated_Matrix::operator(): index out of range");
@@ -538,6 +534,7 @@ double & Accelerated_Matrix::operator() (size_t row, size_t col)
 double Accelerated_Matrix::norm()
 {
     double sum = 0.0;
+    #pragma omp parallel for schedule(static) collapse(2) reduction(+:sum) num_threads(number_of_threads)
     for (size_t i=0; i<m_nrow; ++i)
     {
         for (size_t j=0; j<m_ncol; ++j)
