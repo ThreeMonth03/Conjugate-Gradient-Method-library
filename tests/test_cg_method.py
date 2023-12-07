@@ -57,11 +57,17 @@ def test_nonlinear_cg():
         x_min = np.array([1, 1])
         assert(np.isclose(x_min, x).all())
 
-        print("case 1 custom: ", method)
+        print("case 1 custom : ", method," , without acceleration")
+        x, _ = utils.custom_nonlinear_CG(x, 1e-7, 1e-4, 0.9, utils.nonlinear_func_1, utils.grad(utils.nonlinear_func_1), method, 1)
+        x = np.array(x)
+        x_min = np.array([1, 1])
+        assert(np.isclose(x_min, x).all())
+
+        print("case 1 custom : ", method," , with acceleration")
         x, _ = utils.custom_nonlinear_CG(x, 1e-7, 1e-4, 0.9, utils.nonlinear_func_1, utils.grad(utils.nonlinear_func_1), method)
         x = np.array(x)
         x_min = np.array([1, 1])
-        assert(np.isclose(x_min, x).all())        
+        assert(np.isclose(x_min, x).all())              
 
     x = np.random.uniform(low=0.5, high=0.7, size=(100,))
     for method in ["Fletcher_Reeves", "Polak_Ribiere", "Dai-Yuan", "Hager-Zhang"]:
@@ -71,12 +77,18 @@ def test_nonlinear_cg():
         x_min = np.zeros(100)
         assert(np.isclose(x_min, x).all())            
 
-        print("case 2 custom: ", method)
+        print("case 2 custom: ", method," , without acceleration")
+        x, _ = utils.custom_nonlinear_CG(x, 1e-8, 1e-4, 0.9, utils.nonlinear_func_2, utils.grad(utils.nonlinear_func_2), method, 1)
+        x = np.array(x)
+        x_min = np.zeros(100)
+        assert(np.isclose(x_min, x).all())   
+
+        print("case 2 custom: ", method," , without acceleration")
         x, _ = utils.custom_nonlinear_CG(x, 1e-8, 1e-4, 0.9, utils.nonlinear_func_2, utils.grad(utils.nonlinear_func_2), method)
         x = np.array(x)
         x_min = np.zeros(100)
         assert(np.isclose(x_min, x).all())   
 
-if __name__ == '__main__':
+#if __name__ == '__main__':
 #    test_linear_cg()
 #    test_nonlinear_cg()

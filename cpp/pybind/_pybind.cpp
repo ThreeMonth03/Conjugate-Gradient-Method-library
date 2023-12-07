@@ -79,10 +79,14 @@ PYBIND11_MODULE(_cgpy, m){
         .def("get_number_of_threads", &cg_method::linear_CG::get_number_of_threads)
         ;
     py::class_<cg_method::nonlinear_CG>(m_cg_method, "nonlinear_CG")
-        .def_static("Fletcher_Reeves_next_iteration", &cg_method::nonlinear_CG::Fletcher_Reeves_next_iteration)
-        .def_static("Polak_Ribiere_next_iteration", &cg_method::nonlinear_CG::Polak_Ribiere_next_iteration)
-        .def_static("Hager_Zhang_next_iteration", &cg_method::nonlinear_CG::Hager_Zhang_next_iteration)
-        .def_static("Dai_Yuan_next_iteration", &cg_method::nonlinear_CG::Dai_Yuan_next_iteration)
+        .def_static("Naive_Fletcher_Reeves_next_iteration", &cg_method::nonlinear_CG::Naive_Fletcher_Reeves_next_iteration)
+        .def_static("Naive_Polak_Ribiere_next_iteration", &cg_method::nonlinear_CG::Naive_Polak_Ribiere_next_iteration)
+        .def_static("Naive_Hager_Zhang_next_iteration", &cg_method::nonlinear_CG::Naive_Hager_Zhang_next_iteration)
+        .def_static("Naive_Dai_Yuan_next_iteration", &cg_method::nonlinear_CG::Naive_Dai_Yuan_next_iteration)
+        .def_static("Accelerated_Fletcher_Reeves_next_iteration", &cg_method::nonlinear_CG::Accelerated_Fletcher_Reeves_next_iteration)
+        .def_static("Accelerated_Polak_Ribiere_next_iteration", &cg_method::nonlinear_CG::Accelerated_Polak_Ribiere_next_iteration)
+        .def_static("Accelerated_Hager_Zhang_next_iteration", &cg_method::nonlinear_CG::Accelerated_Hager_Zhang_next_iteration)
+        .def_static("Accelerated_Dai_Yuan_next_iteration", &cg_method::nonlinear_CG::Accelerated_Dai_Yuan_next_iteration)        
         ;
     //m.def("multiply_naive", &multiply_naive);
     //m.def("multiply_tile", &multiply_tile);

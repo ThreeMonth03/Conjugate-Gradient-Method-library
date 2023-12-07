@@ -43,25 +43,14 @@ def custom_linear_CG(x, a, b, epsilon = 5e-7, epoch=10000000, num_threads = -1):
         mat_a = Accelerated_Matrix(a)
         mat_b = Accelerated_Matrix(b)
         mat_x = Accelerated_Matrix(x)
-        linear_cg_model = CG.linear_CG(epsilon, epoch)
-        if(num_threads != -1):
-            linear_cg_model.set_number_of_threads(num_threads)
+        if(num_threads == -1):
+            linear_cg_model = CG.linear_CG(epsilon, epoch)
+        else:
+            linear_cg_model = CG.linear_CG(epsilon, epoch, num_threads)
         mat_x_min = linear_cg_model.solve_by_Accelerated_Matrix(mat_a, mat_b, mat_x)
     
     return np.array(mat_x_min.tolist())
-'''
-def custom_linear_CG(x, a, b, epsilon = 5e-7, epoch=100000):
-    ## Solve the linear system Ax = b using conjugate gradient method by calling the C++ library
-    mat_a = Naive_Matrix(a)
-    mat_b = Naive_Matrix(b)
-    mat_x = Naive_Matrix(x)
-    #mat_a = a
-    #mat_b = b
-    #mat_x = x
-    linear_cg_model = CG.linear_CG(epsilon, epoch, 1)
-    mat_x_min = linear_cg_model.solve_by_Naive_Matrix(mat_a, mat_b, mat_x)
-    return np.array(mat_x_min.tolist())
-'''
+
 def np_linear_CG(x, A, b, epsilon, epoch=10000000):
     ## Solve the linear system Ax = b using conjugate gradient method by calling the numpy library
     res = A.dot(x) - b
@@ -106,14 +95,23 @@ def nonlinear_func_2(x):
     x = np.array(x)
     return (np.sum(x**4))**0.5
 
-def custom_nonlinear_CG(X, tol, alpha_1, alpha_2, f, Df, method = "Fletcher_Reeves"):
+def custom_nonlinear_CG(X, tol, alpha_1, alpha_2, f, Df, method = "Fletcher_Reeves", num_threads = -1):
     ## Solve the nonlinear system using conjugate gradient method by calling the c++ library
-    method_dict = {
-                "Fletcher_Reeves": CG.nonlinear_CG.Fletcher_Reeves_next_iteration,\
-                "Polak_Ribiere": CG.nonlinear_CG.Polak_Ribiere_next_iteration,\
-                "Hager-Zhang": CG.nonlinear_CG.Hager_Zhang_next_iteration,\
-                "Dai-Yuan": CG.nonlinear_CG.Dai_Yuan_next_iteration,\
-    }
+    method_dict = {}
+    if(num_threads == 1):
+        method_dict = {
+                    "Fletcher_Reeves": CG.nonlinear_CG.Naive_Fletcher_Reeves_next_iteration,\
+                    "Polak_Ribiere": CG.nonlinear_CG.Naive_Polak_Ribiere_next_iteration,\
+                    "Hager-Zhang": CG.nonlinear_CG.Naive_Hager_Zhang_next_iteration,\
+                    "Dai-Yuan": CG.nonlinear_CG.Naive_Dai_Yuan_next_iteration,\
+        }
+    else:
+        method_dict = {
+                    "Fletcher_Reeves": CG.nonlinear_CG.Accelerated_Fletcher_Reeves_next_iteration,\
+                    "Polak_Ribiere": CG.nonlinear_CG.Accelerated_Polak_Ribiere_next_iteration,\
+                    "Hager-Zhang": CG.nonlinear_CG.Accelerated_Hager_Zhang_next_iteration,\
+                    "Dai-Yuan": CG.nonlinear_CG.Accelerated_Dai_Yuan_next_iteration,\
+        }
 
     NORM = np.linalg.norm
     next_Df = Df(X)
@@ -135,7 +133,7 @@ def custom_nonlinear_CG(X, tol, alpha_1, alpha_2, f, Df, method = "Fletcher_Reev
             cur_Df = next_Df
             next_Df = Df(X)
             if method in method_dict:
-                delta = method_dict[method](cur_Df, next_Df, delta)
+                delta = method_dict[method](cur_Df, next_Df, delta, num_threads)
                 delta = np.array(delta.tolist())
             else:
                 raise AssertionError("method not supported")
