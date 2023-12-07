@@ -5,25 +5,28 @@
 #include <_matrix.hpp>
 #include <algorithm>
 #include <cmath>
-
+#include <omp.h>
 namespace cg_method{
 
 class linear_CG{
     public:
         linear_CG() = default;
-        linear_CG(double epsilon) : epsilon(epsilon) {};
-        linear_CG(double epsilon, double epoch) : epsilon(epsilon), epoch(epoch) {};
+        linear_CG(double epsilon, int epoch, int number_of_threads): 
+                epsilon(epsilon), epoch(epoch), number_of_threads(number_of_threads){};
         Matrix::Naive_Matrix solve_by_Naive_Matrix(Matrix::Naive_Matrix A, Matrix::Naive_Matrix b, Matrix::Naive_Matrix x);
+        Matrix::Accelerated_Matrix solve_by_Accelerated_Matrix(Matrix::Accelerated_Matrix A, Matrix::Accelerated_Matrix b, Matrix::Accelerated_Matrix x);        
         double const & get_epsilon() const{ return epsilon; }
         double       & set_epsilon(){ return epsilon; }
-        double const & get_epoch() const{ return epoch; }
-        double       & set_epoch(){ return epoch; }
-
+        int const & get_epoch() const{ return epoch; }
+        int       & set_epoch(){ return epoch; }
+        int const & get_number_of_threads() const{ return number_of_threads; }
+        int       & set_number_of_threads(){ return number_of_threads; }
     private:
         double epsilon = 5e-7;
         double beta = 0;
         double chi = 0;
-        double epoch = 10000000;
+        int epoch = 10000000;
+        int number_of_threads = omp_get_max_threads();
 };
 
 class nonlinear_CG{

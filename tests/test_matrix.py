@@ -49,7 +49,7 @@ def test_naive_matrix_add():
     np_mat1 = np.random.rand(1000, 1000)
     np_mat2 = np.random.rand(1000, 1000)
     np_mat3 = np_mat1 + np_mat2
-
+    
     mat1 = Naive_Matrix(np_mat1)
     mat2 = Naive_Matrix(np_mat2)
     mat_add = mat1 + mat2

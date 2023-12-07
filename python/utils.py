@@ -11,6 +11,7 @@ from autograd import grad
 import autograd.numpy as au
 from _cgpy import CG
 from _cgpy.Matrix import Naive_Matrix
+from _cgpy.Matrix import Accelerated_Matrix
 
 def is_pos_def(x): 
     ## Check if a matrix is positive definite
@@ -26,15 +27,41 @@ def generate_symmetric(n):
     A = np.random.rand(n, n)
     return (A + A.T)/2
 
-def custom_linear_CG(x, a, b, epsilon = 5e-7, epoch=10000000):
+def custom_linear_CG(x, a, b, epsilon = 5e-7, epoch=10000000, num_threads = -1):
+    ## Solve the linear system Ax = b using conjugate gradient method by calling the C++ library
+    mat_x_min = None
+    if(num_threads == 1):
+        mat_a = Naive_Matrix(a)
+        mat_b = Naive_Matrix(b)
+        mat_x = Naive_Matrix(x)
+        linear_cg_model = CG.linear_CG(epsilon, epoch)
+        mat_x_min = linear_cg_model.solve_by_Naive_Matrix(mat_a, mat_b, mat_x)
+
+    
+    else:
+        print("no")
+        mat_a = Accelerated_Matrix(a)
+        mat_b = Accelerated_Matrix(b)
+        mat_x = Accelerated_Matrix(x)
+        linear_cg_model = CG.linear_CG(epsilon, epoch)
+        if(num_threads != -1):
+            linear_cg_model.set_number_of_threads(num_threads)
+        mat_x_min = linear_cg_model.solve_by_Accelerated_Matrix(mat_a, mat_b, mat_x)
+    
+    return np.array(mat_x_min.tolist())
+'''
+def custom_linear_CG(x, a, b, epsilon = 5e-7, epoch=100000):
     ## Solve the linear system Ax = b using conjugate gradient method by calling the C++ library
     mat_a = Naive_Matrix(a)
     mat_b = Naive_Matrix(b)
     mat_x = Naive_Matrix(x)
-    linear_cg_model = CG.linear_CG(epsilon, epoch)
+    #mat_a = a
+    #mat_b = b
+    #mat_x = x
+    linear_cg_model = CG.linear_CG(epsilon, epoch, 1)
     mat_x_min = linear_cg_model.solve_by_Naive_Matrix(mat_a, mat_b, mat_x)
     return np.array(mat_x_min.tolist())
-
+'''
 def np_linear_CG(x, A, b, epsilon, epoch=10000000):
     ## Solve the linear system Ax = b using conjugate gradient method by calling the numpy library
     res = A.dot(x) - b

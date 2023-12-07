@@ -4,6 +4,7 @@
 #include <utility>
 #include <_matrix.hpp>
 #include <_cg_method.hpp>
+#include <omp.h>
 namespace py = pybind11;
 
 PYBIND11_MODULE(_cgpy, m){
@@ -67,10 +68,15 @@ PYBIND11_MODULE(_cgpy, m){
 
     auto m_cg_method = m.def_submodule("CG");    
     py::class_<cg_method::linear_CG>(m_cg_method, "linear_CG")
-        .def(py::init<>())
-        .def(py::init<double const &>())
-        .def(py::init<double const &, double const &>())
+        .def(py::init<double , int, int>(), py::arg("epsilon") = 5e-7, py::arg("epoch") = 10000000, py::arg("number_of_threads") = 1)
         .def("solve_by_Naive_Matrix", &cg_method::linear_CG::solve_by_Naive_Matrix)
+        .def("solve_by_Accelerated_Matrix", &cg_method::linear_CG::solve_by_Accelerated_Matrix)
+        .def("set_epsilon", &cg_method::linear_CG::set_epsilon)
+        .def("get_epsilon", &cg_method::linear_CG::get_epsilon)
+        .def("set_epoch", &cg_method::linear_CG::set_epoch)
+        .def("get_epoch", &cg_method::linear_CG::get_epoch)
+        .def("set_number_of_threads", &cg_method::linear_CG::set_number_of_threads)
+        .def("get_number_of_threads", &cg_method::linear_CG::get_number_of_threads)
         ;
     py::class_<cg_method::nonlinear_CG>(m_cg_method, "nonlinear_CG")
         .def_static("Fletcher_Reeves_next_iteration", &cg_method::nonlinear_CG::Fletcher_Reeves_next_iteration)
