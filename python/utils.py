@@ -6,7 +6,7 @@ dir_path = os.path.dirname(os.path.abspath(__file__)) + "/../cpp"
 sys.path.append(dir_path)
 
 import numpy as np
-from scipy.optimize import line_search
+import random
 from autograd import grad
 import autograd.numpy as au
 from _cgpy import CG
@@ -37,7 +37,6 @@ def custom_linear_CG(x, a, b, epsilon = 5e-7, epoch=10000000, num_threads = -1):
         linear_cg_model = CG.linear_CG(epsilon, epoch)
         mat_x_min = linear_cg_model.solve_by_Naive_Matrix(mat_a, mat_b, mat_x)
 
-    
     else:
         print("no")
         mat_a = Accelerated_Matrix(a)
@@ -95,33 +94,95 @@ def nonlinear_func_2(x):
     x = np.array(x)
     return (np.sum(x**4))**0.5
 
-def custom_nonlinear_CG(X, tol, alpha_1, alpha_2, f, Df, method = "Fletcher_Reeves", num_threads = -1):
+def line_search(f, df, x, d, alpha=5e-4, beta=0.8):
+    """
+    Functionality: Perform a backtracking line search to find the step size.
+    Parameters:
+    f: The objective function.
+    df: The gradient of the objective function.
+    x: The current point.
+    d: The search direction.
+    alpha: The fraction of decrease in f we expect.
+    beta: The fraction by which we decrease t if the previous t doesn't work.
+    """
+    t = 1.0
+    while f(x + t * d) > f(x) + alpha * t * np.dot(df(x), d):
+        t *= beta
+    return t
+
+
+
+def custom_nonlinear_CG(X, tol, alpha, beta, f, Df, method = "Fletcher_Reeves", num_threads = -1):
+    ## Solve the nonlinear system using conjugate gradient method by calling the c++ library
+    if(num_threads == 1):
+        return custom_naive_nonlinear_CG(X, tol, alpha, beta, f, Df, method = "Fletcher_Reeves")
+    
+    else:
+        return custom_accelerated_nonlinear_CG(X, tol, alpha, beta, f, Df, method = "Fletcher_Reeves", num_threads = -1)
+                
+def custom_naive_nonlinear_CG(X, tol, alpha, beta, f, Df, method = "Fletcher_Reeves"):
     ## Solve the nonlinear system using conjugate gradient method by calling the c++ library
     method_dict = {}
-    if(num_threads == 1):
-        method_dict = {
-                    "Fletcher_Reeves": CG.nonlinear_CG.Naive_Fletcher_Reeves_next_iteration,\
-                    "Polak_Ribiere": CG.nonlinear_CG.Naive_Polak_Ribiere_next_iteration,\
-                    "Hager-Zhang": CG.nonlinear_CG.Naive_Hager_Zhang_next_iteration,\
-                    "Dai-Yuan": CG.nonlinear_CG.Naive_Dai_Yuan_next_iteration,\
-        }
-    else:
-        method_dict = {
-                    "Fletcher_Reeves": CG.nonlinear_CG.Accelerated_Fletcher_Reeves_next_iteration,\
-                    "Polak_Ribiere": CG.nonlinear_CG.Accelerated_Polak_Ribiere_next_iteration,\
-                    "Hager-Zhang": CG.nonlinear_CG.Accelerated_Hager_Zhang_next_iteration,\
-                    "Dai-Yuan": CG.nonlinear_CG.Accelerated_Dai_Yuan_next_iteration,\
-        }
+    method_dict = {
+                "Fletcher_Reeves": CG.nonlinear_CG.Naive_Fletcher_Reeves_next_iteration,\
+                "Hager-Zhang": CG.nonlinear_CG.Naive_Hager_Zhang_next_iteration,\
+                "Dai-Yuan": CG.nonlinear_CG.Naive_Dai_Yuan_next_iteration,\
+    }
 
+    if method in method_dict: 
+        method_func = method_dict[method]
+    else:
+        raise AssertionError("method not supported")
+    
     NORM = np.linalg.norm
     next_Df = Df(X)
     delta = - next_Df 
-    
+
     while True:
         start_point = X
-        beta = line_search(f=f, myfprime=Df, xk=start_point, pk=delta, c1=alpha_1, c2=alpha_2)[0] 
-        if beta!=None:
-            next_X = X+ beta*delta 
+        step = line_search(f = f, df = Df, x = start_point, d = delta, alpha=alpha, beta=beta)
+        if step!=None:
+            next_X = X+ step*delta
+        elif step==NAN:
+            raise AssertionError("It diverges, please try another start point or another hyperparameter.")
+        else:
+            return X, f(X)
+        if NORM(Df(next_X)) < tol:
+            return next_X, f(next_X)
+
+        else:
+            X = next_X
+            cur_Df = next_Df
+            next_Df = Df(X)
+            Mat_cur_Df = Naive_Matrix(cur_Df)
+            Mat_next_Df = Naive_Matrix(next_Df)
+            Mat_delta = Naive_Matrix(delta)
+            Mat_delta = method_func(Mat_cur_Df, Mat_next_Df, Mat_delta)
+            delta = np.array(Mat_delta.tolist())
+
+def custom_accelerated_nonlinear_CG(X, tol, alpha, beta, f, Df, method = "Fletcher_Reeves", num_threads = -1):
+    ## Solve the nonlinear system using conjugate gradient method by calling the c++ library
+    method_dict = {}
+    method_dict = {
+                "Fletcher_Reeves": CG.nonlinear_CG.Accelerated_Fletcher_Reeves_next_iteration,\
+                "Hager-Zhang": CG.nonlinear_CG.Accelerated_Hager_Zhang_next_iteration,\
+                "Dai-Yuan": CG.nonlinear_CG.Accelerated_Dai_Yuan_next_iteration,\
+    }
+
+    if method in method_dict: 
+        method_func = method_dict[method]
+    else:
+        raise AssertionError("method not supported")
+    
+    NORM = np.linalg.norm
+    next_Df = Df(X)
+    delta = - next_Df 
+
+    while True:
+        start_point = X
+        step = line_search(f = f, df = Df, x = start_point, d = delta, alpha=alpha, beta=beta)        
+        if step!=None:
+            next_X = X+ step*delta 
         else:
             return X, f(X)
 
@@ -132,17 +193,16 @@ def custom_nonlinear_CG(X, tol, alpha_1, alpha_2, f, Df, method = "Fletcher_Reev
             X = next_X
             cur_Df = next_Df
             next_Df = Df(X)
-            if method in method_dict:
-                delta = method_dict[method](cur_Df, next_Df, delta, num_threads)
-                delta = np.array(delta.tolist())
-            else:
-                raise AssertionError("method not supported")
+            Mat_cur_Df = Accelerated_Matrix(cur_Df)
+            Mat_next_Df = Accelerated_Matrix(next_Df)
+            Mat_delta = Accelerated_Matrix(delta)
+            Mat_delta = method_func(Mat_cur_Df, Mat_next_Df, Mat_delta, num_threads)
+            delta = np.array(Mat_delta.tolist())
 
-def np_nonlinear_CG(X, tol, alpha_1, alpha_2, f, Df, method = "Fletcher_Reeves"):
+def np_nonlinear_CG(X, tol, alpha, beta, f, Df, method = "Fletcher_Reeves"):
     ## Solve the nonlinear system using conjugate gradient method by calling the numpy library
     method_dict = {
                 "Fletcher_Reeves": Fletcher_Reeves_next_iteration,\
-                "Polak_Ribiere": Polak_Ribiere_next_iteration,\
                 "Hager-Zhang": Hager_Zhang_next_iteration,\
                 "Dai-Yuan": Dai_Yuan_next_iteration,\
     }
@@ -150,15 +210,21 @@ def np_nonlinear_CG(X, tol, alpha_1, alpha_2, f, Df, method = "Fletcher_Reeves")
     NORM = np.linalg.norm
     next_Df = Df(X)
     delta = - next_Df 
-    
+
+    if method in method_dict: 
+        method_func = method_dict[method]
+    else:
+        raise AssertionError("method not supported")
+
     while True:
         start_point = X
-        beta = line_search(f=f, myfprime=Df, xk=start_point, pk=delta, c1=alpha_1, c2=alpha_2)[0] 
-        if beta!=None:
-            next_X = X+ beta*delta 
+        step = line_search(f = f, df = Df, x = start_point, d = delta, alpha=alpha, beta=beta)
+        if step!=None:
+            next_X = X+ step*delta 
         else:
             return X, f(X)
 
+        print("NORM(Df(next_X))", NORM(Df(next_X)))
         if NORM(Df(next_X)) < tol:
             return next_X, f(next_X)
 
@@ -166,20 +232,12 @@ def np_nonlinear_CG(X, tol, alpha_1, alpha_2, f, Df, method = "Fletcher_Reeves")
             X = next_X
             cur_Df = next_Df
             next_Df = Df(X)
-            if method in method_dict:
-                delta = method_dict[method](cur_Df, next_Df, delta)
-            else:
-                raise AssertionError("method not supported")
+            delta = method_func(cur_Df, next_Df, delta)
+            delta = np.array(delta.tolist())
             
 def Fletcher_Reeves_next_iteration(cur_Df, next_Df, delta):
     chi = np.linalg.norm(next_Df)**2/np.linalg.norm(cur_Df)**2
     delta = -next_Df + chi*delta
-    return delta
-
-def Polak_Ribiere_next_iteration(cur_Df, next_Df, delta):
-    chi = (next_Df-cur_Df).dot(next_Df)/np.linalg.norm(cur_Df)**2 
-    chi = max(0, chi) 
-    delta = -next_Df + chi*delta 
     return delta
 
 def Hager_Zhang_next_iteration(cur_Df, next_Df, delta):

@@ -80,11 +80,9 @@ PYBIND11_MODULE(_cgpy, m){
         ;
     py::class_<cg_method::nonlinear_CG>(m_cg_method, "nonlinear_CG")
         .def_static("Naive_Fletcher_Reeves_next_iteration", &cg_method::nonlinear_CG::Naive_Fletcher_Reeves_next_iteration)
-        .def_static("Naive_Polak_Ribiere_next_iteration", &cg_method::nonlinear_CG::Naive_Polak_Ribiere_next_iteration)
         .def_static("Naive_Hager_Zhang_next_iteration", &cg_method::nonlinear_CG::Naive_Hager_Zhang_next_iteration)
         .def_static("Naive_Dai_Yuan_next_iteration", &cg_method::nonlinear_CG::Naive_Dai_Yuan_next_iteration)
         .def_static("Accelerated_Fletcher_Reeves_next_iteration", &cg_method::nonlinear_CG::Accelerated_Fletcher_Reeves_next_iteration)
-        .def_static("Accelerated_Polak_Ribiere_next_iteration", &cg_method::nonlinear_CG::Accelerated_Polak_Ribiere_next_iteration)
         .def_static("Accelerated_Hager_Zhang_next_iteration", &cg_method::nonlinear_CG::Accelerated_Hager_Zhang_next_iteration)
         .def_static("Accelerated_Dai_Yuan_next_iteration", &cg_method::nonlinear_CG::Accelerated_Dai_Yuan_next_iteration)        
         ;

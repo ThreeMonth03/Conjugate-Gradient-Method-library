@@ -32,11 +32,9 @@ class linear_CG{
 class nonlinear_CG{
     public:
         static Matrix::Naive_Matrix Naive_Fletcher_Reeves_next_iteration(Matrix::Naive_Matrix cur_Df, Matrix::Naive_Matrix next_Df, Matrix::Naive_Matrix delta);
-        static Matrix::Naive_Matrix Naive_Polak_Ribiere_next_iteration(Matrix::Naive_Matrix cur_Df, Matrix::Naive_Matrix next_Df, Matrix::Naive_Matrix delta);
         static Matrix::Naive_Matrix Naive_Hager_Zhang_next_iteration(Matrix::Naive_Matrix cur_Df, Matrix::Naive_Matrix next_Df, Matrix::Naive_Matrix delta);
         static Matrix::Naive_Matrix Naive_Dai_Yuan_next_iteration(Matrix::Naive_Matrix cur_Df, Matrix::Naive_Matrix next_Df, Matrix::Naive_Matrix delta);
         static Matrix::Accelerated_Matrix Accelerated_Fletcher_Reeves_next_iteration(Matrix::Accelerated_Matrix cur_Df, Matrix::Accelerated_Matrix next_Df, Matrix::Accelerated_Matrix delta, int number_of_threads);
-        static Matrix::Accelerated_Matrix Accelerated_Polak_Ribiere_next_iteration(Matrix::Accelerated_Matrix cur_Df, Matrix::Accelerated_Matrix next_Df, Matrix::Accelerated_Matrix delta, int number_of_threads);
         static Matrix::Accelerated_Matrix Accelerated_Hager_Zhang_next_iteration(Matrix::Accelerated_Matrix cur_Df, Matrix::Accelerated_Matrix next_Df, Matrix::Accelerated_Matrix delta, int number_of_threads);
         static Matrix::Accelerated_Matrix Accelerated_Dai_Yuan_next_iteration(Matrix::Accelerated_Matrix cur_Df, Matrix::Accelerated_Matrix next_Df, Matrix::Accelerated_Matrix delta, int number_of_threads);        
 };
