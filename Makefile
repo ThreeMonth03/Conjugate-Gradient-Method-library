@@ -35,7 +35,7 @@ $(TARGET): %.o : %.cpp
 
 demo: $(MODULE_SHARE_OBJS)
 	mkdir -p demo/results
-	python3 demo/demo_matrix.py | tee demo/results/performance.txt
+#python3 demo/demo_matrix.py | tee demo/results/performance.txt
 	python3 tests/test_cg_method.py
 
 test: $(MODULE_SHARE_OBJS)

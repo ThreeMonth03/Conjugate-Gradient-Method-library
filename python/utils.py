@@ -38,7 +38,6 @@ def custom_linear_CG(x, a, b, epsilon = 5e-7, epoch=10000000, num_threads = -1):
         mat_x_min = linear_cg_model.solve_by_Naive_Matrix(mat_a, mat_b, mat_x)
 
     else:
-        print("no")
         mat_a = Accelerated_Matrix(a)
         mat_b = Accelerated_Matrix(b)
         mat_x = Accelerated_Matrix(x)
@@ -69,11 +68,6 @@ def np_linear_CG(x, A, b, epsilon, epoch=10000000):
         delta = chi*delta -  res 
 
         count += 1
-        if(count % 10000 == 0):
-            print("res", res)
-            print("norm", np.linalg.norm(res))
-            print("count", count)
-            print("------------------")
         #print("A", A)
         #print("B", b)
         #print("x", x)
@@ -281,7 +275,6 @@ def np_nonlinear_CG(X, tol, alpha, beta, f, Df, method = "Fletcher_Reeves"):
         else:
             return X, f(X)
 
-        print("NORM(Df(next_X))", NORM(Df(next_X)))
         if NORM(Df(next_X)) < tol:
             return next_X, f(next_X)
 
@@ -309,9 +302,3 @@ def Dai_Yuan_next_iteration(cur_Df, next_Df, delta):
     chi = np.linalg.norm(next_Df)**2/delta.dot(next_Df - cur_Df)
     delta = -next_Df + chi*delta
     return delta
-
-if __name__ == '__main__':
-    x =np.random.uniform(low=0.5, high=13.3, size=(1000,))
-    print(x)
-    y = nonlinear_func_2(x)
-    print(y)
