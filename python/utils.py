@@ -94,7 +94,60 @@ def nonlinear_func_2(x):
     x = np.array(x)
     return (np.sum(x**4))**0.5
 
-def line_search(f, df, x, d, alpha=5e-4, beta=0.8):
+def custom_naive_line_search(f, df, x, d, alpha=5e-4, beta=0.8):
+    """
+    Functionality: Perform a backtracking line search to find the step size.
+    Parameters:
+    f: The objective function.
+    df: The gradient of the objective function.
+    x: The current point.
+    d: The search direction.
+    alpha: The fraction of decrease in f we expect.
+    beta: The fraction by which we decrease t if the previous t doesn't work.
+    """
+    Mat_df_x = Naive_Matrix(df(x)) #df(x)
+    Mat_d = Naive_Matrix(d) #d
+    Mat_df_x_dot_d_mul_alpha = (Mat_df_x @ Mat_d)[0, 0] * alpha #df(x).dot(d) * alpha
+    f_x = f(x) #f(x)
+
+    t = 1.0
+    Mat_x_p_t_d = Naive_Matrix(x) + Mat_d * t #x + t * d
+
+    while f(Mat_x_p_t_d.tolist()) > (Mat_df_x_dot_d_mul_alpha * t + f_x):
+        t *= beta
+        Mat_x_p_t_d = Naive_Matrix(x) + Mat_d * t
+    return t
+
+def custom_accelerated_line_search(f, df, x, d, alpha=5e-4, beta=0.8, num_threads = -1):
+    """
+    Functionality: Perform a backtracking line search to find the step size.
+    Parameters:
+    f: The objective function.
+    df: The gradient of the objective function.
+    x: The current point.
+    d: The search direction.
+    alpha: The fraction of decrease in f we expect.
+    beta: The fraction by which we decrease t if the previous t doesn't work.
+    """
+    Mat_df_x = Accelerated_Matrix(df(x)) #df(x)
+    Mat_d = Accelerated_Matrix(d) #d
+    if(num_threads != -1):
+        Mat_df_x.set_num_threads(num_threads)
+        Mat_d.set_num_threads(num_threads)
+    Mat_df_x_dot_d_mul_alpha = (Mat_df_x @ Mat_d)[0, 0] * alpha #df(x).dot(d) * alpha
+    f_x = f(x) #f(x)
+
+    t = 1.0
+    Mat_x_p_t_d = Accelerated_Matrix(x) + Mat_d * t #x + t * d
+    if(num_threads != -1):
+        Mat_x_p_t_d.set_num_threads(num_threads)
+
+    while f(Mat_x_p_t_d.tolist()) > (Mat_df_x_dot_d_mul_alpha * t + f_x):
+        t *= beta
+        Mat_x_p_t_d = Accelerated_Matrix(x) + Mat_d * t
+    return t
+
+def np_line_search(f, df, x, d, alpha=5e-4, beta=0.8):
     """
     Functionality: Perform a backtracking line search to find the step size.
     Parameters:
@@ -140,7 +193,7 @@ def custom_naive_nonlinear_CG(X, tol, alpha, beta, f, Df, method = "Fletcher_Ree
 
     while True:
         start_point = X
-        step = line_search(f = f, df = Df, x = start_point, d = delta, alpha=alpha, beta=beta)
+        step = custom_naive_line_search(f = f, df = Df, x = start_point, d = delta, alpha=alpha, beta=beta)
         if step!=None:
             next_X = X+ step*delta
         elif step==NAN:
@@ -180,9 +233,11 @@ def custom_accelerated_nonlinear_CG(X, tol, alpha, beta, f, Df, method = "Fletch
 
     while True:
         start_point = X
-        step = line_search(f = f, df = Df, x = start_point, d = delta, alpha=alpha, beta=beta)        
+        step = custom_accelerated_line_search(f = f, df = Df, x = start_point, d = delta, alpha=alpha, beta=beta, num_threads = num_threads)
         if step!=None:
             next_X = X+ step*delta 
+        elif step==NAN:
+            raise AssertionError("It diverges, please try another start point or another hyperparameter.")
         else:
             return X, f(X)
 
@@ -218,9 +273,11 @@ def np_nonlinear_CG(X, tol, alpha, beta, f, Df, method = "Fletcher_Reeves"):
 
     while True:
         start_point = X
-        step = line_search(f = f, df = Df, x = start_point, d = delta, alpha=alpha, beta=beta)
+        step = np_line_search(f = f, df = Df, x = start_point, d = delta, alpha=alpha, beta=beta)
         if step!=None:
             next_X = X+ step*delta 
+        elif step==NAN:
+            raise AssertionError("It diverges, please try another start point or another hyperparameter.")
         else:
             return X, f(X)
 
