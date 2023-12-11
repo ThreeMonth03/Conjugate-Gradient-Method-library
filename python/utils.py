@@ -126,15 +126,15 @@ def custom_accelerated_line_search(f, df, x, d, alpha=5e-4, beta=0.8, num_thread
     Mat_df_x = Accelerated_Matrix(df(x)) #df(x)
     Mat_d = Accelerated_Matrix(d) #d
     if(num_threads != -1):
-        Mat_df_x.set_num_threads(num_threads)
-        Mat_d.set_num_threads(num_threads)
+        Mat_df_x.set_number_of_threads(num_threads)
+        Mat_d.set_number_of_threads(num_threads)
     Mat_df_x_dot_d_mul_alpha = (Mat_df_x @ Mat_d)[0, 0] * alpha #df(x).dot(d) * alpha
     f_x = f(x) #f(x)
 
     t = 1.0
     Mat_x_p_t_d = Accelerated_Matrix(x) + Mat_d * t #x + t * d
     if(num_threads != -1):
-        Mat_x_p_t_d.set_num_threads(num_threads)
+        Mat_x_p_t_d.set_number_of_threads(num_threads)
 
     while f(Mat_x_p_t_d.tolist()) > (Mat_df_x_dot_d_mul_alpha * t + f_x):
         t *= beta

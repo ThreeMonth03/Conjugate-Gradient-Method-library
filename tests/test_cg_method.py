@@ -23,6 +23,7 @@ from _cgpy.Matrix import Accelerated_Matrix
 
 
 def test_linear_cg():
+    np.random.seed(0)
     a = np.random.rand(100, 100)
     a = utils.generate_pos_def(100)
     a = utils.generate_symmetric(100)
@@ -48,6 +49,7 @@ def test_linear_cg():
     assert(np.isclose(x_min, np_acc_mat_x_min).all())
 
 def test_nonlinear_cg():
+    np.random.seed(3)
     x_rand = np.random.uniform(low=3, high=5, size=(2,))
     for method in ["Fletcher_Reeves", "Dai-Yuan", "Hager-Zhang"]:
         x = np.copy(x_rand)

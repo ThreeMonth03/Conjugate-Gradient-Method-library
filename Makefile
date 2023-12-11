@@ -1,6 +1,6 @@
 #Flags
 CXX = g++
-FLAGS = -O3 -g -m64 -Wall -shared -std=c++11 -fPIC -fopenmp
+FLAGS = -O3 -g -m64 -Wall -shared -std=c++17 -fPIC -fopenmp
 PYBINCLUDE = $(shell python3-config --includes) $(shell python3 -m pybind11 --includes)
 FLAGS_DEP = -MMD -MP
 DIRS = $(shell find $(shell pwd)/cpp/* -type d)
@@ -39,7 +39,7 @@ demo: $(MODULE_SHARE_OBJS)
 	python3 tests/test_cg_method.py
 
 test: $(MODULE_SHARE_OBJS)
-#python3 -m pytest -v tests/test_matrix.py
+	python3 -m pytest -v tests/test_matrix.py
 	python3 -m pytest -v tests/test_cg_method.py
 
 clean:
