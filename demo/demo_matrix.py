@@ -18,11 +18,11 @@ import time
 import numpy as np
 
 def compare_matrix_2D_dot_2D(matrix_size = 1024, epoch = 5):
-    print("Test matrix multiplication 2D @ 2D")
+    print("Compare matrix multiplication 2D @ 2D")
     np.random.seed(0)
     size = matrix_size
     total_epoch = epoch
-    ### Test Numpy ###
+    ### Compare Numpy ###
     np_mat1 = np.random.rand(size, size)
     np_mat2 = np.random.rand(size, size)
     
@@ -40,7 +40,7 @@ def compare_matrix_2D_dot_2D(matrix_size = 1024, epoch = 5):
     np_total_time = sum/total_epoch
     print("Average time for numpy with matrix size", size, "*",size,": ", np_total_time,"s")
 
-    ### Test Naive Matrix ###
+    ### Compare Naive Matrix ###
     Naive_mat1 = Naive_Matrix(np_mat1)
     Naive_mat2 = Naive_Matrix(np_mat2)
 
@@ -57,7 +57,7 @@ def compare_matrix_2D_dot_2D(matrix_size = 1024, epoch = 5):
     naive_total_time = sum/total_epoch
     print("Average time for naive matrix with matrix size", size, "*",size,": ", naive_total_time,"s")
     
-    ### Test Accelerated Matrix ###
+    ### Compare Accelerated Matrix ###
     Accelerated_mat1 = Accelerated_Matrix(np_mat1)
     Accelerated_mat2 = Accelerated_Matrix(np_mat2)
 
@@ -80,11 +80,11 @@ def compare_matrix_2D_dot_2D(matrix_size = 1024, epoch = 5):
     print("_____________________________")
 
 def compare_matrix_1D_dot_1D(matrix_size = 1000000, epoch = 5):
-    print("Test matrix multiplication 1D @ 1D")
+    print("Compare matrix multiplication 1D @ 1D")
     np.random.seed(0)
     size = matrix_size
     total_epoch = epoch
-    ### Test Numpy ###
+    ### Compare Numpy ###
     np_mat1 = np.random.rand(size, 1)
     np_mat2 = np.random.rand(size, 1)
     
@@ -102,7 +102,7 @@ def compare_matrix_1D_dot_1D(matrix_size = 1000000, epoch = 5):
     np_total_time = sum/total_epoch
     print("Average time for numpy with matrix size", size, "*",size,": ", np_total_time,"s")
 
-    ### Test Naive Matrix ###
+    ### Compare Naive Matrix ###
     Naive_mat1 = Naive_Matrix(np_mat1)
     Naive_mat2 = Naive_Matrix(np_mat2)
 
@@ -119,7 +119,7 @@ def compare_matrix_1D_dot_1D(matrix_size = 1000000, epoch = 5):
     naive_total_time = sum/total_epoch
     print("Average time for naive matrix with matrix size", size, "*",size,": ", naive_total_time,"s")
     
-    ### Test Accelerated Matrix ###
+    ### Compare Accelerated Matrix ###
     Accelerated_mat1 = Accelerated_Matrix(np_mat1)
     Accelerated_mat2 = Accelerated_Matrix(np_mat2)
 
@@ -142,11 +142,11 @@ def compare_matrix_1D_dot_1D(matrix_size = 1000000, epoch = 5):
     print("_____________________________")
 
 def compare_matrix_2D_dot_0D(matrix_size = 1024, epoch = 5):
-    print("Test matrix multiplication 2D @ 0D")
+    print("Compare matrix multiplication 2D @ 0D")
     np.random.seed(0)
     size = matrix_size
     total_epoch = epoch
-    ### Test Numpy ###
+    ### Compare Numpy ###
     np_mat1 = np.random.rand(size, size)
     np_mat2 = np.random.rand(1, 1)
     a = 3
@@ -163,7 +163,7 @@ def compare_matrix_2D_dot_0D(matrix_size = 1024, epoch = 5):
     np_total_time = sum/total_epoch
     print("Average time for numpy with matrix size", size, "*",size,": ", np_total_time,"s")
 
-    ### Test Naive Matrix ###
+    ### Compare Naive Matrix ###
     Naive_mat1 = Naive_Matrix(np_mat1)
     Naive_mat2 = Naive_Matrix(np_mat2)
     
@@ -178,7 +178,7 @@ def compare_matrix_2D_dot_0D(matrix_size = 1024, epoch = 5):
     naive_total_time = sum/total_epoch
     print("Average time for naive matrix with matrix size", size, "*",size,": ", naive_total_time,"s")
     
-    ### Test Accelerated Matrix ###
+    ### Compare Accelerated Matrix ###
     Accelerated_mat1 = Accelerated_Matrix(np_mat1)
     Accelerated_mat2 = Accelerated_Matrix(np_mat2)
 
@@ -200,11 +200,11 @@ def compare_matrix_2D_dot_0D(matrix_size = 1024, epoch = 5):
     print("_____________________________")
 
 def compare_matrix_2D_dot_scalar(matrix_size = 1024, epoch = 5):
-    print("Test matrix multiplication 2D * scalar")
+    print("Compare matrix multiplication 2D * scalar")
     np.random.seed(0)
     size = matrix_size
     total_epoch = epoch
-    ### Test Numpy ###
+    ### Compare Numpy ###
     np_mat1 = np.random.rand(size, size) 
     a = 3
     sum = 0
@@ -220,7 +220,7 @@ def compare_matrix_2D_dot_scalar(matrix_size = 1024, epoch = 5):
     np_total_time = sum/total_epoch
     print("Average time for numpy with matrix size", size, "*",size,": ", np_total_time,"s")
 
-    ### Test Naive Matrix ###
+    ### Compare Naive Matrix ###
     Naive_mat1 = Naive_Matrix(np_mat1)
 
     sum = 0
@@ -236,7 +236,7 @@ def compare_matrix_2D_dot_scalar(matrix_size = 1024, epoch = 5):
     naive_total_time = sum/total_epoch
     print("Average time for naive matrix with matrix size", size, "*",size,": ", naive_total_time,"s")
     
-    ### Test Accelerated Matrix ###
+    ### Compare Accelerated Matrix ###
     Accelerated_mat1 = Accelerated_Matrix(np_mat1)
 
 
@@ -257,11 +257,11 @@ def compare_matrix_2D_dot_scalar(matrix_size = 1024, epoch = 5):
     print("_____________________________")
 
 def compare_matrix_norm(matrix_size = 1000000, epoch = 5):
-    print("Test matrix norm")
+    print("Compare matrix norm")
     np.random.seed(0)
     size = matrix_size
     total_epoch = epoch
-    ### Test Numpy ###
+    ### Compare Numpy ###
     np_mat1 = np.random.rand(size, 1)
     
     sum = 0
@@ -277,7 +277,7 @@ def compare_matrix_norm(matrix_size = 1000000, epoch = 5):
     np_total_time = sum/total_epoch
     print("Average time for numpy with matrix size", size, "*",size,": ", np_total_time,"s")
 
-    ### Test Naive Matrix ###
+    ### Compare Naive Matrix ###
     Naive_mat1 = Naive_Matrix(np_mat1)
 
     sum = 0
@@ -293,7 +293,7 @@ def compare_matrix_norm(matrix_size = 1000000, epoch = 5):
     naive_total_time = sum/total_epoch
     print("Average time for naive matrix with matrix size", size, "*",size,": ", naive_total_time,"s")
     
-    ### Test Accelerated Matrix ###
+    ### Compare Accelerated Matrix ###
     Accelerated_mat1 = Accelerated_Matrix(np_mat1)
 
 
@@ -314,11 +314,11 @@ def compare_matrix_norm(matrix_size = 1000000, epoch = 5):
     print("_____________________________")
 
 def compare_matrix_1D_add_1D(matrix_size = 1000000, epoch = 5):
-    print("Test matrix addition 1D + 1D")
+    print("Compare matrix addition 1D + 1D")
     np.random.seed(0)
     size = matrix_size
     total_epoch = epoch
-    ### Test Numpy ###
+    ### Compare Numpy ###
     np_mat1 = np.random.rand(size, 1)
     np_mat2 = np.random.rand(size, 1)
     
@@ -336,7 +336,7 @@ def compare_matrix_1D_add_1D(matrix_size = 1000000, epoch = 5):
     np_total_time = sum/total_epoch
     print("Average time for numpy with matrix size", size, "*",size,": ", np_total_time,"s")
 
-    ### Test Naive Matrix ###
+    ### Compare Naive Matrix ###
     Naive_mat1 = Naive_Matrix(np_mat1)
     Naive_mat2 = Naive_Matrix(np_mat2)
 
@@ -353,7 +353,7 @@ def compare_matrix_1D_add_1D(matrix_size = 1000000, epoch = 5):
     naive_total_time = sum/total_epoch
     print("Average time for naive matrix with matrix size", size, "*",size,": ", naive_total_time,"s")
     
-    ### Test Accelerated Matrix ###
+    ### Compare Accelerated Matrix ###
     Accelerated_mat1 = Accelerated_Matrix(np_mat1)
     Accelerated_mat2 = Accelerated_Matrix(np_mat2)
 
@@ -376,11 +376,11 @@ def compare_matrix_1D_add_1D(matrix_size = 1000000, epoch = 5):
     print("_____________________________")
 
 def compare_matrix_1D_sub_1D(matrix_size = 1000000, epoch = 5):
-    print("Test matrix subtraction 1D - 1D")
+    print("Compare matrix subtraction 1D - 1D")
     np.random.seed(0)
     size = matrix_size
     total_epoch = epoch
-    ### Test Numpy ###
+    ### Compare Numpy ###
     np_mat1 = np.random.rand(size, 1)
     np_mat2 = np.random.rand(size, 1)
     
@@ -398,7 +398,7 @@ def compare_matrix_1D_sub_1D(matrix_size = 1000000, epoch = 5):
     np_total_time = sum/total_epoch
     print("Average time for numpy with matrix size", size, "*",size,": ", np_total_time,"s")
 
-    ### Test Naive Matrix ###
+    ### Compare Naive Matrix ###
     Naive_mat1 = Naive_Matrix(np_mat1)
     Naive_mat2 = Naive_Matrix(np_mat2)
 
@@ -415,7 +415,7 @@ def compare_matrix_1D_sub_1D(matrix_size = 1000000, epoch = 5):
     naive_total_time = sum/total_epoch
     print("Average time for naive matrix with matrix size", size, "*",size,": ", naive_total_time,"s")
     
-    ### Test Accelerated Matrix ###
+    ### Compare Accelerated Matrix ###
     Accelerated_mat1 = Accelerated_Matrix(np_mat1)
     Accelerated_mat2 = Accelerated_Matrix(np_mat2)
 
@@ -438,11 +438,11 @@ def compare_matrix_1D_sub_1D(matrix_size = 1000000, epoch = 5):
     print("_____________________________")
 
 def compare_matrix_neg_1D(matrix_size = 1000000, epoch = 5):
-    print("Test matrix negative 1D")
+    print("Compare matrix negative 1D")
     np.random.seed(0)
     size = matrix_size
     total_epoch = epoch
-    ### Test Numpy ###
+    ### Compare Numpy ###
     np_mat1 = np.random.rand(size, 1)
     
     
@@ -458,7 +458,7 @@ def compare_matrix_neg_1D(matrix_size = 1000000, epoch = 5):
     np_total_time = sum/total_epoch
     print("Average time for numpy with matrix size", size, "*",size,": ", np_total_time,"s")
 
-    ### Test Naive Matrix ###
+    ### Compare Naive Matrix ###
     Naive_mat1 = Naive_Matrix(np_mat1)
 
     sum = 0
@@ -474,7 +474,7 @@ def compare_matrix_neg_1D(matrix_size = 1000000, epoch = 5):
     naive_total_time = sum/total_epoch
     print("Average time for naive matrix with matrix size", size, "*",size,": ", naive_total_time,"s")
     
-    ### Test Accelerated Matrix ###
+    ### Compare Accelerated Matrix ###
     Accelerated_mat1 = Accelerated_Matrix(np_mat1)
 
 

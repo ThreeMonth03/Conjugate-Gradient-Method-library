@@ -9,6 +9,7 @@
 #include <cmath>
 #include <cstring>
 #include <omp.h>
+#include <thread>
 
 namespace Matrix{
 

@@ -5,6 +5,7 @@ dir_path = os.path.dirname(os.path.abspath(__file__)) + "/../cpp"
 # Add the directory to the Python path
 sys.path.append(dir_path)
 
+import math
 import numpy as np
 import random
 from autograd import grad
@@ -27,26 +28,27 @@ def generate_symmetric(n):
     A = np.random.rand(n, n)
     return (A + A.T)/2
 
-def custom_linear_CG(x, a, b, epsilon = 5e-7, epoch=10000000, num_threads = -1):
+def custom_linear_CG(x, a, b, epsilon = 5e-7, epoch=10000000, num_threads = 3):
     ## Solve the linear system Ax = b using conjugate gradient method by calling the C++ library
     mat_x_min = None
-    if(num_threads == 1):
-        mat_a = Naive_Matrix(a)
-        mat_b = Naive_Matrix(b)
-        mat_x = Naive_Matrix(x)
-        linear_cg_model = CG.linear_CG(epsilon, epoch)
-        mat_x_min = linear_cg_model.solve_by_Naive_Matrix(mat_a, mat_b, mat_x)
-
-    else:
+    if(num_threads != 1):
         mat_a = Accelerated_Matrix(a)
         mat_b = Accelerated_Matrix(b)
         mat_x = Accelerated_Matrix(x)
-        if(num_threads == -1):
-            linear_cg_model = CG.linear_CG(epsilon, epoch)
-        else:
-            linear_cg_model = CG.linear_CG(epsilon, epoch, num_threads)
+        linear_cg_model = CG.linear_CG(epsilon, epoch, num_threads)
         mat_x_min = linear_cg_model.solve_by_Accelerated_Matrix(mat_a, mat_b, mat_x)
-    
+
+
+    else:
+        mat_a = Naive_Matrix(a)
+        mat_b = Naive_Matrix(b)
+        mat_x = Naive_Matrix(x)
+        #mat_a = Accelerated_Matrix(a)
+        #mat_b = Accelerated_Matrix(b)
+        #mat_x = Accelerated_Matrix(x)
+        linear_cg_model = CG.linear_CG(epsilon, epoch)
+        #mat_x_min = linear_cg_model.solve_by_Accelerated_Matrix(mat_a, mat_b, mat_x)
+        mat_x_min = linear_cg_model.solve_by_Naive_Matrix(mat_a, mat_b, mat_x)
     return np.array(mat_x_min.tolist())
 
 def np_linear_CG(x, A, b, epsilon, epoch=10000000):
@@ -190,7 +192,7 @@ def custom_naive_nonlinear_CG(X, tol, alpha, beta, f, Df, method = "Fletcher_Ree
         step = custom_naive_line_search(f = f, df = Df, x = start_point, d = delta, alpha=alpha, beta=beta)
         if step!=None:
             next_X = X+ step*delta
-        elif step==NAN:
+        elif step != step: #IsNaN
             raise AssertionError("It diverges, please try another start point or another hyperparameter.")
         else:
             return X, f(X)
@@ -230,7 +232,7 @@ def custom_accelerated_nonlinear_CG(X, tol, alpha, beta, f, Df, method = "Fletch
         step = custom_accelerated_line_search(f = f, df = Df, x = start_point, d = delta, alpha=alpha, beta=beta, num_threads = num_threads)
         if step!=None:
             next_X = X+ step*delta 
-        elif step==NAN:
+        elif step != step: #IsNaN
             raise AssertionError("It diverges, please try another start point or another hyperparameter.")
         else:
             return X, f(X)
@@ -270,7 +272,7 @@ def np_nonlinear_CG(X, tol, alpha, beta, f, Df, method = "Fletcher_Reeves"):
         step = np_line_search(f = f, df = Df, x = start_point, d = delta, alpha=alpha, beta=beta)
         if step!=None:
             next_X = X+ step*delta 
-        elif step==NAN:
+        elif step != step: #IsNaN
             raise AssertionError("It diverges, please try another start point or another hyperparameter.")
         else:
             return X, f(X)

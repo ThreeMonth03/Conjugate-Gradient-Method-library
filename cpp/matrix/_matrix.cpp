@@ -280,7 +280,7 @@ Accelerated_Matrix::Accelerated_Matrix(Accelerated_Matrix const &mat) : m_nrow(m
 {
     reset_buffer(mat.m_nrow, mat.m_ncol);
     size_t i, j;
-    #pragma omp parallel for private(i, j) schedule(static) collapse(2) num_threads(number_of_threads)
+    //#pragma omp parallel for private(i, j) schedule(static) collapse(2) num_threads(number_of_threads)
     for (i = 0; i<m_nrow; ++i){
         for (j = 0; j<m_ncol; ++j)
         {
@@ -339,7 +339,7 @@ Accelerated_Matrix & Accelerated_Matrix::operator=(std::vector<double> const & v
         throw std::out_of_range("number of elements mismatch");
     }
     size_t i, shape = m_nrow * m_ncol;
-    #pragma omp parallel for private(i) num_threads(number_of_threads)
+    //#pragma omp parallel for private(i) num_threads(number_of_threads)
     for (i=0; i< shape; ++i)
     {
         m_buffer[i] = vec[i];
@@ -353,7 +353,7 @@ Accelerated_Matrix & Accelerated_Matrix::operator=(std::vector<std::vector<doubl
         throw std::out_of_range("number of elements mismatch");
     }
     size_t i, j;
-    #pragma omp parallel for private(i, j) collapse(2) num_threads(number_of_threads)
+    //#pragma omp parallel for private(i, j) collapse(2) num_threads(number_of_threads)
     for (i=0; i<m_nrow; ++i)
     {
         for (j=0; j<m_ncol; ++j)
@@ -372,7 +372,7 @@ Accelerated_Matrix & Accelerated_Matrix::operator=(Accelerated_Matrix const & ot
         reset_buffer(other.m_nrow, other.m_ncol);
     }
     size_t i, shape = m_nrow * m_ncol;
-    #pragma omp parallel for private(i) num_threads(number_of_threads)
+    //#pragma omp parallel for private(i) num_threads(number_of_threads)
     for (i=0; i< shape; ++i)
     {
         m_buffer[i] = other.m_buffer[i];
@@ -387,7 +387,7 @@ Accelerated_Matrix Accelerated_Matrix::operator+(Accelerated_Matrix const & othe
     }
     Accelerated_Matrix temp(m_nrow, m_ncol);
     size_t i, shape = m_nrow * m_ncol;
-    #pragma omp parallel for private(i)  num_threads(number_of_threads)
+    //#pragma omp parallel for private(i)  num_threads(number_of_threads)
     for(i = 0 ; i < shape; ++i){
         temp.m_buffer[i] = m_buffer[i] + other.m_buffer[i];
     }
@@ -400,7 +400,7 @@ Accelerated_Matrix Accelerated_Matrix::operator-(Accelerated_Matrix const & othe
     }    
     Accelerated_Matrix temp(m_nrow, m_ncol);
     size_t i, shape = m_nrow * m_ncol;
-    #pragma omp parallel for private(i)  num_threads(number_of_threads)
+    //#pragma omp parallel for private(i)  num_threads(number_of_threads)
     for(i = 0 ; i < shape; ++i){
         temp.m_buffer[i] = m_buffer[i] - other.m_buffer[i];
     }
@@ -410,7 +410,7 @@ Accelerated_Matrix Accelerated_Matrix::operator-(Accelerated_Matrix const & othe
 Accelerated_Matrix Accelerated_Matrix::operator-(){
     Accelerated_Matrix temp(m_nrow, m_ncol);
     size_t i, shape = m_nrow * m_ncol;
-    #pragma omp parallel for private(i)  num_threads(number_of_threads)
+    //#pragma omp parallel for private(i)  num_threads(number_of_threads)
     for(i = 0 ; i < shape; ++i){
         temp.m_buffer[i] = -m_buffer[i];
     }
@@ -423,7 +423,7 @@ Accelerated_Matrix Accelerated_Matrix::operator*(Accelerated_Matrix const & mat)
         Accelerated_Matrix temp(m_nrow, m_ncol);
         size_t i, shape = m_nrow * m_ncol;
         double value = mat(0,0);
-        #pragma omp parallel for private(i, value) num_threads(number_of_threads)
+        //#pragma omp parallel for private(i, value) num_threads(number_of_threads)
         for(i = 0 ; i < shape; ++i){
             temp.m_buffer[i] = m_buffer[i] * value;
         }
@@ -434,7 +434,7 @@ Accelerated_Matrix Accelerated_Matrix::operator*(Accelerated_Matrix const & mat)
         Accelerated_Matrix temp(mat.nrow(), mat.ncol());
         size_t i, shape = m_nrow * m_ncol;
         double value = (*this)(0,0);
-        #pragma omp parallel for private(i, shape, value) num_threads(number_of_threads)
+        //#pragma omp parallel for private(i, shape, value) num_threads(number_of_threads)
         for(i = 0 ; i < shape; ++i){
             temp.m_buffer[i] = mat.m_buffer[i] * value;
         }
@@ -446,7 +446,7 @@ Accelerated_Matrix Accelerated_Matrix::operator*(Accelerated_Matrix const & mat)
         double sum = .0f;
         size_t i;
         size_t shape = (*this).nrow();
-        #pragma omp parallel for private(i, shape) reduction(+:sum) num_threads(number_of_threads)
+        //#pragma omp parallel for private(i, shape) reduction(+:sum) num_threads(number_of_threads)
         for(i = 0; i < (*this).nrow(); ++i){
             sum += (*this).m_buffer[i] * mat.m_buffer[i];
         }
@@ -462,7 +462,7 @@ Accelerated_Matrix Accelerated_Matrix::operator*(Accelerated_Matrix const & mat)
     size_t i, j, k, ii, jj, kk;
 
     double sum = .0;
-    #pragma omp parallel for private(i, j, k, ii, jj ,kk ,sum) collapse(2) num_threads(number_of_threads)
+    //#pragma omp parallel for private(i, j, k, ii, jj ,kk ,sum) collapse(2) num_threads(number_of_threads)
     for (i = 0; i < max_i; i += tsize)
     {
         for (j = 0; j < max_j; j += tsize)
@@ -494,7 +494,7 @@ Accelerated_Matrix Accelerated_Matrix::operator*(Accelerated_Matrix const & mat)
 Accelerated_Matrix Accelerated_Matrix::operator*(double const & other){
     Accelerated_Matrix temp(m_nrow, m_ncol);
     size_t i, shape = m_nrow * m_ncol;
-    #pragma omp parallel for private(i) num_threads(number_of_threads)
+    //#pragma omp parallel for private(i) num_threads(number_of_threads)
     for(i = 0 ; i < shape; ++i){
         temp.m_buffer[i] = m_buffer[i] * other;
     }
@@ -505,7 +505,7 @@ bool Accelerated_Matrix::operator==(Accelerated_Matrix const & mat) const
 {
     if (mat.m_ncol != m_ncol || mat.m_nrow != m_nrow) return false;
     bool check = true;
-    #pragma omp parallel for schedule(static) collapse(2) reduction(&&:check) num_threads(number_of_threads)
+    //#pragma omp parallel for schedule(static) collapse(2) reduction(&&:check) num_threads(number_of_threads)
     for (size_t i = 0; i < mat.m_nrow; ++i){
         for (size_t j = 0; j < mat.m_ncol; ++j){
             if(mat(i, j) != m_buffer[i*m_nrow+j]) check = false;
@@ -545,7 +545,7 @@ double Accelerated_Matrix::norm()
     double sum = 0.0;
     size_t i;
     size_t shape = m_nrow * m_ncol;
-    #pragma omp parallel for private(i) reduction(+:sum) num_threads(number_of_threads)
+    //#pragma omp parallel for private(i) reduction(+:sum) num_threads(number_of_threads)
     for (i = 0; i< shape; ++i)
     {
         sum += m_buffer[i] * m_buffer[i];
