@@ -130,7 +130,7 @@ private:
     size_t m_nrow = 0;
     size_t m_ncol = 0;
     double * m_buffer = nullptr;
-    int number_of_threads = omp_get_max_threads();
+    static int number_of_threads;
 };
 
 std::ostream & operator << (std::ostream & ostr, Naive_Matrix const & mat);

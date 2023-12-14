@@ -1,6 +1,6 @@
 #Flags
 CXX = g++
-FLAGS = -g -O3 -m64 -Wall -shared -std=c++17 -fPIC -fopenmp
+FLAGS = -g -O3 -m64 -Wall -shared -std=c++17 -fPIC -fopenmp -pthread
 PYBINCLUDE = $(shell python3-config --includes) $(shell python3 -m pybind11 --includes)
 FLAGS_DEP = -MMD -MP
 DIRS = $(shell find $(shell pwd)/cpp/* -type d)
@@ -35,7 +35,7 @@ $(TARGET): %.o : %.cpp
 
 demo: $(MODULE_SHARE_OBJS)
 	mkdir -p demo/results
-#python3 demo/demo_matrix.py | tee demo/results/matrix_performance.txt
+	python3 demo/demo_matrix.py | tee demo/results/matrix_performance.txt
 	python3 demo/demo_cg_method.py | tee demo/results/cg_method_performance.txt
 
 test: $(MODULE_SHARE_OBJS)

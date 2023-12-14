@@ -91,7 +91,7 @@ def test_nonlinear_cg():
 
         print("case 2 custom: ", method," , with acceleration")
         x = np.copy(x_rand)
-        x, _ = utils.custom_nonlinear_CG(x, 1e-8, 0.5, 0.8, utils.nonlinear_func_2, utils.grad(utils.nonlinear_func_2), method)
+        x, _ = utils.custom_nonlinear_CG(x, 1e-8, 0.5, 0.8, utils.nonlinear_func_2, utils.grad(utils.nonlinear_func_2), method, 2)
         x = np.array(x)
         x_min = np.zeros(100)
         assert(np.isclose(x_min, x).all())   

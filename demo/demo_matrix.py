@@ -495,11 +495,11 @@ def compare_matrix_neg_1D(matrix_size = 1000000, epoch = 5):
     print("_____________________________")
 
 if __name__ == '__main__':
-    compare_matrix_2D_dot_2D(256, 10)
-    compare_matrix_1D_dot_1D(1000000,100)
+    compare_matrix_2D_dot_2D(256, 100)
+    #compare_matrix_1D_dot_1D(1000000,100)
     compare_matrix_2D_dot_0D(1024, 100)
     compare_matrix_2D_dot_scalar(1024, 100)
-    compare_matrix_norm(1000000, 100)
-    compare_matrix_1D_add_1D(1000000, 100)
-    compare_matrix_1D_sub_1D(1000000, 100)
-    compare_matrix_neg_1D(1000000, 100)
+    #compare_matrix_norm(1000000, 100)
+    #compare_matrix_1D_add_1D(1000000, 100)
+    #compare_matrix_1D_sub_1D(1000000, 100)
+    #compare_matrix_neg_1D(1000000, 100)

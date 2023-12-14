@@ -26,7 +26,7 @@ class linear_CG{
         double beta = 0;
         double chi = 0;
         int epoch = 10000000;
-        int number_of_threads = omp_get_max_threads();
+        int number_of_threads = std::thread::hardware_concurrency();
 };
 
 class nonlinear_CG{
