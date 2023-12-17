@@ -8,12 +8,13 @@
 ## Setting Environment
 If you want to use API, please add the ```repo_path/cpp``` 
 and ```repo_path/python``` into environment path 
-in the python file at first. Then import utils and numpy.
+in the python file at first. Then import numpy and 
+utils in ```repo_path/python```.
 
 ```python
 import sys
 
-dir_path = absolute_path_of_the_repo + "/../cpp"
+dir_path = absolute_path_of_the_repo + "/cpp"
 
 sys.path.append(dir_path)
 
