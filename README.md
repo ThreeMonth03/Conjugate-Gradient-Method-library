@@ -34,6 +34,6 @@ or build and run the dockerfile in /contrib/docker.
 3. ```make test``` for run the pytest 
 and ```make demo``` for run the simple example and analysis.
 
-### User Tutorial
+## User Tutorial
 <a href="./python">API Introduction</a>
 
