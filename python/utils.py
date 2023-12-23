@@ -31,13 +31,12 @@ def generate_pos_def(n):
     A = np.random.rand(n, n)
     return A.dot(A.T)
 
-def generate_symmetric(n):
+def generate_symmetric(A):
     """
     Functionality: Generate a random symmetric matrix
     Parameters:
-    n: The dimension of the matrix.
+    n: The given matrix.
     """
-    A = np.random.rand(n, n)
     return (A + A.T)/2
 
 def custom_linear_CG(x, a, b, epsilon = 5e-7, epoch=10000000, num_threads = 3):

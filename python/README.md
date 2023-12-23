@@ -116,3 +116,8 @@ x_min = utils.custom_nonlinear_CG(X = initial_point,
     method = "Fletcher_Reeves",
     num_threads = number_of_threads)
 ```
+
+By the way, there are three algorithm that the nonlinear CG method could choose, 
+including ```"Fletcher_Reeves"```, ```"Dai-Yuan"``` and ```"Hager-Zhang"```.
+We can choose the algorithm by passing the string to the 
+```method``` parameter.
