@@ -24,13 +24,11 @@ from _cgpy.Matrix import Accelerated_Matrix
 
 def test_linear_cg():
     np.random.seed(0)
-    a = np.random.rand(100, 100)
     a = utils.generate_pos_def(100)
-    a = utils.generate_symmetric(100)
+    a = utils.generate_symmetric(a)
     while(np.linalg.cond(a) < 50000):
-        a = np.random.rand(100, 100)
         a = utils.generate_pos_def(100)
-        a = utils.generate_symmetric(100)
+        a = utils.generate_symmetric(a)
     b = np.random.rand(100)
     x = np.random.rand(100)
     x = utils.np_linear_CG(x, a, b, 5e-7)
