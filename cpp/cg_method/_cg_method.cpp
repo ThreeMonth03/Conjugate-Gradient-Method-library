@@ -5,6 +5,18 @@
 namespace cg_method
 {
 
+namespace
+{
+int max_threads()
+{
+#ifdef _OPENMP
+    return omp_get_max_threads();
+#else
+    return 1;
+#endif
+}
+} // namespace
+
 Matrix::Naive_Matrix linear_CG::solve_by_Naive_Matrix(Matrix::Naive_Matrix A,
                                                       Matrix::Naive_Matrix b,
                                                       Matrix::Naive_Matrix x)
@@ -86,9 +98,9 @@ Matrix::Naive_Matrix nonlinear_CG::Naive_Fletcher_Reeves_next_iteration(
     /*
     Functionality: calculate the next iteration of delta by Fletcher Reeves method
     Parameter:
-        cur_Df: Naive_Matrix, the gradient of the objective function at current iteration
-        next_Df: Naive_Matrix, the gradient of the objective function at next iteration
-        delta: Naive_Matrix, the direction of the next iteration
+        cur_Df: Naive_Matrix, the gradient of the objective function at current
+    iteration next_Df: Naive_Matrix, the gradient of the objective function at
+    next iteration delta: Naive_Matrix, the direction of the next iteration
     */
     double chi = std::pow(next_Df.norm() / cur_Df.norm(), 2);
     delta = -next_Df + delta * chi;
@@ -102,9 +114,9 @@ Matrix::Naive_Matrix nonlinear_CG::Naive_Hager_Zhang_next_iteration(Matrix::Naiv
     /*
     Functionality: calculate the next iteration of delta by Hager Zhang method
     Parameter:
-        cur_Df: Naive_Matrix, the gradient of the objective function at current iteration
-        next_Df: Naive_Matrix, the gradient of the objective function at next iteration
-        delta: Naive_Matrix, the direction of the next iteration
+        cur_Df: Naive_Matrix, the gradient of the objective function at current
+    iteration next_Df: Naive_Matrix, the gradient of the objective function at
+    next iteration delta: Naive_Matrix, the direction of the next iteration
     */
     Matrix::Naive_Matrix Q = next_Df - cur_Df;
     Matrix::Naive_Matrix M = Q - delta * (std::pow(Q.norm(), 2) * 2 / (delta * Q)(0, 0));
@@ -121,9 +133,9 @@ Matrix::Naive_Matrix nonlinear_CG::Naive_Dai_Yuan_next_iteration(Matrix::Naive_M
     /*
     Functionality: calculate the next iteration of delta by Dai Yuan method
     Parameter:
-        cur_Df: Naive_Matrix, the gradient of the objective function at current iteration
-        next_Df: Naive_Matrix, the gradient of the objective function at next iteration
-        delta: Naive_Matrix, the direction of the next iteration
+        cur_Df: Naive_Matrix, the gradient of the objective function at current
+    iteration next_Df: Naive_Matrix, the gradient of the objective function at
+    next iteration delta: Naive_Matrix, the direction of the next iteration
     */
     double chi = std::pow(next_Df.norm(), 2) / (delta * (next_Df - cur_Df))(0, 0);
     delta = -next_Df + delta * chi;
@@ -137,12 +149,12 @@ Matrix::Accelerated_Matrix nonlinear_CG::Accelerated_Fletcher_Reeves_next_iterat
     /*
     Functionality: calculate the next iteration of delta by Fletcher Reeves method
     Parameter:
-        cur_Df: Accelerated_Matrix, the gradient of the objective function at current iteration
-        next_Df: Accelerated_Matrix, the gradient of the objective function at next iteration
-        delta: Accelerated_Matrix, the direction of the next iteration
+        cur_Df: Accelerated_Matrix, the gradient of the objective function at
+    current iteration next_Df: Accelerated_Matrix, the gradient of the objective
+    function at next iteration delta: Accelerated_Matrix, the direction of the
+    next iteration
     */
-    cur_Df.set_number_of_threads() =
-        number_of_threads == -1 ? omp_get_max_threads() : number_of_threads;
+    cur_Df.set_number_of_threads() = number_of_threads == -1 ? max_threads() : number_of_threads;
 
     double chi = std::pow(next_Df.norm() / cur_Df.norm(), 2);
     delta = -next_Df + delta * chi;
@@ -156,13 +168,13 @@ Matrix::Accelerated_Matrix nonlinear_CG::Accelerated_Hager_Zhang_next_iteration(
     /*
     Functionality: calculate the next iteration of delta by Hager Zhang method
     Parameter:
-        cur_Df: Accelerated_Matrix, the gradient of the objective function at current iteration
-        next_Df: Accelerated_Matrix, the gradient of the objective function at next iteration
-        delta: Accelerated_Matrix, the direction of the next iteration
+        cur_Df: Accelerated_Matrix, the gradient of the objective function at
+    current iteration next_Df: Accelerated_Matrix, the gradient of the objective
+    function at next iteration delta: Accelerated_Matrix, the direction of the
+    next iteration
     */
 
-    cur_Df.set_number_of_threads() =
-        number_of_threads == -1 ? omp_get_max_threads() : number_of_threads;
+    cur_Df.set_number_of_threads() = number_of_threads == -1 ? max_threads() : number_of_threads;
 
     Matrix::Accelerated_Matrix Q = next_Df - cur_Df;
     Matrix::Accelerated_Matrix M = Q - delta * (std::pow(Q.norm(), 2) * 2 / (delta * Q)(0, 0));
@@ -179,13 +191,13 @@ Matrix::Accelerated_Matrix nonlinear_CG::Accelerated_Dai_Yuan_next_iteration(
     /*
     Functionality: calculate the next iteration of delta by Dai Yuan method
     Parameter:
-        cur_Df: Accelerated_Matrix, the gradient of the objective function at current iteration
-        next_Df: Accelerated_Matrix, the gradient of the objective function at next iteration
-        delta: Accelerated_Matrix, the direction of the next iteration
+        cur_Df: Accelerated_Matrix, the gradient of the objective function at
+    current iteration next_Df: Accelerated_Matrix, the gradient of the objective
+    function at next iteration delta: Accelerated_Matrix, the direction of the
+    next iteration
     */
 
-    cur_Df.set_number_of_threads() =
-        number_of_threads == -1 ? omp_get_max_threads() : number_of_threads;
+    cur_Df.set_number_of_threads() = number_of_threads == -1 ? max_threads() : number_of_threads;
     double chi = std::pow(next_Df.norm(), 2) / (delta * (next_Df - cur_Df))(0, 0);
     delta = -next_Df + delta * chi;
     return delta;

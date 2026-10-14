@@ -221,20 +221,11 @@ def custom_nonlinear_CG(
     num_threads: The number of threads used in the C++ library.
     """
     if num_threads == 1:
-        return custom_naive_nonlinear_CG(
-            X, tol, alpha, beta, f, Df, method="Fletcher_Reeves"
-        )
+        return custom_naive_nonlinear_CG(X, tol, alpha, beta, f, Df, method=method)
 
     else:
         return custom_accelerated_nonlinear_CG(
-            X,
-            tol,
-            alpha,
-            beta,
-            f,
-            Df,
-            method="Fletcher_Reeves",
-            num_threads=num_threads,
+            X, tol, alpha, beta, f, Df, method=method, num_threads=num_threads
         )
 
 

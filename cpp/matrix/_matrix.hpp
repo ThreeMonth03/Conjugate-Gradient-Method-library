@@ -6,10 +6,12 @@
 #include <cstring>
 #include <iomanip>
 #include <iostream>
-#include <omp.h>
 #include <stdexcept>
-#include <thread>
 #include <vector>
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+#include <thread>
 
 namespace Matrix
 {
@@ -133,7 +135,7 @@ class Accelerated_Matrix
     size_t m_nrow = 0;
     size_t m_ncol = 0;
     double *m_buffer = nullptr;
-    static int number_of_threads;
+    int number_of_threads = 1;
 };
 
 std::ostream &operator<<(std::ostream &ostr, Naive_Matrix const &mat);

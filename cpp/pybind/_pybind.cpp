@@ -1,6 +1,5 @@
 #include <_cg_method.hpp>
 #include <_matrix.hpp>
-#include <omp.h>
 #include <pybind11/operators.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>

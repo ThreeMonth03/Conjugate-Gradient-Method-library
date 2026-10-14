@@ -4,8 +4,10 @@
 #include <_matrix.hpp>
 #include <algorithm>
 #include <cmath>
-#include <omp.h>
 #include <vector>
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 namespace cg_method
 {
 

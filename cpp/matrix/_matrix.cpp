@@ -3,6 +3,20 @@
 namespace Matrix
 {
 
+namespace
+{
+size_t nested_columns(const std::vector<std::vector<double>> &rows)
+{
+    const size_t columns = rows.empty() ? 0 : rows.front().size();
+    for (const auto &row : rows)
+    {
+        if (row.size() != columns)
+            throw std::invalid_argument("Ragged matrix input");
+    }
+    return columns;
+}
+} // namespace
+
 // Naive Matrix
 
 Naive_Matrix::Naive_Matrix(size_t nrow, size_t ncol) : m_nrow(nrow), m_ncol(ncol)
@@ -43,7 +57,7 @@ Naive_Matrix::Naive_Matrix(std::vector<double> const &vec) : m_nrow(vec.size()),
 }
 
 Naive_Matrix::Naive_Matrix(std::vector<std::vector<double>> const &vec)
-    : m_nrow(vec.size()), m_ncol(vec[0].size())
+    : m_nrow(vec.size()), m_ncol(nested_columns(vec))
 {
     reset_buffer(m_nrow, m_ncol);
     (*this) = vec;
@@ -92,9 +106,14 @@ Naive_Matrix &Naive_Matrix::operator=(std::vector<double> const &vec)
 
 Naive_Matrix &Naive_Matrix::operator=(std::vector<std::vector<double>> const &vec2d)
 {
-    if (m_nrow != vec2d.size() || m_ncol != vec2d[0].size())
+    if (m_nrow != vec2d.size() || m_ncol != (vec2d.empty() ? 0 : vec2d[0].size()))
     {
         throw std::out_of_range("number of elements mismatch");
+    }
+    for (const auto &row : vec2d)
+    {
+        if (row.size() != m_ncol)
+            throw std::invalid_argument("Ragged matrix input");
     }
     for (size_t i = 0; i < m_nrow; ++i)
     {
@@ -204,6 +223,8 @@ Naive_Matrix Naive_Matrix::operator*(Naive_Matrix const &mat)
 
     if ((*this).ncol() == 1 && mat.ncol() == 1 && mat.nrow() != 1)
     {
+        if (m_nrow != mat.m_nrow)
+            throw std::invalid_argument("Dot product size mismatch");
         Naive_Matrix return_value(1, 1);
         for (size_t i = 0; i < (*this).nrow(); ++i)
         {
@@ -214,8 +235,9 @@ Naive_Matrix Naive_Matrix::operator*(Naive_Matrix const &mat)
 
     if ((*this).ncol() != mat.nrow())
     {
-        throw std::out_of_range("Number of columns in the first matrix must be equal to the number "
-                                "of rows in the second matrix.");
+        throw std::out_of_range(
+            "Number of columns in the first matrix must be equal to the number of "
+            "rows in the second matrix.");
     }
 
     Naive_Matrix result((*this).nrow(), mat.ncol());
@@ -256,7 +278,7 @@ bool Naive_Matrix::operator==(Naive_Matrix const &mat) const
     {
         for (size_t j = 0; j < mat.m_ncol; ++j)
         {
-            if (mat(i, j) != m_buffer[i * m_nrow + j])
+            if (mat(i, j) != m_buffer[i * m_ncol + j])
                 return false;
         }
     }
@@ -321,7 +343,6 @@ void Naive_Matrix::reset_buffer(size_t nrow, size_t ncol)
 }
 
 // Accelerated Matrix
-int Accelerated_Matrix::number_of_threads = std::thread::hardware_concurrency();
 
 Accelerated_Matrix::Accelerated_Matrix(size_t nrow, size_t ncol) : m_nrow(nrow), m_ncol(ncol)
 {
@@ -343,8 +364,8 @@ Accelerated_Matrix::Accelerated_Matrix(size_t nrow, size_t ncol, std::vector<dou
 {
     if (vec.size() != nrow * ncol)
     {
-        throw std::out_of_range(
-            "Accelerated_Matrix::Accelerated_Matrix(): vector size differs from matrix size");
+        throw std::out_of_range("Accelerated_Matrix::Accelerated_Matrix(): vector "
+                                "size differs from matrix size");
     }
     reset_buffer(nrow, ncol);
     (*this) = vec;
@@ -358,7 +379,7 @@ Accelerated_Matrix::Accelerated_Matrix(std::vector<double> const &vec)
 }
 
 Accelerated_Matrix::Accelerated_Matrix(std::vector<std::vector<double>> const &vec)
-    : m_nrow(vec.size()), m_ncol(vec[0].size())
+    : m_nrow(vec.size()), m_ncol(nested_columns(vec))
 {
     reset_buffer(m_nrow, m_ncol);
     (*this) = vec;
@@ -401,9 +422,14 @@ Accelerated_Matrix &Accelerated_Matrix::operator=(std::vector<double> const &vec
 
 Accelerated_Matrix &Accelerated_Matrix::operator=(std::vector<std::vector<double>> const &vec2d)
 {
-    if (m_nrow != vec2d.size() || m_ncol != vec2d[0].size())
+    if (m_nrow != vec2d.size() || m_ncol != (vec2d.empty() ? 0 : vec2d[0].size()))
     {
         throw std::out_of_range("number of elements mismatch");
+    }
+    for (const auto &row : vec2d)
+    {
+        if (row.size() != m_ncol)
+            throw std::invalid_argument("Ragged matrix input");
     }
     size_t i;
     // #pragma omp parallel for private(i) num_threads(number_of_threads)
@@ -481,7 +507,7 @@ Accelerated_Matrix Accelerated_Matrix::operator*(Accelerated_Matrix const &mat)
         Accelerated_Matrix temp(m_nrow, m_ncol);
         size_t i, shape = m_nrow * m_ncol;
         double value = mat(0, 0);
-#pragma omp parallel for private(i, value) num_threads(number_of_threads)
+#pragma omp parallel for private(i) firstprivate(value) num_threads(number_of_threads)
         for (i = 0; i < shape; ++i)
         {
             temp.m_buffer[i] = m_buffer[i] * value;
@@ -492,9 +518,9 @@ Accelerated_Matrix Accelerated_Matrix::operator*(Accelerated_Matrix const &mat)
     if ((*this).nrow() == 1 && (*this).ncol() == 1)
     {
         Accelerated_Matrix temp(mat.nrow(), mat.ncol());
-        size_t i, shape = m_nrow * m_ncol;
+        size_t i, shape = mat.m_nrow * mat.m_ncol;
         double value = (*this)(0, 0);
-#pragma omp parallel for private(i, value) num_threads(number_of_threads)
+#pragma omp parallel for private(i) firstprivate(value) num_threads(number_of_threads)
         for (i = 0; i < shape; ++i)
         {
             temp.m_buffer[i] = mat.m_buffer[i] * value;
@@ -504,10 +530,13 @@ Accelerated_Matrix Accelerated_Matrix::operator*(Accelerated_Matrix const &mat)
 
     if ((*this).ncol() == 1 && mat.ncol() == 1 && mat.nrow() != 1)
     {
+        if (m_nrow != mat.m_nrow)
+            throw std::invalid_argument("Dot product size mismatch");
         Accelerated_Matrix return_value(1, 1);
         double sum = .0f;
         size_t i;
-        // #pragma omp parallel for private(i) reduction(+:sum) num_threads(number_of_threads)
+        // #pragma omp parallel for private(i) reduction(+:sum)
+        // num_threads(number_of_threads)
         for (i = 0; i < (*this).nrow(); ++i)
         {
             sum += (*this).m_buffer[i] * mat.m_buffer[i];
@@ -516,6 +545,10 @@ Accelerated_Matrix Accelerated_Matrix::operator*(Accelerated_Matrix const &mat)
         return return_value;
     }
 
+    if (m_ncol != mat.m_nrow)
+        throw std::invalid_argument("Matrix product size mismatch");
+    if (number_of_threads < 1)
+        throw std::invalid_argument("Thread count must be positive");
     Accelerated_Matrix result((*this).nrow(), mat.ncol());
     size_t tsize = 32;
     size_t max_i = (*this).nrow();
@@ -583,7 +616,7 @@ bool Accelerated_Matrix::operator==(Accelerated_Matrix const &mat) const
     {
         for (size_t j = 0; j < mat.m_ncol; ++j)
         {
-            if (mat(i, j) != m_buffer[i * m_nrow + j])
+            if (mat(i, j) != m_buffer[i * m_ncol + j])
                 return false;
         }
     }
@@ -619,7 +652,8 @@ double Accelerated_Matrix::norm()
     double sum = 0.0;
     size_t i;
     size_t shape = m_nrow * m_ncol;
-    // #pragma omp parallel for private(i) reduction(+:sum) num_threads(number_of_threads)
+    // #pragma omp parallel for private(i) reduction(+:sum)
+    // num_threads(number_of_threads)
     for (i = 0; i < shape; ++i)
     {
         sum += m_buffer[i] * m_buffer[i];
