@@ -114,6 +114,26 @@ TEST(Backend, HandlesPaddedRowMajorStorage)
     EXPECT_DOUBLE_EQ(backend.apply_dot(A, input.view(), output.view()), 70);
 }
 
+TEST(Backend, EmptyColumnsProduceZeroProductsWithoutDereferencingNullStorage)
+{
+    const cg::DenseMatrixView A(nullptr, 3, 0);
+    const cg::Vector b({1, 2, 3});
+    cg::Vector output({10, 20, 30});
+    for (const bool fused : {false, true})
+    {
+        const cg::CpuBackend backend(1, fused);
+        backend.apply(A, {}, output.view());
+        for (std::size_t i = 0; i < output.size(); ++i)
+        {
+            EXPECT_DOUBLE_EQ(output.data()[i], 0);
+        }
+        EXPECT_DOUBLE_EQ(backend.residual(A, b.view(), {}, output.view()), 14);
+        EXPECT_DOUBLE_EQ(output.data()[1], 2);
+        EXPECT_DOUBLE_EQ(backend.residual(A, b.view(), {}, output.view(), false), 14);
+        EXPECT_DOUBLE_EQ(output.data()[1], -2);
+    }
+}
+
 TEST(Backend, SupportsExactInPlaceAxpbyAndRejectsPartialOverlap)
 {
     cg::Vector x({1, 2, 3});
@@ -155,6 +175,113 @@ TEST(Backend, ResidualSignIsExplicit)
     EXPECT_DOUBLE_EQ(r.data()[1], 3);
     EXPECT_DOUBLE_EQ(backend.residual(A.view(), b.view(), x.view(), r.view(), false), 18);
     EXPECT_DOUBLE_EQ(r.data()[0], -3);
+}
+
+TEST(Backend, StableNormHandlesTinyLargeAndSubnormalValues)
+{
+    const cg::CpuBackend backend;
+    for (const double magnitude : {1e-200, 1e-160, 1e200, std::numeric_limits<double>::denorm_min(),
+                                   std::numeric_limits<double>::max() / 4.0})
+    {
+        const cg::Vector values({magnitude, -magnitude});
+        const double expected = std::hypot(magnitude, magnitude);
+        const double ulp =
+            std::nextafter(expected, std::numeric_limits<double>::infinity()) - expected;
+        EXPECT_NEAR(backend.norm(values.view()), expected, 8.0 * ulp);
+    }
+    const cg::Vector zero(3);
+    EXPECT_DOUBLE_EQ(backend.norm(zero.view()), 0);
+    EXPECT_DOUBLE_EQ(backend.norm({}), 0);
+    const cg::Vector infinite({std::numeric_limits<double>::infinity(), 1.0});
+    const cg::Vector nan({std::numeric_limits<double>::quiet_NaN(), 1.0});
+    EXPECT_TRUE(std::isinf(backend.norm(infinite.view())));
+    EXPECT_TRUE(std::isnan(backend.norm(nan.view())));
+}
+
+TEST(CGRange, DoesNotClaimConvergenceWhenSquaredResidualUnderflowsOrOverflows)
+{
+    const cg::DenseMatrix identity(2, 2, {1, 0, 0, 1});
+    const cg::CpuBackend backend;
+    for (const auto algorithm : {cg::Algorithm::explicit_residual, cg::Algorithm::recurrence})
+    {
+        for (const double magnitude : {1e-200, 1e-160, 1e200})
+        {
+            const cg::Vector b({magnitude, -magnitude});
+            cg::Vector x(2);
+            cg::Workspace workspace(2);
+            cg::CgOptions options;
+            options.algorithm = algorithm;
+            const auto info =
+                cg::solve_into(identity.view(), b.view(), x.view(), workspace, backend, options);
+            EXPECT_EQ(info.status, cg::Status::non_finite);
+            EXPECT_EQ(info.iterations, 0u);
+            EXPECT_EQ(info.matvecs, 1u);
+            EXPECT_NEAR(info.residual_norm, std::hypot(magnitude, magnitude), magnitude * 1e-14);
+            EXPECT_GT(info.residual_norm, options.rtol * std::hypot(magnitude, magnitude));
+            EXPECT_DOUBLE_EQ(x.data()[0], 0);
+        }
+    }
+}
+
+TEST(CGRange, AcceptsActualConvergenceAndUsableScaling)
+{
+    const cg::DenseMatrix identity(2, 2, {1, 0, 0, 1});
+    const cg::CpuBackend backend;
+    for (const auto algorithm : {cg::Algorithm::explicit_residual, cg::Algorithm::recurrence})
+    {
+        cg::CgOptions options;
+        options.algorithm = algorithm;
+        for (const double magnitude : {1e-150, 1e150})
+        {
+            const cg::Vector b({magnitude, -magnitude});
+            cg::Vector x(2);
+            cg::Workspace workspace(2);
+            const auto info =
+                cg::solve_into(identity.view(), b.view(), x.view(), workspace, backend, options);
+            EXPECT_EQ(info.status, cg::Status::converged);
+            EXPECT_EQ(info.iterations, 1u);
+            EXPECT_DOUBLE_EQ(info.residual_norm, 0);
+        }
+        const cg::Vector tiny({1e-200, -1e-200});
+        cg::Vector x(2);
+        cg::Workspace workspace(2);
+        options.atol = 1e-199;
+        const auto accepted =
+            cg::solve_into(identity.view(), tiny.view(), x.view(), workspace, backend, options);
+        EXPECT_EQ(accepted.status, cg::Status::converged);
+        EXPECT_EQ(accepted.iterations, 0u);
+        EXPECT_GT(accepted.residual_norm, 0);
+        EXPECT_LE(accepted.residual_norm, options.atol);
+        options.atol = 0;
+        options.maxiter = 0;
+        const auto limited =
+            cg::solve_into(identity.view(), tiny.view(), x.view(), workspace, backend, options);
+        EXPECT_EQ(limited.status, cg::Status::max_iterations);
+        EXPECT_GT(limited.residual_norm, 0);
+    }
+}
+
+TEST(CGRange, ZeroOrSubnormalCurvatureIsReportedAsNumericalRangeFailure)
+{
+    const cg::CpuBackend backend;
+    for (const auto algorithm : {cg::Algorithm::explicit_residual, cg::Algorithm::recurrence})
+    {
+        for (const double diagonal : {1e-310, 1e-200})
+        {
+            const cg::DenseMatrix A(1, 1, {diagonal});
+            const double magnitude = diagonal == 1e-310 ? 1.0 : 1e-150;
+            const cg::Vector b(std::vector<double>{magnitude});
+            cg::Vector x(1);
+            cg::Workspace workspace(1);
+            cg::CgOptions options;
+            options.algorithm = algorithm;
+            const auto info =
+                cg::solve_into(A.view(), b.view(), x.view(), workspace, backend, options);
+            EXPECT_EQ(info.status, cg::Status::non_finite);
+            EXPECT_EQ(info.iterations, 0u);
+            EXPECT_DOUBLE_EQ(info.residual_norm, magnitude);
+        }
+    }
 }
 
 TEST(CGExplicit, SolvesFromAnIndependentInitialGuess)

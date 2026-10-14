@@ -21,7 +21,13 @@ class CpuBackend
 
     void copy(ConstVectorView source, VectorView destination) const;
     double dot(ConstVectorView x, ConstVectorView y) const;
+    // Stable L2 norm. norm2 is the squared sum used by the recurrence and may
+    // overflow or underflow when the norm itself is still representable.
+    double norm(ConstVectorView x) const;
     double norm2(ConstVectorView x) const;
+    void multiply(ConstVectorView x, ConstVectorView y, VectorView output) const;
+    // z = factors * r; return dot(r,z). The output must be disjoint from inputs.
+    double multiply_dot(ConstVectorView factors, ConstVectorView r, VectorView z) const;
     void axpy(double alpha, ConstVectorView x, VectorView y) const;
     void axpby(double alpha, ConstVectorView x, double beta, ConstVectorView y,
                VectorView output) const;
@@ -43,6 +49,12 @@ class CpuBackend
     int threads_;
     bool fused_;
 };
+
+namespace detail
+{
+// The view was validated by the operation that produced squared_norm.
+double norm_from_squared(ConstVectorView x, double squared_norm);
+} // namespace detail
 
 } // namespace cg
 

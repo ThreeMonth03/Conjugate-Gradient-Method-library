@@ -6,6 +6,8 @@
 namespace cg
 {
 
+class JacobiPreconditioner;
+
 enum class Algorithm
 {
     explicit_residual,
@@ -16,6 +18,8 @@ enum class Status
     converged,
     max_iterations,
     non_positive_curvature,
+    // Also covers underflow/overflow of recurrence products outside the usable
+    // float64 squared-sum range, even when the reported stable norm is finite.
     non_finite
 };
 
@@ -44,10 +48,13 @@ const char *status_name(Status status) noexcept;
 // x is an initial guess and output. The output and workspace must be disjoint
 // from A and b. The workspace must match A.rows; prepare it outside timing.
 // Inputs are validated once, and no vector storage is allocated by the solve.
+// M is an optional prepared Jacobi preconditioner; it requires recurrence CG.
 SolveInfo solve_into(DenseMatrixView A, ConstVectorView b, VectorView x, Workspace &workspace,
-                     const CpuBackend &backend, const CgOptions &options = {});
+                     const CpuBackend &backend, const CgOptions &options = {},
+                     const JacobiPreconditioner *M = nullptr);
 SolveInfo solve_into(const CsrMatrix &A, ConstVectorView b, VectorView x, Workspace &workspace,
-                     const CpuBackend &backend, const CgOptions &options = {});
+                     const CpuBackend &backend, const CgOptions &options = {},
+                     const JacobiPreconditioner *M = nullptr);
 
 } // namespace cg
 

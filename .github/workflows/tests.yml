@@ -53,9 +53,16 @@ jobs:
       - name: Install project-local tooling
         run: |
           python -m venv .venv
-          .venv/bin/python -m pip install --cache-dir .cache/pip -r requirements/dev.lock
+          .venv/bin/python -m pip install --cache-dir .cache/pip -r requirements/test.lock
       - name: Run native and Python tests
         run: make test PRESET=${{ matrix.preset }} JOBS=2
+
+      - name: Reproduce sparse CG, PCG and direct-solver smoke comparisons
+        run: make pyprof PRESET=${{ matrix.preset }} PYPROF_SUITE=smoke-sparse-solvers PYPROF_ROUNDS=6 PYPROF_REPETITIONS=1 JOBS=2
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sparse-smoke-py${{ matrix.python }}-${{ matrix.preset }}
+          path: build/${{ matrix.preset }}/benchmarks/*.json
 
   sanitizer:
     runs-on: ubuntu-24.04
