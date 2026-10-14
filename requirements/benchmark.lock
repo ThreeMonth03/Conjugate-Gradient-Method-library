@@ -1,0 +1,6 @@
+# CPU-only PyTorch is intentional: CUDA will be introduced separately.
+--extra-index-url https://download.pytorch.org/whl/cpu
+-r dev.lock
+scipy==1.15.3
+threadpoolctl==3.6.0
+torch==2.8.0+cpu

@@ -1,51 +1,46 @@
-#Flags
-CXX = g++
-FLAGS = -g -O3 -m64 -Wall -shared -std=c++17 -fPIC -fopenmp -pthread
-PYBINCLUDE = $(shell python3-config --includes) $(shell python3 -m pybind11 --includes)
-FLAGS_DEP = -MMD -MP
-DIRS = $(shell find $(shell pwd)/cpp/* -type d)
-CXXINCLUDE := $(patsubst %,-I %,$(DIRS))
-#PATH
-MODULE_SHARE_OBJS_RLT_DIR = cpp
-MODULE_SHARE_OBJS_ABS_DIR = $(shell pwd)/$(MODULE_SHARE_OBJS_RLT_DIR)
-PYTHONPATH := $(MODULE_SHARE_OBJS_ABS_DIR):$(PYTHONPATH)
-export PYTHONPATH
+PYTHON ?= $(CURDIR)/.venv/bin/python
+CMAKE ?= $(CURDIR)/.venv/bin/cmake
+PRESET ?= cpu-release
+BUILD_DIR ?= $(CURDIR)/build/$(PRESET)
+JOBS ?= 2
+RUFF := $(CURDIR)/.venv/bin/ruff
+CLANG_FORMAT := $(CURDIR)/.venv/bin/clang-format
+CPP_FILES := $(wildcard cpp/*/*.cpp cpp/*/*.hpp tests/cpp/*.cpp)
+CMAKE_ARGS ?=
 
-#Includes
-CPP_FILE = $(wildcard $(MODULE_SHARE_OBJS_RLT_DIR)/*/*.cpp)
-MODULE_SHARE_OBJS = $(MODULE_SHARE_OBJS_RLT_DIR)/_cgpy$(shell python3-config --extension-suffix)
-TARGET = $(CPP_FILE:.cpp=.o)
+.DEFAULT_GOAL := all
+.PHONY: all configure build test pytest gtest lint format wheel clean
 
-#dependency
-DEPS = $(TARGET:.o=.d)
--include $(DEPS)
+all: build
 
-#Makefile
-.PHONY: all demo test clean
-default: all
+configure:
+	$(CMAKE) --preset $(PRESET) -B $(BUILD_DIR) -DPython_EXECUTABLE=$(PYTHON) $(CMAKE_ARGS)
 
-all: $(MODULE_SHARE_OBJS)
+build: configure
+	$(CMAKE) --build $(BUILD_DIR) --parallel $(JOBS)
 
-$(MODULE_SHARE_OBJS): $(TARGET)
-	$(CXX) $(FLAGS) $^ -o $@
+test: build
+	$(CMAKE) -E env OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 $(CURDIR)/.venv/bin/ctest --test-dir $(BUILD_DIR) --output-on-failure
 
-$(TARGET): %.o : %.cpp
-	$(CXX) $(FLAGS) $(FLAGS_DEP) $(PYBINCLUDE) $(CXXINCLUDE)  -c $< -o $@
+pytest: build
+	$(CMAKE) -E env OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 $(CURDIR)/.venv/bin/ctest --test-dir $(BUILD_DIR) --output-on-failure -L python
 
+gtest: configure
+	$(CMAKE) --build $(BUILD_DIR) --target cg_gtests --parallel $(JOBS)
+	$(CURDIR)/.venv/bin/ctest --test-dir $(BUILD_DIR) --output-on-failure -L cpp
 
-demo: $(MODULE_SHARE_OBJS)
-	mkdir -p demo/results
-	python3 demo/demo_matrix.py | tee demo/results/matrix_performance.txt
-	python3 demo/demo_cg_method.py | tee demo/results/cg_method_performance.txt
+lint:
+	$(RUFF) check .
+	$(RUFF) format --check .
+	$(CLANG_FORMAT) --dry-run --Werror $(CPP_FILES)
 
-test: $(MODULE_SHARE_OBJS)
-	python3 -m pytest -v tests/test_matrix.py
-	python3 -m pytest -v tests/test_cg_method.py
+format:
+	$(RUFF) check --fix .
+	$(RUFF) format .
+	$(CLANG_FORMAT) -i $(CPP_FILES)
+
+wheel:
+	PIP_CACHE_DIR=$(CURDIR)/.cache/pip $(PYTHON) -m build --wheel --no-isolation
 
 clean:
-	rm -rf *.so cpp/*.so cpp/*/*.so
-	rm -rf cpp/*/*.o
-	rm -rf */__pycache__ cpp/*/__pycache__
-	rm -rf .pytest_cache */.pytest_cache
-	rm -rf demo/results
-	rm -rf cpp/*/*.d
+	$(CMAKE) -E rm -rf $(BUILD_DIR)

@@ -1,38 +1,93 @@
-name: CI
+name: CPU checks
 
 on:
   push:
-    branches:
-      - progress
+    branches: [main]
   pull_request:
-    branches:
-      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cpu-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
 
 jobs:
-    build:
-        runs-on: ubuntu-22.04
-        steps:
-            - uses: actions/checkout@v2
-            - name: Install dependencies
-              run: |
-                sudo apt-get -q update
-                sudo apt update
-                sudo apt upgrade -y
-                sudo apt install -y \
-                    curl \
-                    vim \
-                    git \
-                    fish 
-                sudo apt-get -qy install \
-                    curl build-essential make \
-                    gcc g++ intel-mkl-full \
-                    python3 python3-pip python3-pytest \
-                    python3-numpy python3-scipy python3-pandas
-                python3 -m pip install --upgrade pip
-                pip install pytest pytest-cov pybind11
-                sudo apt-get install -y libomp-dev
-                pip install -r contrib/docker/config/requirements.txt
-            - name: Test
-              run: |
-                make test
-                make demo
+  style:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install project-local tooling
+        run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install --cache-dir .cache/pip -r requirements/dev.lock
+      - name: Check formatting and Python lint
+        run: make lint
+      - name: Check native static analysis when the runner provides clang-tidy
+        run: |
+          if command -v clang-tidy >/dev/null 2>&1; then
+            make build PRESET=cpu-debug BUILD_DIR="$PWD/build/cpu-tidy" CMAKE_ARGS='-DCG_ENABLE_CLANG_TIDY=ON -DCG_BUILD_PYTHON=OFF -DBUILD_TESTING=OFF'
+          fi
+
+  correctness:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - python: '3.10'
+            preset: cpu-release
+          - python: '3.12'
+            preset: cpu-release
+          - python: '3.12'
+            preset: cpu-openmp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install project-local tooling
+        run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install --cache-dir .cache/pip -r requirements/dev.lock
+      - name: Run native and Python tests
+        run: make test PRESET=${{ matrix.preset }} JOBS=2
+
+  sanitizer:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install project-local tooling
+        run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install --cache-dir .cache/pip -r requirements/dev.lock
+      - name: Run native address and undefined-behavior sanitizers
+        run: make gtest PRESET=cpu-asan JOBS=2
+
+  wheel:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install project-local tooling
+        run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install --cache-dir .cache/pip -r requirements/dev.lock
+      - name: Build wheel
+        run: make wheel
+      - name: Import installed wheel outside the source tree
+        run: |
+          python -m venv build/wheel-smoke
+          build/wheel-smoke/bin/python -m pip install --cache-dir .cache/pip -c requirements/dev.lock dist/*.whl
+          mkdir -p build/wheel-smoke/run
+          cd build/wheel-smoke/run
+          ../bin/python -c 'import _cgpy, utils; assert _cgpy.Matrix.Naive_Matrix(2, 2).nrow == 2'
