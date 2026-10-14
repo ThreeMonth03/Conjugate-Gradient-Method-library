@@ -1,10 +1,22 @@
 #include <_matrix.hpp>
+#include <limits>
 
 namespace Matrix
 {
 
 namespace
 {
+size_t checked_elements(size_t rows, size_t columns)
+{
+    const size_t maximum = std::numeric_limits<size_t>::max();
+    if (rows != 0 && columns > maximum / rows)
+        throw std::length_error("Matrix element count overflows size_t");
+    const size_t count = rows * columns;
+    if (count > maximum / sizeof(double))
+        throw std::length_error("Matrix byte size overflows size_t");
+    return count;
+}
+
 size_t nested_columns(const std::vector<std::vector<double>> &rows)
 {
     const size_t columns = rows.empty() ? 0 : rows.front().size();
@@ -21,14 +33,16 @@ size_t nested_columns(const std::vector<std::vector<double>> &rows)
 
 Naive_Matrix::Naive_Matrix(size_t nrow, size_t ncol) : m_nrow(nrow), m_ncol(ncol)
 {
-    size_t nelement = nrow * ncol;
     reset_buffer(nrow, ncol);
-    memset(m_buffer, 0, nelement * sizeof(double));
+    if (size() != 0)
+        memset(m_buffer, 0, size() * sizeof(double));
 }
 
 Naive_Matrix::Naive_Matrix(Naive_Matrix const &mat) : m_nrow(mat.m_nrow), m_ncol(mat.m_ncol)
 {
     reset_buffer(mat.m_nrow, mat.m_ncol);
+    if (m_buffer == nullptr)
+        return;
     for (size_t i = 0; i < m_nrow; ++i)
     {
         for (size_t j = 0; j < m_ncol; ++j)
@@ -41,7 +55,7 @@ Naive_Matrix::Naive_Matrix(Naive_Matrix const &mat) : m_nrow(mat.m_nrow), m_ncol
 Naive_Matrix::Naive_Matrix(size_t nrow, size_t ncol, std::vector<double> const &vec)
     : m_nrow(nrow), m_ncol(ncol)
 {
-    if (vec.size() != nrow * ncol)
+    if (vec.size() != checked_elements(nrow, ncol))
     {
         throw std::out_of_range(
             "Naive_Matrix::Naive_Matrix(): vector size differs from matrix size");
@@ -325,19 +339,10 @@ size_t Naive_Matrix::ncol() const { return m_ncol; }
 
 void Naive_Matrix::reset_buffer(size_t nrow, size_t ncol)
 {
-    if (m_buffer)
-    {
-        delete[] m_buffer;
-    }
-    const size_t nelement = nrow * ncol;
-    if (nelement)
-    {
-        m_buffer = new double[nelement];
-    }
-    else
-    {
-        m_buffer = nullptr;
-    }
+    const size_t nelement = checked_elements(nrow, ncol);
+    double *replacement = nelement ? new double[nelement] : nullptr;
+    delete[] m_buffer;
+    m_buffer = replacement;
     m_nrow = nrow;
     m_ncol = ncol;
 }
@@ -346,9 +351,9 @@ void Naive_Matrix::reset_buffer(size_t nrow, size_t ncol)
 
 Accelerated_Matrix::Accelerated_Matrix(size_t nrow, size_t ncol) : m_nrow(nrow), m_ncol(ncol)
 {
-    size_t nelement = nrow * ncol;
     reset_buffer(nrow, ncol);
-    memset(m_buffer, 0, nelement * sizeof(double));
+    if (size() != 0)
+        memset(m_buffer, 0, size() * sizeof(double));
 }
 //
 
@@ -356,13 +361,14 @@ Accelerated_Matrix::Accelerated_Matrix(Accelerated_Matrix const &mat)
     : m_nrow(mat.m_nrow), m_ncol(mat.m_ncol)
 {
     reset_buffer(mat.m_nrow, mat.m_ncol);
-    memcpy(m_buffer, mat.m_buffer, m_nrow * m_ncol * sizeof(double));
+    if (size() != 0)
+        memcpy(m_buffer, mat.m_buffer, size() * sizeof(double));
 }
 
 Accelerated_Matrix::Accelerated_Matrix(size_t nrow, size_t ncol, std::vector<double> const &vec)
     : m_nrow(nrow), m_ncol(ncol)
 {
-    if (vec.size() != nrow * ncol)
+    if (vec.size() != checked_elements(nrow, ncol))
     {
         throw std::out_of_range("Accelerated_Matrix::Accelerated_Matrix(): vector "
                                 "size differs from matrix size");
@@ -416,7 +422,8 @@ Accelerated_Matrix &Accelerated_Matrix::operator=(std::vector<double> const &vec
         throw std::out_of_range("number of elements mismatch");
     }
     size_t shape = m_nrow * m_ncol;
-    memcpy(m_buffer, vec.data(), shape * sizeof(double));
+    if (shape != 0)
+        memcpy(m_buffer, vec.data(), shape * sizeof(double));
     return *this;
 }
 
@@ -431,6 +438,8 @@ Accelerated_Matrix &Accelerated_Matrix::operator=(std::vector<std::vector<double
         if (row.size() != m_ncol)
             throw std::invalid_argument("Ragged matrix input");
     }
+    if (size() == 0)
+        return *this;
     size_t i;
     // #pragma omp parallel for private(i) num_threads(number_of_threads)
     for (i = 0; i < m_nrow; ++i)
@@ -451,7 +460,8 @@ Accelerated_Matrix &Accelerated_Matrix::operator=(Accelerated_Matrix const &othe
         reset_buffer(other.m_nrow, other.m_ncol);
     }
     size_t shape = m_nrow * m_ncol;
-    memcpy(m_buffer, other.m_buffer, shape * sizeof(double));
+    if (shape != 0)
+        memcpy(m_buffer, other.m_buffer, shape * sizeof(double));
     return *this;
 }
 
@@ -668,19 +678,10 @@ size_t Accelerated_Matrix::ncol() const { return m_ncol; }
 
 void Accelerated_Matrix::reset_buffer(size_t nrow, size_t ncol)
 {
-    if (m_buffer)
-    {
-        delete[] m_buffer;
-    }
-    const size_t nelement = nrow * ncol;
-    if (nelement)
-    {
-        m_buffer = new double[nelement];
-    }
-    else
-    {
-        m_buffer = nullptr;
-    }
+    const size_t nelement = checked_elements(nrow, ncol);
+    double *replacement = nelement ? new double[nelement] : nullptr;
+    delete[] m_buffer;
+    m_buffer = replacement;
     m_nrow = nrow;
     m_ncol = ncol;
 }
