@@ -1,4 +1,5 @@
 #include "cg/backend.hpp"
+#include "cg/detail/blas.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -90,13 +91,29 @@ double row_dot(const double *row, const double *x, std::size_t size, bool optimi
 
 } // namespace
 
-CpuBackend::CpuBackend(int threads, bool fused) : threads_(threads), fused_(fused)
+CpuBackend::CpuBackend(int threads, bool fused, DenseKernel dense_kernel)
+    : threads_(threads), fused_(fused), dense_kernel_(dense_kernel)
 {
     if (threads < 1)
     {
         throw std::invalid_argument("threads must be a positive integer");
     }
-    if (threads > 1 && !openmp_enabled())
+    if (dense_kernel != DenseKernel::native && dense_kernel != DenseKernel::blas)
+    {
+        throw std::invalid_argument("unsupported dense kernel");
+    }
+    if (dense_kernel == DenseKernel::blas)
+    {
+        if (!blas_enabled())
+        {
+            throw std::invalid_argument("BLAS dense kernel requires a BLAS-enabled build");
+        }
+        if (threads != 1)
+        {
+            throw std::invalid_argument("BLAS dense kernel requires threads=1");
+        }
+    }
+    else if (threads > 1 && !openmp_enabled())
     {
         throw std::invalid_argument("multiple threads require an OpenMP build");
     }
@@ -255,6 +272,11 @@ void CpuBackend::axpby(double alpha, ConstVectorView x, double beta, ConstVector
 void CpuBackend::apply(DenseMatrixView A, ConstVectorView x, VectorView output) const
 {
     validate_apply(A, x, output);
+    if (dense_kernel_ == DenseKernel::blas)
+    {
+        detail::blas_apply(A, x, output);
+        return;
+    }
     if (A.cols == 0)
     {
         if (output.size != 0)
@@ -278,7 +300,7 @@ double CpuBackend::apply_dot(DenseMatrixView A, ConstVectorView p, VectorView ap
 {
     same_size(p, ap);
     validate_apply(A, p, ap);
-    if (!fused_)
+    if (!fused_ || dense_kernel_ == DenseKernel::blas)
     {
         apply(A, p, ap);
         return dot(p, ap);
@@ -304,6 +326,23 @@ double CpuBackend::residual(DenseMatrixView A, ConstVectorView b, ConstVectorVie
     same_size(b, r);
     no_overlap(b, r);
     validate_apply(A, x, r);
+    if (dense_kernel_ == DenseKernel::blas)
+    {
+        detail::blas_apply(A, x, r);
+        if (!fused_)
+        {
+            axpby(b_minus_ax ? 1.0 : -1.0, b, b_minus_ax ? -1.0 : 1.0, r, r);
+            return norm2(r);
+        }
+        double squared_norm = 0.0;
+        for (std::size_t i = 0; i < r.size; ++i)
+        {
+            const double value = b_minus_ax ? b.data[i] - r.data[i] : r.data[i] - b.data[i];
+            r.data[i] = value;
+            squared_norm += value * value;
+        }
+        return squared_norm;
+    }
     if (A.cols == 0)
     {
         axpby(b_minus_ax ? 1.0 : -1.0, b, 0.0, b, r);

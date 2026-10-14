@@ -371,6 +371,8 @@ SolveInfo solve_into(const CsrMatrix &A, ConstVectorView b, VectorView x, Worksp
                      const CpuBackend &backend, const CgOptions &options,
                      const JacobiPreconditioner *M)
 {
+    if (backend.dense_kernel() == DenseKernel::blas)
+        throw std::invalid_argument("BLAS dense kernels do not support CSR matrices");
     validate_solve(A, b, x, workspace, options, M);
     return options.algorithm == Algorithm::explicit_residual
                ? solve_explicit(A, b, x, workspace, backend, options)

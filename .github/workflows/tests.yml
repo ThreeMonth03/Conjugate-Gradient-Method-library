@@ -45,6 +45,10 @@ jobs:
             preset: cpu-release
           - python: '3.12'
             preset: cpu-openmp
+          - python: '3.10'
+            preset: cpu-blas
+          - python: '3.12'
+            preset: cpu-blas
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -57,8 +61,30 @@ jobs:
       - name: Run native and Python tests
         run: make test PRESET=${{ matrix.preset }} JOBS=2
 
+      - name: Install project-local Sphinx tooling
+        if: matrix.python == '3.12' && matrix.preset != 'cpu-openmp'
+        run: .venv/bin/python -m pip install --cache-dir .cache/pip -r requirements/docs.lock
+      - name: Build API documentation and execute examples with warnings as errors
+        if: matrix.python == '3.12' && matrix.preset != 'cpu-openmp'
+        run: make docs doctest PRESET=${{ matrix.preset }} JOBS=2
+
       - name: Reproduce sparse CG, PCG and direct-solver smoke comparisons
         run: make pyprof PRESET=${{ matrix.preset }} PYPROF_SUITE=smoke-sparse-solvers PYPROF_ROUNDS=6 PYPROF_REPETITIONS=1 JOBS=2
+      - name: Install optional CPU benchmark candidates locally
+        if: matrix.python == '3.12' && matrix.preset == 'cpu-blas'
+        run: .venv/bin/python -m pip install --cache-dir .cache/pip -r requirements/benchmark.lock
+      - name: Exercise explicit native and BLAS dense benchmark adapters
+        if: matrix.python == '3.12' && matrix.preset == 'cpu-blas'
+        run: |
+          make pyprof PRESET=cpu-blas PYPROF_SUITE=smoke PYPROF_ROUNDS=8 PYPROF_REPETITIONS=1 JOBS=2 PYPROF_ARGS='--implementations native,native-blas,numpy-out,torch-eager-out'
+          .venv/bin/python - <<'PY'
+          import json
+          from pathlib import Path
+          artifact = json.loads(Path('build/cpu-blas/benchmarks/smoke-t1-prepared.json').read_text())
+          for case in artifact['cases']:
+              assert len(case['results']) == 4
+              assert all(result['status'] == 'measured' for result in case['results'])
+          PY
       - uses: actions/upload-artifact@v4
         with:
           name: sparse-smoke-py${{ matrix.python }}-${{ matrix.preset }}
@@ -80,35 +106,19 @@ jobs:
 
   wheel:
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.10', '3.12']
+        blas: ['OFF', 'ON']
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: ${{ matrix.python }}
       - name: Install project-local tooling
         run: |
           python -m venv .venv
-          .venv/bin/python -m pip install --cache-dir .cache/pip -r requirements/dev.lock
-      - name: Build wheel
-        run: make wheel
-      - name: Import installed wheel outside the source tree
-        run: |
-          python -m venv build/wheel-smoke
-          build/wheel-smoke/bin/python -m pip install --cache-dir .cache/pip -c requirements/dev.lock dist/*.whl
-          mkdir -p build/wheel-smoke/run
-          cd build/wheel-smoke/run
-          ../bin/python - <<'PY'
-          import importlib.util
-          import numpy as np
-          import _cgpy
-          import utils
-          import cgpy
-          assert importlib.util.find_spec('autograd') is None
-          assert _cgpy.Matrix.Naive_Matrix(2, 2).nrow == 2
-          matrix = cgpy.CSRMatrix([0, 2, 4], [0, 1, 0, 1], [4., 1., 1., 3.], (2, 2))
-          plan = cgpy.prepare(matrix, preconditioner='jacobi')
-          output = np.zeros(2)
-          info = plan.solve_into(np.array([1., 2.]), output, workspace=plan.create_workspace())
-          assert info.converged
-          np.testing.assert_allclose(output, [1 / 11, 7 / 11])
-          PY
+          .venv/bin/python -m pip install --cache-dir .cache/pip -r requirements/packaging.lock
+      - name: Build source distribution and isolated wheel, then test relocated installation
+        run: make test-dist DIST_BLAS=${{ matrix.blas }} JOBS=2

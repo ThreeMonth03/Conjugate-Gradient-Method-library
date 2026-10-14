@@ -1,0 +1,22 @@
+# Sphinx and its dependencies support Python 3.10 and 3.12.
+# Install into .venv with --cache-dir .cache/pip.
+-r dev.lock
+Sphinx==8.1.3
+alabaster==1.0.0
+babel==2.18.0
+certifi==2026.7.22
+charset-normalizer==3.5.2
+docutils==0.21.2
+idna==3.20
+imagesize==2.0.1
+Jinja2==3.1.6
+MarkupSafe==3.0.3
+requests==2.34.2
+snowballstemmer==3.1.1
+sphinxcontrib-applehelp==2.0.0
+sphinxcontrib-devhelp==2.0.0
+sphinxcontrib-htmlhelp==2.1.0
+sphinxcontrib-jsmath==1.0.1
+sphinxcontrib-qthelp==2.0.0
+sphinxcontrib-serializinghtml==2.0.0
+urllib3==2.8.0

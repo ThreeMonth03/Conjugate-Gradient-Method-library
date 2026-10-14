@@ -11,6 +11,7 @@
         "CMAKE_MAKE_PROGRAM": "${sourceDir}/.venv/bin/ninja",
         "Python_EXECUTABLE": "${sourceDir}/.venv/bin/python",
         "CG_ENABLE_OPENMP": "OFF",
+        "CG_ENABLE_BLAS": "OFF",
         "BUILD_TESTING": "ON"
       }
     },
@@ -27,6 +28,12 @@
       "cacheVariables": {"CG_ENABLE_OPENMP": "ON"}
     },
     {
+      "name": "cpu-blas",
+      "inherits": "cpu-release",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {"CG_ENABLE_BLAS": "ON"}
+    },
+    {
       "name": "cpu-asan",
       "inherits": "cpu-debug",
       "binaryDir": "${sourceDir}/build/${presetName}",
@@ -37,12 +44,14 @@
     {"name": "cpu-release", "configurePreset": "cpu-release"},
     {"name": "cpu-debug", "configurePreset": "cpu-debug"},
     {"name": "cpu-openmp", "configurePreset": "cpu-openmp"},
+    {"name": "cpu-blas", "configurePreset": "cpu-blas"},
     {"name": "cpu-asan", "configurePreset": "cpu-asan"}
   ],
   "testPresets": [
     {"name": "cpu-release", "configurePreset": "cpu-release", "output": {"outputOnFailure": true}},
     {"name": "cpu-debug", "configurePreset": "cpu-debug", "output": {"outputOnFailure": true}},
     {"name": "cpu-openmp", "configurePreset": "cpu-openmp", "output": {"outputOnFailure": true}},
+    {"name": "cpu-blas", "configurePreset": "cpu-blas", "output": {"outputOnFailure": true}},
     {"name": "cpu-asan", "configurePreset": "cpu-asan", "output": {"outputOnFailure": true}}
   ]
 }

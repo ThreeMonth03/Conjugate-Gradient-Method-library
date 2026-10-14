@@ -6,6 +6,8 @@ writer. All dependencies belong in the project `.venv` / local build tree.
 
 See [recorded CPU results](results.md) for complete measurements, raw artifacts,
 hardware provenance, and reproduction commands.
+The [explicit dense BLAS results](blas-results.md) add both kernel modes in
+prepared and API scopes, with complete timing artifacts and comparison limits.
 
 The sparse solver strategy suite is the primary CG/PCG-versus-direct comparison:
 
@@ -94,6 +96,24 @@ initial guesses. `condition_scale` specifies the diagonal range, not an exact
 condition number. Input preparation and matrix generation are excluded from
 both scopes. A SHA-256 hash includes the exact input bytes; a seed alone does
 not guarantee identical inputs across library versions.
+
+To compare both explicit dense kernel modes in a BLAS-enabled build:
+
+```bash
+make pyprof PRESET=cpu-blas PYPROF_SUITE=cpu-dense-f64-v1 \
+  PYPROF_THREADS=1 PYPROF_SCOPE=prepared \
+  PYPROF_ARGS='--implementations native,native-blas,numpy-out,torch-eager-out'
+```
+
+`native` always selects `dense_kernel="native"`; `native-blas` always selects
+`dense_kernel="blas"`. There is no automatic selection or size threshold.
+Both candidates retain the selected recurrence, preconditioner, residual policy
+and `fused` flag. The private BLAS provider replaces dense matrix-vector
+products; vector operations still use the native backend. `native-blas` requires
+an enabled build, a dense suite and one thread; unsupported selections fail.
+Use `PYPROF_SUITE=smoke` for the same adapters on a short correctness run.
+Artifacts record the selected kernel and provider configuration, and replay
+preserves the candidate names.
 
 `smoke-csr` uses a 4-by-4 grid (16 unknowns). `cpu-csr-f64-v1` uses 8, 32, 64
 and 128 points per grid side (64 through 16,384 unknowns). Each sparse system

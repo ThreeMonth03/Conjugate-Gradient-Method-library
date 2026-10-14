@@ -18,7 +18,7 @@ flowchart TD
 | --- | --- |
 | `include/cg/storage.hpp` | Borrowed const/mutable views, owning dense/vector storage, reusable workspace. Views retain no Python owner. |
 | `include/cg/csr.hpp` | Owning, validated CSR with sorted unique columns, float64 values, and `size_t` indices. Storage is immutable after construction. |
-| `include/cg/backend.hpp` | Synchronous CPU operations and per-instance thread/fusion settings. No process-wide thread changes. |
+| `include/cg/backend.hpp` | Synchronous CPU operations and per-instance thread/fusion/dense-kernel settings. No process-wide thread changes. |
 | `include/cg/preconditioner.hpp` | Validate and cache a positive Jacobi inverse; apply it through backend operations. |
 | `include/cg/solver.hpp` | Shared stopping rules, recurrence, refresh/restart, failure status, and operation counts. |
 | `bindings/cpu.cpp` | Strict array validation, prepared snapshots, owner lifetimes, GIL release, and a concurrent-use guard on Python workspace. |
@@ -29,7 +29,7 @@ flowchart TD
 
 Workspace owns five vectors: residual `r`, direction `p`, product `Ap`, true-residual scratch, and preconditioned residual `z`. Prepare its size before calling the native solver. The native core with a prepared preconditioner does not allocate vector storage. Standalone Python calls with Jacobi construct its inverse diagonal for that call. Keep the output and workspace disjoint from all inputs; use one workspace and output per concurrent solve.
 
-`solve` normalizes array-like inputs and allocates the result and workspace. `solve_into` borrows compatible arrays and uses caller-owned output/workspace. `prepare` owns a matrix snapshot and an optional Jacobi inverse, so repeated solves can share those immutable objects. Each API call is synchronous; borrowed arrays must remain alive and free from conflicting mutation until it returns. The binding releases the GIL only around the native solve.
+`solve` normalizes array-like inputs and allocates the result and workspace. `solve_into` borrows compatible arrays and uses caller-owned output/workspace. `prepare` owns a matrix snapshot and an optional Jacobi inverse, so repeated solves can share those immutable objects. Preparation fixes its thread count and dense-kernel choice. Each API call is synchronous; borrowed arrays must remain alive and free from conflicting mutation until it returns. The binding releases the GIL only around the native solve.
 
 ## Operations and numerical policy
 
@@ -37,12 +37,14 @@ The backend exposes primitive operations and selected fused operations: matvec w
 
 Dense fused row reductions use independent accumulators to permit vectorization without fast-math or host-specific compiler flags. Odd tails and padded row strides are supported; tests compare against long-double sums and retain non-finite multiplication behavior. `make pyprof PYPROF_ARGS='--no-fused'` selects the native reference path for measurement.
 
+The explicit `dense_kernel="blas"` option delegates dense matrix-vector products to the optional private sequential LP64 OpenBLAS provider. It accepts one CPU thread, rejects CSR operators, and preserves the selected vector fusion policy. `dense_kernel="native"` remains the default. Provider capability/configuration is reported by the imported extension, and distribution checks exercise both modes. The build keeps provider downloads and products under the project and statically includes private symbols in BLAS wheels.
+
 Standard CG and Jacobi PCG share the recurrence. PCG uses `z=M⁻¹r` and `rᵀz`, while convergence always uses the Euclidean true residual. Periodic replacement restarts the direction from the recomputed residual (or its preconditioned value). Candidate convergence and final results are verified even when periodic refresh is disabled. The explicit legacy algorithm remains selectable and does not support Jacobi.
 
 Stable norm evaluation prevents false zero residuals from squared-sum underflow. Required inner products still use ordinary float64 arithmetic: an unusable product returns `non_finite`, even if the inputs and reported residual are finite. This is deliberate failure reporting, not arbitrary-scale arithmetic support. SPD remains a caller precondition.
 
 ## Validation and future backends
 
-GoogleTest covers native ownership, aliasing, kernels, CSR validation, and CG/PCG breakdown. Pytest covers conversion, strict arrays, snapshots, GIL/workspace behavior, and the benchmark contract. CMake presets isolate serial, OpenMP, debug, and sanitizer builds. CI checks formatting, static analysis, native/Python tests, sparse comparison artifacts, and installed-wheel imports. Timing thresholds require a stable dedicated machine.
+GoogleTest covers native ownership, aliasing, kernels, CSR validation, and CG/PCG breakdown. Pytest covers conversion, strict arrays, snapshots, GIL/workspace behavior, and the benchmark contract. CMake presets isolate serial, OpenMP, BLAS, debug, and sanitizer builds. Sphinx imports the real extension and checks executable documentation examples. CI checks formatting, static analysis, native/Python tests, sparse comparison artifacts, documentation, and source-distribution-to-wheel installs outside the checkout. Distribution checks exercise native and BLAS modes. Timing thresholds require a stable dedicated machine.
 
 CUDA is a later extension. It needs explicit device storage/views, stream and completion semantics, device workspace, and separate transfer/setup timing. CPU borrowed pointers must not be reinterpreted as device pointers. The operation boundary and shared recurrence provide the extension points; add the backend abstraction when a second implementation exists, with explicit device lifetime and synchronization contracts.

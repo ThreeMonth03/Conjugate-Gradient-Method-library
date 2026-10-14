@@ -8,16 +8,29 @@ namespace cg
 
 class CsrMatrix;
 
+enum class DenseKernel
+{
+    native,
+    blas
+};
+
 // All methods are synchronous. Thread settings are local to this context and
 // never change OpenMP's process-wide defaults. Inputs must remain alive and
 // unmodified by other threads until the operation returns.
+// The optional BLAS kernel uses a private sequential provider and only accepts
+// threads=1. It replaces dense matvecs; vector operations remain native. CSR
+// operations reject this kernel selection.
 class CpuBackend
 {
   public:
-    explicit CpuBackend(int threads = 1, bool fused = true);
+    explicit CpuBackend(int threads = 1, bool fused = true,
+                        DenseKernel dense_kernel = DenseKernel::native);
     int threads() const noexcept { return threads_; }
     bool fused() const noexcept { return fused_; }
+    DenseKernel dense_kernel() const noexcept { return dense_kernel_; }
     static bool openmp_enabled() noexcept;
+    static bool blas_enabled() noexcept;
+    static const char *blas_info() noexcept;
 
     void copy(ConstVectorView source, VectorView destination) const;
     double dot(ConstVectorView x, ConstVectorView y) const;
@@ -48,6 +61,7 @@ class CpuBackend
   private:
     int threads_;
     bool fused_;
+    DenseKernel dense_kernel_;
 };
 
 namespace detail
