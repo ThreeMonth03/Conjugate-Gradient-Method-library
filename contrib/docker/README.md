@@ -10,7 +10,7 @@ docker run --rm cg-cpu make gtest PRESET=cpu-asan
 docker run --rm -it cg-cpu bash
 ```
 
-The default command is `make test`. Python tools are installed in `/workspace/cg/.venv`; downloads and build outputs stay under that container's project directory. The image installs a CPU compiler and Git inside the container and performs no system upgrades. It uses no GPU runtime and mounts no host directories.
+The default command is `make test`. Python tools are installed in `/workspace/cg/.venv`; downloads and build outputs stay under that container's project directory. Compiler, Git, and their package dependencies are installed inside the image. It uses no GPU runtime and mounts no host directories.
 
 Include the optional CPU benchmark dependencies when building a benchmark image:
 
