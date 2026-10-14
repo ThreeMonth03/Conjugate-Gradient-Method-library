@@ -134,9 +134,11 @@ reset x0 on every invocation, including warmups and repeated timed calls.
 on candidate convergence, and residual replacement plus direction restart
 every 50 iterations. `--residual-refresh 0` disables periodic replacement.
 `explicit` preserves the original library's explicit r=Ax-b formulation, with
-two matvecs per iteration. All candidates use the selected algorithm, tolerance
+two matvecs per iteration. Matching-policy implementation candidates use the selected algorithm, tolerance
 `max(atol, rtol*||b||2)`, maximum iterations and replacement policy. Recorded
-matvec counts include initial and final true-residual evaluations.
+matvec counts include initial and final true-residual evaluations. Official
+SciPy and direct candidates follow the separate policies described above;
+their independent accuracy gate uses the same requested tolerance.
 
 Before timing, each candidate must report convergence and independently satisfy
 the requested true residual. The norm comparison allows only a 64-machine-

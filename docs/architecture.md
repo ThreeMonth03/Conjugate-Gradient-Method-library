@@ -27,13 +27,13 @@ flowchart TD
 
 ## Workspace and ownership
 
-Workspace owns five vectors: residual `r`, direction `p`, product `Ap`, true-residual scratch, and preconditioned residual `z`. Prepare its size before calling the native solver. Solves do not allocate vector storage. Keep the output and workspace disjoint from all inputs; use one workspace and output per concurrent solve.
+Workspace owns five vectors: residual `r`, direction `p`, product `Ap`, true-residual scratch, and preconditioned residual `z`. Prepare its size before calling the native solver. The native core with a prepared preconditioner does not allocate vector storage. Standalone Python calls with Jacobi construct its inverse diagonal for that call. Keep the output and workspace disjoint from all inputs; use one workspace and output per concurrent solve.
 
 `solve` normalizes array-like inputs and allocates the result and workspace. `solve_into` borrows compatible arrays and uses caller-owned output/workspace. `prepare` owns a matrix snapshot and an optional Jacobi inverse, so repeated solves can share those immutable objects. Each API call is synchronous; borrowed arrays must remain alive and free from conflicting mutation until it returns. The binding releases the GIL only around the native solve.
 
 ## Operations and numerical policy
 
-The backend exposes primitive operations and selected fused operations: matvec with `pᵀAp`, solution/residual update with residual reduction, and Jacobi application with `rᵀz`. `fused=False` keeps a separate-operation reference path. Fusion changes data traversal and summation order; it does not select the CG algorithm. Dense fused row reductions use independent accumulators without fast-math flags.
+The backend exposes primitive operations and selected fused operations: matvec with `pᵀAp`, solution/residual update with residual reduction, and Jacobi application with `rᵀz`. `fused=False` keeps a separate-operation reference path. Fusion changes data traversal and summation order; it does not select the CG algorithm.
 
 Standard CG and Jacobi PCG share the recurrence. PCG uses `z=M⁻¹r` and `rᵀz`, while convergence always uses the Euclidean true residual. Periodic replacement restarts the direction from the recomputed residual (or its preconditioned value). Candidate convergence and final results are verified even when periodic refresh is disabled. The explicit legacy algorithm remains selectable and does not support Jacobi.
 
