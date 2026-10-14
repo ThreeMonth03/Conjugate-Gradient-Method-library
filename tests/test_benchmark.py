@@ -1,6 +1,7 @@
 """Exercise the same fixtures, adapters and collector used by make pyprof."""
 
 import json
+import math
 import os
 import subprocess
 import sys
@@ -122,6 +123,34 @@ def test_true_residual_gate_rejects_finite_wrong_solution(solver_options):
     correctness = check_outcome(outcome, arrays, solver_options)
     assert not correctness["eligible"]
     assert correctness["true_residual_norm"] > correctness["residual_threshold"]
+
+
+@pytest.mark.parametrize("magnitude", (1e-200, 1e200))
+def test_true_residual_gate_preserves_extreme_float64_norms(solver_options, magnitude):
+    rhs = np.array([magnitude, -magnitude])
+    arrays = (np.eye(2), rhs, np.zeros(2))
+    outcome = Outcome(np.zeros(2), "converged", 0, 1, 0.0)
+    correctness = check_outcome(outcome, arrays, {**solver_options, "atol": 0.0})
+    assert not correctness["eligible"]
+    assert correctness["true_residual_norm"] == math.hypot(magnitude, -magnitude)
+    assert correctness["true_residual_norm"] > correctness["residual_threshold"]
+
+
+@pytest.mark.parametrize("magnitude", (1e-200, 1e200))
+@pytest.mark.parametrize("preconditioner", ("none", "jacobi"))
+@pytest.mark.parametrize("implementation", ("numpy-out", "torch-eager-out"))
+def test_reference_reports_unrepresentable_inner_product_range(
+    solver_options, magnitude, preconditioner, implementation
+):
+    if implementation == "torch-eager-out":
+        pytest.importorskip("torch")
+    rhs = np.array([magnitude, -magnitude])
+    arrays = (np.eye(2), rhs, np.zeros(2))
+    options = {**solver_options, "atol": 0.0, "preconditioner": preconditioner}
+    outcome = make_executor(implementation, arrays, options, "prepared", 1)()
+    assert outcome.status == "non_finite" and not outcome.converged
+    assert outcome.residual_norm == math.hypot(magnitude, -magnitude)
+    assert not check_outcome(outcome, arrays, options)["eligible"]
 
 
 @pytest.mark.parametrize("algorithm", ("standard", "explicit"))
@@ -326,3 +355,105 @@ def test_native_csr_uses_shared_fixture(solver_options, algorithm):
     assert check_outcome(native, arrays, options)["eligible"]
     assert check_outcome(reference, arrays, options)["eligible"]
     np.testing.assert_allclose(native.x, reference.x, rtol=1e-6, atol=1e-8)
+
+
+@pytest.mark.parametrize("scope", ("prepared", "api"))
+@pytest.mark.parametrize("implementation", ("scipy-reference-pcg", "torch-pcg", "scipy-pcg"))
+def test_jacobi_pcg_on_scaled_poisson(solver_options, scope, implementation):
+    pytest.importorskip("scipy")
+    if implementation == "torch-pcg":
+        pytest.importorskip("torch")
+    arrays = make_case(SUITES["smoke-sparse-solvers"][0])[:3]
+    options = {**solver_options, "residual_refresh": 5}
+    executor = make_executor(implementation, arrays, options, scope, 1)
+    first = executor()
+    assert check_outcome(first, arrays, options)["eligible"]
+    expected = first.x.copy()
+    iterations = first.iterations
+    assert executor.benchmark_metadata()["preconditioner_stored_bytes"] == arrays[1].nbytes
+    first.x.fill(1e6)
+    second = executor()
+    assert check_outcome(second, arrays, options)["eligible"]
+    assert second.iterations == iterations
+    np.testing.assert_array_equal(second.x, expected)
+    matched_cg = "scipy-cg" if implementation == "scipy-pcg" else "scipy-reference-cg"
+    cg = make_executor(matched_cg, arrays, options, scope, 1)()
+    assert first.iterations < cg.iterations
+
+
+@pytest.mark.parametrize("scope", ("prepared", "api"))
+@pytest.mark.parametrize("implementation", ("scipy-lu-total", "scipy-lu-reuse"))
+def test_sparse_direct_setup_memory_and_true_residual(solver_options, scope, implementation):
+    pytest.importorskip("scipy")
+    arrays = make_case(SUITES["smoke-sparse-solvers"][1])[:3]
+    executor = make_executor(implementation, arrays, solver_options, scope, 1)
+    first = executor()
+    assert check_outcome(first, arrays, solver_options)["eligible"]
+    metadata = executor.benchmark_metadata()
+    assert metadata["factor_stored_bytes"] > 0
+    assert metadata["factorization_setup_elapsed_ns"] >= 0
+    assert metadata["factorization_in_timed_call"] == implementation.endswith("total")
+    if implementation == "scipy-lu-total":
+        assert executor.last_factor is None
+    expected = first.x.copy()
+    first.x.fill(1e6)
+    second = executor()
+    assert check_outcome(second, arrays, solver_options)["eligible"]
+    np.testing.assert_array_equal(second.x, expected)
+    assert second.iterations == 0 and second.matvecs == 1
+
+
+@pytest.mark.parametrize("implementation", ("scipy-cg", "scipy-pcg"))
+def test_official_scipy_tiny_residual_respects_absolute_tolerance(solver_options, implementation):
+    sparse = pytest.importorskip("scipy.sparse")
+    rhs = np.array([1e-200, -1e-200])
+    arrays = (2.0 * sparse.eye(2, format="csr"), rhs, np.zeros(2))
+    options = {**solver_options, "atol": 1e-199}
+    outcome = make_executor(implementation, arrays, options, "prepared", 1)()
+    assert outcome.converged
+    assert check_outcome(outcome, arrays, options)["eligible"]
+    assert not check_outcome(outcome, arrays, {**options, "atol": 0.0})["eligible"]
+
+
+def test_sparse_solver_collection_uses_same_inputs_and_separate_algorithm_tags(smoke_spec):
+    pytest.importorskip("scipy")
+    spec = {
+        **smoke_spec,
+        "comparison": "sparse-solvers",
+        "implementations": ["scipy-cg", "scipy-pcg", "scipy-lu-total", "scipy-lu-reuse"],
+    }
+    case = collect_case(SUITES["smoke-sparse-solvers"][0], spec)
+    assert case["cycle_rows"] == 4 and case["sampling"]["rounds"] == 4
+    assert all(entry["status"] == "measured" for entry in case["results"])
+    assert all(
+        entry["setup"]["implementation_role"] == "algorithm_comparison" for entry in case["results"]
+    )
+    assert case["results"][0]["setup"]["library_solver"] == "scipy.sparse.linalg.cg"
+    assert case["input_stored_bytes"] > 0
+
+
+def test_reference_pcg_rejects_explicit_algorithm(solver_options):
+    pytest.importorskip("scipy")
+    arrays = make_case(SUITES["smoke-sparse-solvers"][0])[:3]
+    with pytest.raises(ValueError, match="requires the standard recurrence"):
+        make_executor(
+            "scipy-reference-pcg",
+            arrays,
+            {**solver_options, "algorithm": "explicit"},
+            "prepared",
+            1,
+        )
+
+
+def test_sparse_solver_smoke_all_six_candidates(smoke_spec):
+    pytest.importorskip("scipy")
+    cgpy = pytest.importorskip("cgpy")
+    if not hasattr(cgpy, "CSRMatrix"):
+        pytest.skip("native CSR binding is not available")
+    from cgbench.cli import SPARSE_SOLVERS
+
+    spec = {**smoke_spec, "comparison": "sparse-solvers", "implementations": list(SPARSE_SOLVERS)}
+    for fixture in SUITES["smoke-sparse-solvers"]:
+        case = collect_case(fixture, spec)
+        assert case["cycle_rows"] == 6 and case["sampling"]["rounds"] == 6
+        assert all(entry["status"] == "measured" for entry in case["results"])

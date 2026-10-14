@@ -62,6 +62,7 @@ def environment_metadata():
             "module_path": str(binary),
             "module_sha256": hashlib.sha256(binary.read_bytes()).hexdigest(),
             "build_info": build_info() if callable(build_info) else None,
+            "python_package_path": getattr(package, "__file__", None),
         }
         # Use only an ancestor cache of the binary actually imported. Installed
         # wheels may have no adjacent cache; never substitute another build.
@@ -191,6 +192,7 @@ def summarize(data):
                 "case": case["case"]["name"],
                 "implementation": entry["name"],
                 "status": entry["status"],
+                "setup": entry.get("setup", {}),
             }
             if entry["status"] == "measured":
                 samples = (
@@ -216,6 +218,32 @@ def summarize(data):
 
 def print_summary(data):
     rows = summarize(data)
+    if data.get("metric") == "sparse_solver_comparison":
+        print(
+            "case solver status median_ms p5_ms p95_ms iterations matvecs true_residual setup_ms factor_stored_bytes"
+        )
+        for row in rows:
+            if row["status"] != "measured":
+                print(f"{row['case']} {row['implementation']} {row['status']}: {row['reason']}")
+                continue
+            setup = row["setup"]
+            setup_ns = setup.get(
+                "factorization_setup_elapsed_ns", setup.get("preconditioner_setup_elapsed_ns")
+            )
+            setup_ms = f"{setup_ns / 1e6:.6f}" if setup_ns is not None else "n/a"
+            print(
+                f"{row['case']} {row['implementation']} measured {row['median_ns'] / 1e6:.6f} {row['p5_ns'] / 1e6:.6f} {row['p95_ns'] / 1e6:.6f} {row['iterations']} {row['matvecs']} {row['true_residual_norm']:.6e} {setup_ms} {setup.get('factor_stored_bytes', 0)}"
+            )
+        print(
+            "Solver strategies differ: compare verified solution time and disclosed setup; no implementation speedup ratio."
+        )
+        print(
+            "Setup samples are separate untimed probes; API preconditioning and LU-total factorization are also included in timed calls."
+        )
+        print(
+            "Stored input/factor/preconditioner array bytes are not peak process memory. Percentiles summarize round-average latency."
+        )
+        return
     native = {
         row["case"]: row["median_ns"]
         for row in rows

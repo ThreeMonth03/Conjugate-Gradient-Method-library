@@ -80,12 +80,14 @@ class Workspace
     VectorView direction() noexcept { return p_.view(); }
     VectorView product() noexcept { return ap_.view(); }
     VectorView scratch() noexcept { return scratch_.view(); }
+    VectorView preconditioned() noexcept { return z_.view(); }
 
   private:
     Vector r_;
     Vector p_;
     Vector ap_;
     Vector scratch_;
+    Vector z_;
 };
 
 namespace detail

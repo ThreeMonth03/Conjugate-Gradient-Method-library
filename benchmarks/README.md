@@ -4,6 +4,74 @@
 builder, solver adapters, correctness gate, Williams scheduler and artifact
 writer. All dependencies belong in the project `.venv` / local build tree.
 
+The sparse solver strategy suite is the primary CG/PCG-versus-direct comparison:
+
+```bash
+make pyprof PYPROF_SUITE=sparse-solvers PYPROF_THREADS=1 PYPROF_SCOPE=prepared
+make pyprof PYPROF_SUITE=smoke-sparse-solvers \
+  PYPROF_ARGS="--warmups 1 --repetitions 1 --rounds 6"
+```
+
+Its six default candidates are `native-cg`, `native-pcg`, `scipy-cg`,
+`scipy-pcg`, `scipy-lu-total` and `scipy-lu-reuse`. The SciPy CG candidates
+call the actual public `scipy.sparse.linalg.cg`; PCG supplies a Jacobi
+`LinearOperator`. Their residual recurrence follows SciPy's library policy,
+without the native solver's configured periodic true-residual replacement.
+This is a solver-strategy comparison, so its output reports verified solution
+times and setup costs without a generic native implementation speedup ratio.
+All candidates must satisfy the same requested true-residual threshold; direct
+solves can achieve tighter residuals and are not claimed to have equal error.
+
+The full suite has diagonally scaled 2D grids of sides 16/32 and 3D grids of
+sides 6/10, plus a neutral unscaled 2D grid of side 16. Scaled matrices are
+`A=D*P*D`, where P is the Dirichlet Poisson operator and D has a geometric
+diagonal from 1 to 20. This preserves SPD and makes Jacobi useful. The parameter
+specifies scaling, not an exact condition number. The neutral constant-diagonal
+case keeps Jacobi's lack of useful scaling work visible. Smoke uses scaled 2D
+side 4 and 3D side 3 (scale 10), plus unscaled 2D side 4. Inputs and known
+solutions use the same case builder and SHA-256 contract in pytest and pyprof.
+
+The opt-in `sparse-solvers-large` suite uses unscaled 2D grids of sides 64/128
+and 3D grids of sides 20/30 (up to 27,000 unknowns). It exposes sparse factor
+fill-in at a more useful scale and is excluded from default/CI smoke runs.
+The larger direct factorizations require more time and stored factor memory.
+Use an explicit short sampling plan when exploring it:
+
+```bash
+make pyprof PYPROF_SUITE=sparse-solvers-large PYPROF_THREADS=1 \
+  PYPROF_SCOPE=prepared PYPROF_ARGS="--warmups 1 --repetitions 1 --rounds 6"
+```
+
+Native prepared PCG caches its Jacobi inverse; native API PCG constructs it in
+each measured call. Official SciPy prepared PCG caches its Jacobi operator,
+but public SciPy CG allocates iterative workspace in both scopes. API SciPy
+PCG includes Jacobi construction each time. Setup samples are measured once
+outside formal timing, and artifacts state whether setup repeats inside each
+timed invocation. Native setup metadata comes from the plan's inverse-diagonal
+construction timer when available. SciPy iteration/matvec instrumentation runs
+only in the first untimed correctness probe; formal timings use direct CSR
+input without a callback or counting wrapper.
+
+SuperLU uses public `scipy.sparse.linalg.splu` on CSC storage. `scipy-lu-total`
+factors and solves on every measured call. `scipy-lu-reuse` factors once before
+measurement and times subsequent solves; its factorization setup time is
+reported separately. CSR-to-CSC conversion is outside both variants and its
+time/storage are disclosed. Every candidate is charged the output reset from
+the same x0, although a direct factor solve does not use an initial guess.
+Saved input, inverse-diagonal, CSC and L/U/permutation array bytes describe
+stored numerical arrays, not peak RSS or all allocator/SuperLU overhead.
+CSR input bytes count the shared SciPy arrays with their original index dtype.
+They are not the native owning CSR size: native size_t indices may use more
+bytes, and native snapshots/workspace are excluded from this shared-input count.
+
+For implementation comparisons, use the dense/CSR suites below or optional
+`scipy-reference-cg` / `scipy-reference-pcg` / `torch-cg` / `torch-pcg` candidates.
+The reference candidates use this project's recurrence and replacement policy;
+they are clearly separate from the official `scipy-cg` / `scipy-pcg` solvers.
+Jacobi PCG supports `--algorithm standard`; the explicit legacy algorithm and
+Jacobi combination is rejected. Normal implementation suites also accept
+`--preconditioner jacobi` when selecting their common preconditioner.
+
 The underlying entry point is useful for selecting one comparison:
 
 ```bash
@@ -77,6 +145,11 @@ solutions are marked invalid and excluded from timing/speedup. A final check
 after timing guards against accidentally retaining a solved initial guess.
 Missing optional Torch is ineligible and visible in the artifact; missing
 requested native code or a numerically invalid candidate fails the run.
+Independent verification uses a scaled `math.hypot` norm to avoid admitting
+false zero residuals when squaring tiny values underflows. Reference/native
+iterative solvers retain their ordinary float64 fast path and report numerical
+range failure when nonzero squared inner products cannot be represented;
+this does not promise arbitrary-scale CG support.
 
 Every run starts a fresh worker with BLAS/OpenMP thread environment variables
 set before numerical imports. Torch intraop threads use the requested count;
@@ -97,7 +170,9 @@ calibrate repetitions.
 
 Artifacts save raw nanoseconds, actual schedules, input hashes, solver options,
 revision/dirty state, CPU/OS/affinity, package versions, BLAS/thread information
-and available CMake compiler/flag metadata. Keep artifacts from separate
+and the loaded native module path/SHA-256 plus embedded build metadata and an
+adjacent CMake cache when available. A cache from another build is never used.
+Keep artifacts from separate
 processes separate. Compare and replay with:
 
 ```bash
@@ -112,11 +187,11 @@ environments differ. CI should gate correctness and artifact collection in the
 smoke suite. Speed thresholds belong on a stable machine, separate from
 ordinary shared-runner PR checks.
 
-These comparisons measure implementations of the same CG algorithm. Dense
+The implementation suites measure the same CG recurrence and policy. Dense
 `numpy.linalg.solve` / `torch.linalg.solve` use direct solvers and belong in a
 separately labeled application comparison. The independent mature SciPy CG
-solver can be added with a separate tag, since its stopping/replacement
-implementation may differ. Converting sparse problems to dense solely for a
+solver is part of the sparse strategy suite with its stopping/replacement
+policy disclosed. Converting sparse problems to dense solely for a
 baseline would conflate storage and algorithm costs. Fixed-iteration
 throughput and compiled Torch baselines can be added as
 separately labeled metrics rather than replacing time to a verified solution.

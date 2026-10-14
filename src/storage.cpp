@@ -71,7 +71,7 @@ DenseMatrix::DenseMatrix(std::size_t rows, std::size_t cols, std::vector<double>
     }
 }
 
-Workspace::Workspace(std::size_t size) : r_(size), p_(size), ap_(size), scratch_(size) {}
+Workspace::Workspace(std::size_t size) : r_(size), p_(size), ap_(size), scratch_(size), z_(size) {}
 
 void Workspace::prepare(std::size_t size)
 {
@@ -84,6 +84,7 @@ void Workspace::prepare(std::size_t size)
     p_.resize(size);
     ap_.resize(size);
     scratch_.resize(size);
+    z_.resize(size);
 }
 
 namespace detail

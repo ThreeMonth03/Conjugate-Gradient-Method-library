@@ -57,14 +57,16 @@ def check_outcome(outcome, arrays, options):
     """Independently validate the true residual before admitting timing data."""
     import numpy as np
 
+    from .numerics import stable_l2
+
     matrix, rhs, _initial = arrays
     x = np.asarray(outcome.x)
     if x.shape != rhs.shape or x.dtype != rhs.dtype:
         return {"eligible": False, "reason": "solution shape or dtype mismatch"}
     if not np.all(np.isfinite(x)):
         return {"eligible": False, "reason": "solution contains non-finite values"}
-    true_norm = float(np.linalg.norm(rhs - matrix @ x))
-    threshold = max(options["atol"], options["rtol"] * float(np.linalg.norm(rhs)))
+    true_norm = stable_l2(rhs - matrix @ x)
+    threshold = max(options["atol"], options["rtol"] * stable_l2(rhs))
     # Permit only the rounding-scale difference between equivalent norm sums.
     rounding = 1.0 + 64.0 * np.finfo(rhs.dtype).eps
     eligible = outcome.converged and math.isfinite(true_norm) and true_norm <= threshold * rounding
@@ -117,6 +119,7 @@ def collect_case(case_spec, run_spec):
             "status": "measured" if eligible else "invalid",
             **correctness,
             "round_elapsed_ns": [],
+            "setup": execute.benchmark_metadata() if hasattr(execute, "benchmark_metadata") else {},
         }
         results.append(entry)
         if eligible:
@@ -150,6 +153,16 @@ def collect_case(case_spec, run_spec):
         "dtype": "float64",
         "layout": "CSR" if case_spec.storage == "csr" else "C",
         "nnz": int(matrix.nnz) if case_spec.storage == "csr" else None,
+        "input_stored_bytes": int(
+            rhs.nbytes
+            + initial.nbytes
+            + (
+                matrix.data.nbytes + matrix.indices.nbytes + matrix.indptr.nbytes
+                if case_spec.storage == "csr"
+                else matrix.nbytes
+            )
+        ),
+        "input_storage_basis": "shared input NumPy/SciPy arrays, including original index dtype; excludes native owning copies and workspace",
         "sampling": sampling,
         "schedule": "williams",
         "cycle_rows": cycle,

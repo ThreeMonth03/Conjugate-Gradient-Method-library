@@ -112,11 +112,11 @@ class CSRMatrix:
         return self._native.nnz
 
 
-def prepare(A, *, num_threads=1):
+def prepare(A, *, num_threads=1, preconditioner="none"):
     """Snapshot A for repeated solves; each active solve needs its own workspace."""
     if isinstance(A, CSRMatrix):
-        return PreparedCsrSolver(A._native, num_threads)
-    return PreparedSolver(_matrix(A), num_threads)
+        return PreparedCsrSolver(A._native, num_threads, preconditioner)
+    return PreparedSolver(_matrix(A), num_threads, preconditioner)
 
 
 def solve_into(
@@ -132,11 +132,13 @@ def solve_into(
     algorithm="standard",
     fused=True,
     residual_refresh=50,
+    preconditioner="none",
 ):
     """Solve in place, treating x as the initial guess. No implicit array conversion.
 
-    A, b and x must be aligned C-contiguous float64 NumPy arrays. x must be
-    writable and disjoint from A and b. A and b must not be mutated concurrently
+    A may be an owned CSRMatrix or an aligned C-contiguous float64 NumPy array.
+    b and x must be aligned C-contiguous float64 NumPy arrays. x must be writable
+    and disjoint from A and b. Borrowed arrays must not be mutated concurrently
     while the GIL is released.
     The workspace must match the system size and cannot serve concurrent calls.
     """
@@ -155,6 +157,7 @@ def solve_into(
         algorithm=algorithm,
         fused=fused,
         residual_refresh=residual_refresh,
+        preconditioner=preconditioner,
     )
 
 
@@ -170,6 +173,7 @@ def solve(
     algorithm="standard",
     fused=True,
     residual_refresh=50,
+    preconditioner="none",
 ):
     """Return a new solution; preserve inputs and normalize their dtype/layout.
 
@@ -205,5 +209,6 @@ def solve(
         algorithm=algorithm,
         fused=fused,
         residual_refresh=residual_refresh,
+        preconditioner=preconditioner,
     )
     return SolveResult(x, info)

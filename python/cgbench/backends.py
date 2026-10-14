@@ -1,7 +1,11 @@
 """Preallocated NumPy/PyTorch references and the public native API adapter."""
 
 import math
+import sys
+import time
 from dataclasses import dataclass
+
+from .numerics import l2_from_square
 
 
 @dataclass
@@ -29,13 +33,31 @@ class NativeExecutor:
             self.matrix = cgpy.CSRMatrix(
                 self.matrix.indptr, self.matrix.indices, self.matrix.data, self.matrix.shape
             )
-        self.options = options
+        self.options = dict(options)
+        self.preconditioner = self.options.pop("preconditioner", "none")
         self.scope = scope
         self.threads = threads
+        self.setup_metadata = {"preconditioner": self.preconditioner}
+        settings = {"preconditioner": self.preconditioner} if self.preconditioner != "none" else {}
         if scope == "prepared":
-            self.solver = cgpy.prepare(self.matrix, num_threads=threads)
+            start = time.perf_counter_ns()
+            self.solver = cgpy.prepare(self.matrix, num_threads=threads, **settings)
+            self.setup_metadata["operator_setup_elapsed_ns"] = time.perf_counter_ns() - start
             self.workspace = self.solver.create_workspace()
             self.x = np.empty_like(self.initial)
+            plan = self.solver
+        elif self.preconditioner != "none":
+            plan = cgpy.prepare(self.matrix, num_threads=threads, **settings)
+        else:
+            plan = None
+        self.setup_metadata["preconditioner_setup_elapsed_ns"] = (
+            getattr(plan, "preconditioner_setup_ns", None) if self.preconditioner == "jacobi" else 0
+        )
+        self.setup_metadata["preconditioner_stored_bytes"] = (
+            int(getattr(plan, "preconditioner_nbytes", self.initial.nbytes))
+            if self.preconditioner == "jacobi"
+            else 0
+        )
 
     def __call__(self):
         if self.scope == "prepared":
@@ -46,11 +68,15 @@ class NativeExecutor:
             )
             x = self.x
         else:
+            settings = (
+                {"preconditioner": self.preconditioner} if self.preconditioner != "none" else {}
+            )
             info = self.cgpy.solve(
                 self.matrix,
                 self.rhs,
                 x0=self.initial,
                 num_threads=self.threads,
+                **settings,
                 **self.options,
             )
             x = info.x
@@ -62,6 +88,18 @@ class NativeExecutor:
             info.residual_norm,
         )
 
+    def benchmark_metadata(self):
+        return {
+            **self.setup_metadata,
+            "implementation_role": "native",
+            "solver_family": "pcg" if self.preconditioner == "jacobi" else "cg",
+            "setup_in_timed_call": self.scope == "api",
+            "setup_measurement": "native plan setup outside timing; API setup repeats inside every timed solve",
+            "residual_policy": self.options["algorithm"]
+            + " with residual_refresh="
+            + str(self.options["residual_refresh"]),
+        }
+
 
 class NumpyOps:
     def __init__(self, arrays):
@@ -72,7 +110,22 @@ class NumpyOps:
         self.validate(True)
 
     def workspace(self):
-        return [self.np.empty_like(self.initial) for _ in range(5)]
+        return [self.empty_vector() for _ in range(5)]
+
+    def empty_vector(self):
+        return self.np.empty_like(self.initial)
+
+    def inverse_diagonal(self):
+        diagonal = self.matrix.diagonal().copy()
+        if not self.np.all(self.np.isfinite(diagonal)) or not self.np.all(diagonal > 0.0):
+            raise ValueError("Jacobi requires a finite positive diagonal")
+        self.np.reciprocal(diagonal, out=diagonal)
+        if not self.np.all(self.np.isfinite(diagonal)) or not self.np.all(diagonal > 0.0):
+            raise ValueError("Jacobi reciprocal must be finite and positive")
+        return diagonal
+
+    def precondition(self, inverse, residual, out):
+        self.np.multiply(inverse, residual, out=out)
 
     def validate(self, api):
         arrays = (self.matrix, self.rhs, self.initial) if api else (self.rhs, self.initial)
@@ -125,6 +178,7 @@ class TorchOps:
             torch.set_num_interop_threads(1)
         self.torch = torch
         matrix, rhs, initial = arrays
+        self.original_matrix = matrix
         self.sparse = hasattr(matrix, "indptr")
         if self.sparse:
             self.matrix = torch.sparse_csr_tensor(
@@ -141,7 +195,22 @@ class TorchOps:
             raise ValueError("CSR inputs must be finite")
 
     def workspace(self):
-        return [self.torch.empty_like(self.initial) for _ in range(5)]
+        return [self.empty_vector() for _ in range(5)]
+
+    def empty_vector(self):
+        return self.torch.empty_like(self.initial)
+
+    def inverse_diagonal(self):
+        diagonal = self.torch.from_numpy(self.original_matrix.diagonal().copy())
+        if not bool(self.torch.isfinite(diagonal).all()) or not bool((diagonal > 0).all()):
+            raise ValueError("Jacobi requires a finite positive diagonal")
+        diagonal.reciprocal_()
+        if not bool(self.torch.isfinite(diagonal).all()) or not bool((diagonal > 0).all()):
+            raise ValueError("Jacobi reciprocal must be finite and positive")
+        return diagonal
+
+    def precondition(self, inverse, residual, out):
+        self.torch.mul(inverse, residual, out=out)
 
     def validate(self, api):
         arrays = (
@@ -221,12 +290,44 @@ class ReferenceExecutor:
         self.ops = ops
         self.options = options
         self.scope = scope
+        self.preconditioner = options.get("preconditioner", "none")
+        if self.preconditioner not in ("none", "jacobi"):
+            raise ValueError("preconditioner must be none or jacobi")
+        if self.preconditioner == "jacobi" and options["algorithm"] != "standard":
+            raise ValueError("Jacobi PCG requires the standard recurrence")
         # Prepare a snapshot once, matching the native prepared operator.
         if scope == "prepared":
             self.ops.matrix = (
                 self.ops.matrix.copy() if isinstance(ops, NumpyOps) else self.ops.matrix.clone()
             )
         self.storage = ops.workspace() if scope == "prepared" else None
+        self.inverse = None
+        self.preconditioner_setup_ns = 0
+        if self.preconditioner == "jacobi":
+            start = time.perf_counter_ns()
+            probe = ops.inverse_diagonal()
+            self.preconditioner_setup_ns = time.perf_counter_ns() - start
+            if scope == "prepared":
+                self.inverse = probe
+                self.storage.append(ops.empty_vector())
+
+    def benchmark_metadata(self):
+        return {
+            "implementation_role": "same_policy_reference",
+            "solver_family": "pcg" if self.preconditioner == "jacobi" else "cg",
+            "preconditioner": self.preconditioner,
+            "preconditioner_setup_elapsed_ns": self.preconditioner_setup_ns,
+            "preconditioner_stored_bytes": int(self.ops.initial.numel() * 8)
+            if isinstance(self.ops, TorchOps) and self.preconditioner == "jacobi"
+            else int(self.ops.initial.size * 8)
+            if self.preconditioner == "jacobi"
+            else 0,
+            "setup_in_timed_call": self.scope == "api",
+            "setup_measurement": "single untimed setup probe",
+            "residual_policy": self.options["algorithm"]
+            + " with residual_refresh="
+            + str(self.options["residual_refresh"]),
+        }
 
     def __call__(self):
         ops = self.ops
@@ -237,12 +338,23 @@ class ReferenceExecutor:
 
     def _solve(self):
         ops = self.ops
-        x, residual, direction, product, scratch = (
-            self.storage if self.storage is not None else ops.workspace()
-        )
+        storage = self.storage if self.storage is not None else ops.workspace()
+        inverse = self.inverse
+        if self.preconditioner == "jacobi" and self.scope == "api":
+            inverse = ops.inverse_diagonal()
+            storage.append(ops.empty_vector())
+        x, residual, direction, product, scratch = storage[:5]
+        z = storage[5] if inverse is not None else None
         ops.copy(ops.initial, x)
         explicit = self.options["algorithm"] == "explicit"
-        b_norm = math.sqrt(ops.dot(ops.rhs, ops.rhs))
+
+        def norm(squared, vector):
+            # Do not export Torch tensors on the ordinary squared-norm path.
+            if squared >= sys.float_info.min and math.isfinite(squared):
+                return math.sqrt(squared)
+            return l2_from_square(squared, ops.export(vector))
+
+        b_norm = norm(ops.dot(ops.rhs, ops.rhs), ops.rhs)
         tolerance = max(self.options["atol"], self.options["rtol"] * b_norm)
         matvecs = 0
         iterations = 0
@@ -255,33 +367,46 @@ class ReferenceExecutor:
             return ops.dot(residual, residual)
 
         def result(status, rho):
-            norm = math.sqrt(rho) if rho >= 0.0 else float("nan")
-            return Outcome(ops.export(x), status, iterations, matvecs, norm)
+            residual_norm = norm(rho, residual)
+            return Outcome(ops.export(x), status, iterations, matvecs, residual_norm)
 
         def finish(status):
             final_rho = rho if explicit else true_residual()
-            if not math.isfinite(final_rho):
+            final_norm = norm(final_rho, residual)
+            if not math.isfinite(final_norm):
                 status = "non_finite"
-            elif status != "non_finite" and math.sqrt(final_rho) <= tolerance:
+            elif status != "non_finite" and final_norm <= tolerance:
                 status = "converged"
             return result(status, final_rho)
 
         rho = true_residual()
-        if not math.isfinite(rho) or not math.isfinite(b_norm):
+        residual_norm = norm(rho, residual)
+        if not math.isfinite(residual_norm) or not math.isfinite(b_norm):
             return result("non_finite", rho)
-        if math.sqrt(rho) <= tolerance:
+        if residual_norm <= tolerance:
             return result("converged", rho)
         if self.options["maxiter"] == 0:
             return result("max_iterations", rho)
-        ops.initialize_direction(residual, direction, explicit)
+        if not math.isfinite(rho) or rho < sys.float_info.min:
+            return result("non_finite", rho)
+        if inverse is None:
+            ops.initialize_direction(residual, direction, explicit)
+        else:
+            ops.precondition(inverse, residual, z)
+            rho = ops.dot(residual, z)
+            ops.initialize_direction(z, direction, False)
+            if not math.isfinite(rho) or rho < sys.float_info.min:
+                return finish("non_finite")
         for iteration in range(self.options["maxiter"]):
             ops.matvec(direction, product)
             matvecs += 1
             denominator = ops.dot(direction, product)
             if not math.isfinite(denominator):
                 return finish("non_finite")
-            if denominator <= 0.0:
+            if denominator < 0.0:
                 return finish("non_positive_curvature")
+            if denominator < sys.float_info.min:
+                return finish("non_finite")
             alpha = -ops.dot(residual, direction) / denominator if explicit else rho / denominator
             if not math.isfinite(alpha):
                 return finish("non_finite")
@@ -289,10 +414,13 @@ class ReferenceExecutor:
             iterations = iteration + 1
             if explicit:
                 rho_next = true_residual()
-                if not math.isfinite(rho_next):
+                norm_next = norm(rho_next, residual)
+                if not math.isfinite(norm_next):
                     return result("non_finite", rho_next)
-                if math.sqrt(rho_next) <= tolerance:
+                if norm_next <= tolerance:
                     return result("converged", rho_next)
+                if not math.isfinite(rho_next) or rho_next < sys.float_info.min:
+                    return result("non_finite", rho_next)
                 if iterations == self.options["maxiter"]:
                     return result("max_iterations", rho_next)
                 rho = rho_next
@@ -300,29 +428,47 @@ class ReferenceExecutor:
             else:
                 ops.axpy(-alpha, product, residual, scratch)
                 rho_next = ops.dot(residual, residual)
-                if not math.isfinite(rho_next):
+                norm_next = norm(rho_next, residual)
+                if not math.isfinite(norm_next):
                     return finish("non_finite")
                 refresh = self.options["residual_refresh"]
                 if (
-                    math.sqrt(rho_next) <= tolerance
+                    norm_next <= tolerance
                     or (refresh and iterations % refresh == 0)
                     or iterations == self.options["maxiter"]
                 ):
                     rho_next = true_residual()
-                    if not math.isfinite(rho_next):
+                    norm_next = norm(rho_next, residual)
+                    if not math.isfinite(norm_next):
                         return result("non_finite", rho_next)
-                    if math.sqrt(rho_next) <= tolerance:
+                    if norm_next <= tolerance:
                         return result("converged", rho_next)
+                    if not math.isfinite(rho_next) or rho_next < sys.float_info.min:
+                        return result("non_finite", rho_next)
                     if iterations == self.options["maxiter"]:
                         return result("max_iterations", rho_next)
                     # True residual replacement restarts the search direction.
-                    ops.initialize_direction(residual, direction, False)
-                    rho = rho_next
+                    if inverse is None:
+                        ops.initialize_direction(residual, direction, False)
+                        rho = rho_next
+                    else:
+                        ops.precondition(inverse, residual, z)
+                        rho = ops.dot(residual, z)
+                        if not math.isfinite(rho) or rho < sys.float_info.min:
+                            return result("non_finite", rho_next)
+                        ops.initialize_direction(z, direction, False)
                     continue
+                if not math.isfinite(rho_next) or rho_next < sys.float_info.min:
+                    return finish("non_finite")
+                if inverse is not None:
+                    ops.precondition(inverse, residual, z)
+                    rho_next = ops.dot(residual, z)
+                    if not math.isfinite(rho_next) or rho_next < sys.float_info.min:
+                        return finish("non_finite")
                 beta = rho_next / rho
             if not math.isfinite(beta):
                 return finish("non_finite")
-            ops.direction(beta, residual, direction, explicit)
+            ops.direction(beta, residual if inverse is None else z, direction, explicit)
             rho = rho_next
         rho = true_residual()
         if not math.isfinite(rho):
@@ -331,6 +477,25 @@ class ReferenceExecutor:
 
 
 def make_executor(name, arrays, options, scope, threads):
+    if name in ("scipy-lu-total", "scipy-lu-reuse"):
+        from .sparse_solvers import SparseLUExecutor
+
+        return SparseLUExecutor(arrays, options, scope, reuse=name.endswith("reuse"))
+    if name in ("scipy-cg", "scipy-pcg"):
+        from .sparse_solvers import ScipyKrylovExecutor
+
+        return ScipyKrylovExecutor(arrays, options, scope, jacobi=name == "scipy-pcg")
+    aliases = {
+        "native-cg": ("native", "none"),
+        "native-pcg": ("native", "jacobi"),
+        "scipy-reference-cg": ("scipy-out", "none"),
+        "scipy-reference-pcg": ("scipy-out", "jacobi"),
+        "torch-cg": ("torch-eager-out", "none"),
+        "torch-pcg": ("torch-eager-out", "jacobi"),
+    }
+    if name in aliases:
+        name, preconditioner = aliases[name]
+        options = {**options, "preconditioner": preconditioner}
     if name == "native":
         return NativeExecutor(arrays, options, scope, threads)
     if name == "numpy-out":

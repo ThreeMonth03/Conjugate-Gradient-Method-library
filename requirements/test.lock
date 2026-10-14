@@ -1,0 +1,3 @@
+-r dev.lock
+scipy==1.15.3
+threadpoolctl==3.6.0

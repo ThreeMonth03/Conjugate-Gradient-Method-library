@@ -14,6 +14,8 @@ class CaseSpec:
     condition_scale: float = 100.0
     storage: str = "dense"
     grid: int | None = None
+    dimensions: int = 2
+    diagonal_scale: float = 1.0
 
     def to_dict(self):
         data = asdict(self)
@@ -22,6 +24,10 @@ class CaseSpec:
             data.pop("storage")
         if self.grid is None:
             data.pop("grid")
+        if self.dimensions == 2:
+            data.pop("dimensions")
+        if self.diagonal_scale == 1.0:
+            data.pop("diagonal_scale")
         return data
 
 
@@ -35,6 +41,40 @@ SUITES = {
     ),
 }
 SUITES["cpu-dense-f64-v1"] = SUITES["cpu"]
+SUITES["sparse-solvers"] = tuple(
+    CaseSpec(
+        f"scaled-poisson-{dimensions}d-{grid}",
+        grid**dimensions,
+        storage="csr",
+        grid=grid,
+        dimensions=dimensions,
+        diagonal_scale=20.0,
+    )
+    for dimensions, grid in ((2, 16), (2, 32), (3, 6), (3, 10))
+)
+SUITES["smoke-sparse-solvers"] = tuple(
+    CaseSpec(
+        f"scaled-poisson-{dimensions}d-{grid}",
+        grid**dimensions,
+        storage="csr",
+        grid=grid,
+        dimensions=dimensions,
+        diagonal_scale=10.0,
+    )
+    for dimensions, grid in ((2, 4), (3, 3))
+)
+SUITES["sparse-solvers"] += (CaseSpec("poisson-2d-16-neutral", 256, storage="csr", grid=16),)
+SUITES["smoke-sparse-solvers"] += (CaseSpec("poisson-2d-4-neutral", 16, storage="csr", grid=4),)
+SUITES["sparse-solvers-large"] = tuple(
+    CaseSpec(
+        f"poisson-{dimensions}d-{grid}-large",
+        grid**dimensions,
+        storage="csr",
+        grid=grid,
+        dimensions=dimensions,
+    )
+    for dimensions, grid in ((2, 64), (2, 128), (3, 20), (3, 30))
+)
 
 
 def make_case(spec, seed=20261015):
@@ -52,15 +92,27 @@ def make_case(spec, seed=20261015):
     if spec.storage == "csr":
         from scipy import sparse
 
-        if spec.grid is None or spec.grid < 1 or spec.grid * spec.grid != spec.size:
-            raise ValueError("CSR Poisson size must equal grid squared")
+        if (
+            spec.grid is None
+            or spec.grid < 1
+            or spec.dimensions not in (2, 3)
+            or spec.grid**spec.dimensions != spec.size
+        ):
+            raise ValueError("CSR Poisson size must equal grid to dimensions (2 or 3)")
         line = sparse.diags(
             (-np.ones(spec.grid - 1), 2.0 * np.ones(spec.grid), -np.ones(spec.grid - 1)),
             (-1, 0, 1),
             shape=(spec.grid, spec.grid),
             format="csr",
         )
-        matrix = sparse.kronsum(line, line, format="csr")
+        matrix = line
+        for _ in range(1, spec.dimensions):
+            matrix = sparse.kronsum(matrix, line, format="csr")
+        if spec.diagonal_scale < 1.0 or not np.isfinite(spec.diagonal_scale):
+            raise ValueError("diagonal_scale must be finite and at least one")
+        if spec.diagonal_scale != 1.0:
+            weights = np.geomspace(1.0, spec.diagonal_scale, spec.size)
+            matrix.data *= np.repeat(weights, np.diff(matrix.indptr)) * weights[matrix.indices]
         matrix.sum_duplicates()
         matrix.eliminate_zeros()
         matrix.sort_indices()

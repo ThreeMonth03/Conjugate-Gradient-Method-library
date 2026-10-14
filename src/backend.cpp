@@ -1,6 +1,8 @@
 #include "cg/backend.hpp"
 
 #include <algorithm>
+#include <cmath>
+#include <limits>
 #include <stdexcept>
 
 namespace cg
@@ -100,6 +102,89 @@ double CpuBackend::dot(ConstVectorView x, ConstVectorView y) const
 
 double CpuBackend::norm2(ConstVectorView x) const { return dot(x, x); }
 
+double CpuBackend::norm(ConstVectorView x) const { return detail::norm_from_squared(x, norm2(x)); }
+
+namespace detail
+{
+
+double norm_from_squared(ConstVectorView x, double squared_norm)
+{
+    if (std::isfinite(squared_norm) && squared_norm >= std::numeric_limits<double>::min())
+    {
+        return std::sqrt(squared_norm);
+    }
+    // The fallback is needed only outside the ordinary squared-sum range.
+    // Scaling prevents both overflow and underflow in the norm evaluation.
+    double scale = 0.0;
+    double sum = 1.0;
+    for (std::size_t i = 0; i < x.size; ++i)
+    {
+        const double magnitude = std::abs(x.data[i]);
+        if (!std::isfinite(magnitude))
+        {
+            return magnitude;
+        }
+        if (magnitude != 0.0)
+        {
+            if (scale < magnitude)
+            {
+                const double ratio = scale / magnitude;
+                sum = 1.0 + sum * ratio * ratio;
+                scale = magnitude;
+            }
+            else
+            {
+                const double ratio = magnitude / scale;
+                sum += ratio * ratio;
+            }
+        }
+    }
+    return scale * std::sqrt(sum);
+}
+
+} // namespace detail
+
+void CpuBackend::multiply(ConstVectorView x, ConstVectorView y, VectorView output) const
+{
+    same_size(x, y);
+    same_size(x, output);
+    exact_or_disjoint(x, output);
+    exact_or_disjoint(y, output);
+#ifdef _OPENMP
+#pragma omp parallel for simd schedule(static)                                                     \
+    num_threads(threads_) if (threads_ > 1 && x.size >= 16384)
+#endif
+    for (std::size_t i = 0; i < x.size; ++i)
+    {
+        output.data[i] = x.data[i] * y.data[i];
+    }
+}
+
+double CpuBackend::multiply_dot(ConstVectorView factors, ConstVectorView r, VectorView z) const
+{
+    same_size(factors, r);
+    same_size(r, z);
+    no_overlap(factors, z);
+    no_overlap(r, z);
+    if (!fused_)
+    {
+        multiply(factors, r, z);
+        return dot(r, z);
+    }
+    double product = 0.0;
+#ifdef _OPENMP
+#pragma omp parallel for simd reduction(+ : product) schedule(static)                              \
+    num_threads(threads_) if (threads_ > 1 && r.size >= 16384)
+#endif
+    for (std::size_t i = 0; i < r.size; ++i)
+    {
+        const double value = factors.data[i] * r.data[i];
+        z.data[i] = value;
+        product += r.data[i] * value;
+    }
+    return product;
+}
+
 void CpuBackend::axpy(double alpha, ConstVectorView x, VectorView y) const
 {
     same_size(x, y);
@@ -134,6 +219,14 @@ void CpuBackend::axpby(double alpha, ConstVectorView x, double beta, ConstVector
 void CpuBackend::apply(DenseMatrixView A, ConstVectorView x, VectorView output) const
 {
     validate_apply(A, x, output);
+    if (A.cols == 0)
+    {
+        if (output.size != 0)
+        {
+            std::fill_n(output.data, output.size, 0.0);
+        }
+        return;
+    }
 #ifdef _OPENMP
 #pragma omp parallel for schedule(static)                                                          \
     num_threads(threads_) if (threads_ > 1 && A.rows >= 64 && A.cols >= 128)
@@ -190,6 +283,11 @@ double CpuBackend::residual(DenseMatrixView A, ConstVectorView b, ConstVectorVie
     same_size(b, r);
     no_overlap(b, r);
     validate_apply(A, x, r);
+    if (A.cols == 0)
+    {
+        axpby(b_minus_ax ? 1.0 : -1.0, b, 0.0, b, r);
+        return norm2(r);
+    }
     if (!fused_)
     {
         apply(A, x, r);
