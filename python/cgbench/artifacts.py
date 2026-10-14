@@ -1,0 +1,219 @@
+"""Store exact sampling data and report per-round average timings."""
+
+import json
+import os
+import platform
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+THREAD_VARIABLES = (
+    "OMP_NUM_THREADS",
+    "OPENBLAS_NUM_THREADS",
+    "MKL_NUM_THREADS",
+    "BLIS_NUM_THREADS",
+    "VECLIB_MAXIMUM_THREADS",
+    "NUMEXPR_NUM_THREADS",
+)
+
+
+def _command(arguments, cwd):
+    try:
+        completed = subprocess.run(arguments, cwd=cwd, capture_output=True, text=True, check=True)
+        return completed.stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        return None
+
+
+def environment_metadata():
+    """Record actual library/thread/build information, with missing data explicit."""
+    from importlib.metadata import PackageNotFoundError, version
+
+    import numpy as np
+
+    root = Path(__file__).resolve().parents[2]
+    packages = {}
+    for name in ("numpy", "torch", "threadpoolctl", "cgpy"):
+        try:
+            packages[name] = version(name)
+        except PackageNotFoundError:
+            packages[name] = None
+    threadpools = None
+    try:
+        from threadpoolctl import threadpool_info
+
+        threadpools = threadpool_info()
+    except ImportError:
+        pass
+    try:
+        numpy_config = np.__config__.show(mode="dicts")
+    except TypeError:
+        numpy_config = {"information": "configuration unavailable with this NumPy"}
+    cmake = {}
+    if (root / "build").is_dir():
+        for cache in sorted((root / "build").glob("**/CMakeCache.txt"))[:8]:
+            fields = {}
+            for line in cache.read_text(errors="replace").splitlines():
+                if line.startswith(
+                    (
+                        "CMAKE_CXX_COMPILER:",
+                        "CMAKE_CXX_FLAGS",
+                        "CMAKE_BUILD_TYPE:",
+                        "CG_",
+                    )
+                ):
+                    key, _, value = line.partition("=")
+                    fields[key] = value
+            cmake[str(cache.relative_to(root))] = fields
+    cpu = platform.processor()
+    cpuinfo = Path("/proc/cpuinfo")
+    if not cpu and cpuinfo.exists():
+        for line in cpuinfo.read_text(errors="replace").splitlines():
+            if line.startswith("model name"):
+                cpu = line.partition(":")[2].strip()
+                break
+    metadata = {
+        "platform": platform.platform(),
+        "machine": platform.machine(),
+        "cpu": cpu,
+        "logical_cpus": os.cpu_count(),
+        "affinity": sorted(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else None,
+        "python": sys.version,
+        "python_executable": sys.executable,
+        "python_compiler": platform.python_compiler(),
+        "packages": packages,
+        "revision": _command(["git", "rev-parse", "HEAD"], root),
+        "git_status": _command(["git", "status", "--short"], root),
+        "cmake": cmake,
+        "thread_environment": {name: os.environ.get(name) for name in THREAD_VARIABLES},
+        "dynamic_thread_environment": {
+            name: os.environ.get(name) for name in ("OMP_DYNAMIC", "MKL_DYNAMIC")
+        },
+        "threadpools": threadpools,
+        "numpy_config": numpy_config,
+        "torch": None,
+    }
+    if "torch" in sys.modules:
+        import torch
+
+        metadata["torch"] = {
+            "intraop_threads": torch.get_num_threads(),
+            "interop_threads": torch.get_num_interop_threads(),
+            "config": torch.__config__.show(),
+        }
+    return metadata
+
+
+def validate_artifact(data):
+    if data.get("schema_version") != 1 or not isinstance(data.get("cases"), list):
+        raise ValueError("unsupported benchmark artifact")
+    for case in data["cases"]:
+        sampling = case["sampling"]
+        rounds, repetitions = sampling["rounds"], sampling["repetitions"]
+        if rounds < 1 or repetitions < 1 or rounds % case["cycle_rows"]:
+            raise ValueError("invalid sampling or incomplete Williams cycle")
+        if len(case["round_orders"]) != rounds:
+            raise ValueError("artifact is missing timing rounds")
+        measured = {entry["name"] for entry in case["results"] if entry["status"] == "measured"}
+        for order in case["round_orders"]:
+            # Failed post-measurement checks remain present in the saved schedule.
+            expected = measured | {
+                entry["name"]
+                for entry in case["results"]
+                if entry["status"] == "invalid"
+                and entry.get("reason", "").startswith("post-measurement")
+            }
+            if len(order) != len(expected) or set(order) != expected:
+                raise ValueError("round order does not match measured candidates")
+        for entry in case["results"]:
+            elapsed = entry["round_elapsed_ns"]
+            if entry["status"] == "measured":
+                if len(elapsed) != rounds or any(
+                    isinstance(value, bool) or not isinstance(value, int) or value < 0
+                    for value in elapsed
+                ):
+                    raise ValueError("invalid raw nanosecond samples")
+            elif entry["status"] not in ("invalid", "ineligible") or elapsed:
+                raise ValueError("invalid candidate status")
+    return data
+
+
+def write_artifact(data, output):
+    validate_artifact(data)
+    path = Path(output)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf8", dir=path.parent, delete=False
+        ) as stream:
+            temporary = Path(stream.name)
+            json.dump(data, stream, indent=2, sort_keys=True, allow_nan=False)
+            stream.write("\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+
+def load_artifact(path):
+    return validate_artifact(json.loads(Path(path).read_text(encoding="utf8")))
+
+
+def summarize(data):
+    import numpy as np
+
+    rows = []
+    for case in data["cases"]:
+        for entry in case["results"]:
+            row = {
+                "case": case["case"]["name"],
+                "implementation": entry["name"],
+                "status": entry["status"],
+            }
+            if entry["status"] == "measured":
+                samples = (
+                    np.asarray(entry["round_elapsed_ns"], dtype=np.float64)
+                    / case["sampling"]["repetitions"]
+                )
+                p5, p25, median, p75, p95 = np.percentile(samples, [5, 25, 50, 75, 95])
+                row.update(
+                    median_ns=float(median),
+                    p5_ns=float(p5),
+                    p25_ns=float(p25),
+                    p75_ns=float(p75),
+                    p95_ns=float(p95),
+                    iterations=entry["iterations"],
+                    matvecs=entry["matvecs"],
+                    true_residual_norm=entry["true_residual_norm"],
+                )
+            else:
+                row["reason"] = entry["reason"]
+            rows.append(row)
+    return rows
+
+
+def print_summary(data):
+    rows = summarize(data)
+    native = {
+        row["case"]: row["median_ns"]
+        for row in rows
+        if row["implementation"] == "native" and row["status"] == "measured"
+    }
+    print("case implementation status median_ms p5_ms p95_ms iterations matvecs native_speedup")
+    for row in rows:
+        if row["status"] == "measured":
+            native_time = native.get(row["case"])
+            speedup = f"{row['median_ns'] / native_time:.3f}x" if native_time else "n/a"
+            print(
+                f"{row['case']} {row['implementation']} measured {row['median_ns'] / 1e6:.6f} {row['p5_ns'] / 1e6:.6f} {row['p95_ns'] / 1e6:.6f} {row['iterations']} {row['matvecs']} {speedup}"
+            )
+        else:
+            print(f"{row['case']} {row['implementation']} {row['status']}: {row['reason']}")
+    print("Percentiles describe per-round average ns/call, not individual-call latency.")
+    print(
+        "native_speedup = this implementation's median / native median; >1 means native is faster."
+    )
