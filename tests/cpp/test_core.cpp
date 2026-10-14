@@ -470,9 +470,73 @@ TEST(FusedOperations, MatchesReferenceDenseReductionAndResidual)
                     reference.residual(A.view(), b.view(), p.view(), reference_r.view()), 1e-10);
         for (std::size_t i = 0; i < size; ++i)
         {
-            EXPECT_DOUBLE_EQ(ap.data()[i], reference_ap.data()[i]);
-            EXPECT_DOUBLE_EQ(r.data()[i], reference_r.data()[i]);
+            const double tolerance = 16.0 * std::numeric_limits<double>::epsilon();
+            EXPECT_NEAR(ap.data()[i], reference_ap.data()[i], tolerance);
+            EXPECT_NEAR(r.data()[i], reference_r.data()[i], tolerance);
         }
+    }
+}
+
+TEST(DenseRows, OptimizedReductionsMatchLongDoubleWithOddTailsAndPaddedRows)
+{
+    for (const std::size_t columns : {1u, 3u, 5u, 7u, 17u, 65u, 129u, 257u})
+    {
+        const std::size_t rows = 3;
+        const std::size_t stride = columns + 5;
+        std::vector<double> storage(rows * stride, std::numeric_limits<double>::quiet_NaN());
+        cg::Vector x(columns), output(rows);
+        for (std::size_t column = 0; column < columns; ++column)
+        {
+            x.data()[column] = std::sin(static_cast<double>(column)) + 0.5;
+            for (std::size_t row = 0; row < rows; ++row)
+            {
+                storage[row * stride + column] =
+                    std::cos(static_cast<double>(row + column)) / static_cast<double>(columns);
+            }
+        }
+        const cg::DenseMatrixView A(storage.data(), rows, columns, stride);
+        for (const bool optimized : {false, true})
+        {
+            const cg::CpuBackend backend(1, optimized);
+            backend.apply(A, x.view(), output.view());
+            for (std::size_t row = 0; row < rows; ++row)
+            {
+                long double expected = 0;
+                long double absolute_sum = 0;
+                for (std::size_t column = 0; column < columns; ++column)
+                {
+                    const long double product =
+                        static_cast<long double>(storage[row * stride + column]) *
+                        static_cast<long double>(x.data()[column]);
+                    expected += product;
+                    absolute_sum += std::abs(product);
+                }
+                const double rounding_bound = static_cast<double>(absolute_sum) *
+                                              std::numeric_limits<double>::epsilon() *
+                                              static_cast<double>(columns + 8);
+                EXPECT_TRUE(std::isfinite(output.data()[row]));
+                EXPECT_NEAR(output.data()[row], static_cast<double>(expected), rounding_bound);
+            }
+        }
+    }
+}
+
+TEST(DenseRows, OptimizationPreservesNonfiniteMultiplicationBehavior)
+{
+    cg::DenseMatrix A(17, 17);
+    cg::Vector x(17), b(17), output(17);
+    for (std::size_t i = 0; i < 17; ++i)
+    {
+        A.data()[i * 17 + i] = 1;
+    }
+    A.data()[16] = std::numeric_limits<double>::infinity();
+    for (const bool optimized : {false, true})
+    {
+        const cg::CpuBackend backend(1, optimized);
+        backend.apply(A.view(), x.view(), output.view());
+        EXPECT_TRUE(std::isnan(output.data()[0]));
+        EXPECT_TRUE(std::isnan(backend.apply_dot(A.view(), x.view(), output.view())));
+        EXPECT_TRUE(std::isnan(backend.residual(A.view(), b.view(), x.view(), output.view())));
     }
 }
 
