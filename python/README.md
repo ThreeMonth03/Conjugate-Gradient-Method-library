@@ -33,8 +33,8 @@ Jacobi setup rejects missing, zero, negative, or non-finite diagonal entries and
 | --- | --- |
 | `converged` | The independently evaluated true residual satisfies the requested threshold. |
 | `max_iterations` | The iteration budget was exhausted. |
-| `non_positive_curvature` | A search direction produced non-positive curvature; the SPD precondition may not hold. |
-| `non_finite` | The computation encountered a non-finite value. |
+| `non_positive_curvature` | A search direction produced negative curvature; the SPD precondition may not hold. |
+| `non_finite` | A value became non-finite or a required inner product was outside the usable double range, including zero or subnormal curvature. The reported true residual can still be finite. |
 
 Invalid dimensions, layouts, options, or preconditioner setup raise an exception. Numerical breakdown and iteration limits return a status; inspect it even when the output contains finite numbers.
 
@@ -129,3 +129,7 @@ x = utils.custom_linear_CG(
 ```
 
 Legacy `epsilon` is an absolute residual tolerance. Use the new API when comparing explicit and recurrence algorithms, fusion, workspace reuse, or Jacobi PCG under a shared stopping rule.
+
+The legacy linear wrapper raises `RuntimeError` on numerical breakdown. Reaching `epoch` still returns the current approximation for compatibility; use `cgpy` when you need an explicit convergence status.
+
+Only nonlinear helpers that request derivatives need the optional `autograd` dependency. It is included in the development locks; a runtime-only installation can add it with `.venv/bin/python -m pip install --cache-dir .cache/pip 'cgpy[legacy]'`.

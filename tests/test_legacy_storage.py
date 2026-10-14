@@ -1,5 +1,6 @@
 import ctypes
 
+import numpy as np
 import pytest
 from _cgpy import CG
 from _cgpy.Matrix import Accelerated_Matrix, Naive_Matrix
@@ -47,3 +48,22 @@ def test_legacy_solver_setters_accept_values():
     assert solver.get_epsilon() == 1e-9
     assert solver.get_epoch() == 35
     assert solver.get_number_of_threads() == 2
+
+
+@pytest.mark.parametrize("accelerated", [False, True])
+@pytest.mark.parametrize(
+    "matrix,rhs,tolerance,status",
+    [
+        (np.eye(2), [1e-200, -1e-200], 1e-208, "non_finite"),
+        (np.eye(2), [np.inf, 1.0], 1e-8, "non_finite"),
+        (-np.eye(2), [1.0, 2.0], 1e-8, "non_positive_curvature"),
+    ],
+)
+def test_legacy_solver_exposes_numerical_failure(accelerated, matrix, rhs, tolerance, status):
+    matrix_type = Accelerated_Matrix if accelerated else Naive_Matrix
+    solver = CG.linear_CG(tolerance, 20, 1)
+    solve = solver.solve_by_Accelerated_Matrix if accelerated else solver.solve_by_Naive_Matrix
+    initial = matrix_type([0.0, 0.0])
+    with pytest.raises(RuntimeError, match=status):
+        solve(matrix_type(matrix), matrix_type(rhs), initial)
+    np.testing.assert_array_equal(initial.tolist(), [0.0, 0.0])

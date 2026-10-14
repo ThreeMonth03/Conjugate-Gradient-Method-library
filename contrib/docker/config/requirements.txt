@@ -1,2 +1,2 @@
 # Install the same pinned tooling as the local CPU development environment.
--r ../../../requirements/dev.lock
+-r ../../../requirements/test.lock

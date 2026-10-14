@@ -8,12 +8,12 @@ Use an existing Python 3.12 interpreter and C++17 compiler. Python tools, downlo
 
 ```bash
 python3 -m venv .venv
-.venv/bin/python -m pip install --cache-dir .cache/pip -r requirements/dev.lock
+.venv/bin/python -m pip install --cache-dir .cache/pip -r requirements/test.lock
 .venv/bin/python -m pip install --cache-dir .cache/pip --no-deps --no-build-isolation -e .
 make test
 ```
 
-`make pytest` runs Python tests, `make gtest` runs native GoogleTest cases, and `make lint` checks Python lint/formatting and C++ formatting. `make gtest PRESET=cpu-asan` runs the native tests under AddressSanitizer and UndefinedBehaviorSanitizer. `make wheel` builds a wheel under `dist/`.
+`make pytest` runs Python tests, `make gtest` runs native GoogleTest cases, and `make lint` checks Python lint/formatting and C++ formatting. `make gtest PRESET=cpu-asan` runs the native tests under AddressSanitizer and UndefinedBehaviorSanitizer. `make wheel` builds a wheel under `dist/`; `make demo` runs the examples.
 
 The default build uses one CPU thread. `make test PRESET=cpu-openmp` enables OpenMP. For an editable installation that supports `num_threads > 1`, add `--config-settings=cmake.define.CG_ENABLE_OPENMP=ON` to the editable install command. Presets build into separate directories; selecting an OpenMP preset for a Make target does not change an already installed wheel.
 
@@ -37,6 +37,7 @@ print(result.x, result.iterations, result.residual_norm)
 The stopping rule is `||b - A @ x||2 <= max(atol, rtol * ||b||2)`. Reported residuals are independently recomputed from the final solution. Check `converged` or `status` before using the answer. Symmetry and positive definiteness are caller preconditions; the solver does not perform a full matrix factorization to verify them.
 
 See [Python and C++ interfaces](python/README.md) for options, ownership, and failure statuses.
+See [architecture](docs/architecture.md) for storage, workspace, backend, and fusion boundaries.
 
 ## Reproducible comparisons
 

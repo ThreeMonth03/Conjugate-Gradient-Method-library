@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <cg/solver.hpp>
 #include <cmath>
+#include <string>
 
 namespace cg_method
 {
@@ -40,8 +41,11 @@ void solve_legacy(const MatrixType &A, const MatrixType &b, MatrixType &x, doubl
     options.rtol = 0.0;
     options.atol = epsilon;
     options.maxiter = static_cast<std::size_t>(epoch);
-    cg::solve_into({A.data(), A.nrow(), A.ncol()}, {b.data(), b.size()}, {x.data(), x.size()},
-                   workspace, backend, options);
+    const auto info = cg::solve_into({A.data(), A.nrow(), A.ncol()}, {b.data(), b.size()},
+                                     {x.data(), x.size()}, workspace, backend, options);
+    if (info.status == cg::Status::non_finite || info.status == cg::Status::non_positive_curvature)
+        throw std::runtime_error(std::string("CG numerical failure: ") +
+                                 cg::status_name(info.status));
 }
 } // namespace
 

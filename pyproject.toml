@@ -8,7 +8,10 @@ version = "0.2.0"
 description = "CPU conjugate gradient solvers with a native C++ implementation"
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = ["numpy>=1.24", "autograd>=1.8"]
+dependencies = ["numpy>=1.24"]
+
+[project.optional-dependencies]
+legacy = ["autograd>=1.8"]
 
 [tool.scikit-build]
 cmake.version = ">=3.24"
@@ -28,8 +31,7 @@ addopts = "--import-mode=importlib"
 target-version = "py310"
 line-length = 100
 extend-exclude = [
-    ".deps", ".cache", "build", "demo", "contrib",
-    "python/utils.py", "tests/test_matrix.py", "tests/test_cg_method.py",
+    ".deps", ".cache", "build", "contrib",
 ]
 
 [tool.ruff.lint]

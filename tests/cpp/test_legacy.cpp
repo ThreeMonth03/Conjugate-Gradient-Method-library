@@ -28,6 +28,16 @@ TEST(LegacyCG, SolvesFromZeroInitialGuess)
     EXPECT_DOUBLE_EQ(initial.norm(), 0);
 }
 
+TEST(LegacyCG, NumericalFailureIsNotReturnedAsAnOrdinarySolution)
+{
+    Matrix::Naive_Matrix identity(2, 2, std::vector<double>{1, 0, 0, 1});
+    Matrix::Naive_Matrix tiny_rhs(std::vector<double>{1e-200, -1e-200});
+    Matrix::Naive_Matrix initial(2, 1);
+    cg_method::linear_CG solver(1e-208, 20, 1);
+    EXPECT_THROW(solver.solve_by_Naive_Matrix(identity, tiny_rhs, initial), std::runtime_error);
+    EXPECT_DOUBLE_EQ(initial.norm(), 0.0);
+}
+
 template <class MatrixType> class LegacyStorage : public ::testing::Test
 {
 };

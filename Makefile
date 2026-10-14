@@ -16,7 +16,7 @@ PYPROF_OUTPUT ?= $(BUILD_DIR)/benchmarks/$(PYPROF_SUITE)-t$(PYPROF_THREADS)-$(PY
 PYPROF_ARGS ?=
 
 .DEFAULT_GOAL := all
-.PHONY: all configure build test pytest gtest lint format wheel clean pyprof
+.PHONY: all configure build test pytest gtest lint format wheel clean pyprof demo
 
 all: build
 
@@ -34,16 +34,16 @@ pytest: build
 
 gtest: configure
 	$(CMAKE) --build $(BUILD_DIR) --target cg_gtests --parallel $(JOBS)
-	$(CURDIR)/.venv/bin/ctest --test-dir $(BUILD_DIR) --output-on-failure -L cpp
+	$(CMAKE) -E env OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 $(CURDIR)/.venv/bin/ctest --test-dir $(BUILD_DIR) --output-on-failure -L cpp
 
 lint:
-	$(RUFF) check python tests
-	$(RUFF) format --check python tests
+	$(RUFF) check python tests demo
+	$(RUFF) format --check python tests demo
 	$(CLANG_FORMAT) --dry-run --Werror $(CPP_FILES)
 
 format:
-	$(RUFF) check --fix python tests
-	$(RUFF) format python tests
+	$(RUFF) check --fix python tests demo
+	$(RUFF) format python tests demo
 	$(CLANG_FORMAT) -i $(CPP_FILES)
 
 wheel:
@@ -57,3 +57,7 @@ pyprof: build
 
 clean:
 	$(CMAKE) -E rm -rf $(BUILD_DIR)
+
+demo: build
+	PYTHONPATH=$(BUILD_DIR)/python:$(CURDIR)/python $(PYTHON) demo/demo_matrix.py
+	PYTHONPATH=$(BUILD_DIR)/python:$(CURDIR)/python $(PYTHON) demo/demo_cg_method.py

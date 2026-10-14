@@ -32,6 +32,7 @@ COPY python/cgpy/*.py python/cgpy/
 COPY python/cgbench/*.py python/cgbench/
 COPY tests/*.py tests/
 COPY tests/cpp/*.cpp tests/cpp/
+COPY demo/*.py demo/
 COPY benchmarks/README.md benchmarks/
 
 CMD ["make", "test"]
