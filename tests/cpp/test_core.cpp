@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 
 #include <cmath>
+#include <future>
 #include <limits>
 #include <stdexcept>
 #include <vector>
@@ -39,7 +40,7 @@ TEST(Storage, OwnsItsValuesAndHasConstViews)
     EXPECT_EQ(owned.data()[0], 1.0);
     const auto &immutable = owned;
     ConstVectorView view = immutable.view();
-    EXPECT_EQ(view.size, 3);
+    EXPECT_EQ(view.size, 3u);
     EXPECT_EQ(view.data[2], 3.0);
 }
 
@@ -63,12 +64,12 @@ TEST(Workspace, ReusesStorageAcrossSameAndSmallerSizes)
     workspace.prepare(5);
     EXPECT_EQ(workspace.residual().data, pointer);
     EXPECT_EQ(workspace.capacity(), capacity);
-    EXPECT_EQ(workspace.size(), 5);
+    EXPECT_EQ(workspace.size(), 5u);
     workspace.prepare(32);
     EXPECT_EQ(workspace.residual().data, pointer);
     workspace.prepare(64);
-    EXPECT_EQ(workspace.size(), 64);
-    EXPECT_GE(workspace.capacity(), 64);
+    EXPECT_EQ(workspace.size(), 64u);
+    EXPECT_GE(workspace.capacity(), 64u);
 }
 
 TEST(Backend, ValidatesThreadCountAndKeepsContextLocal)
@@ -158,7 +159,7 @@ TEST(CGExplicit, SolvesFromAnIndependentInitialGuess)
     options.rtol = 1e-12;
     const auto info = cg::solve_into(A.view(), b.view(), x.view(), workspace, backend, options);
     EXPECT_EQ(info.status, cg::Status::converged);
-    EXPECT_GT(info.iterations, 0);
+    EXPECT_GT(info.iterations, 0u);
     EXPECT_EQ(info.matvecs, 1 + 2 * info.iterations);
     EXPECT_NEAR(x.data()[0], 1.0 / 11, 1e-12);
     EXPECT_NEAR(x.data()[1], 7.0 / 11, 1e-12);
@@ -174,8 +175,8 @@ TEST(CGExplicit, ChecksInitialResidualAndZeroRightHandSide)
     const cg::CpuBackend backend;
     auto info = cg::solve_into(A.view(), b.view(), x.view(), workspace, backend);
     EXPECT_EQ(info.status, cg::Status::converged);
-    EXPECT_EQ(info.iterations, 0);
-    EXPECT_EQ(info.matvecs, 1);
+    EXPECT_EQ(info.iterations, 0u);
+    EXPECT_EQ(info.matvecs, 1u);
 }
 
 TEST(CGExplicit, ZeroRightHandSideConvergesWithoutAnIteration)
@@ -187,7 +188,7 @@ TEST(CGExplicit, ZeroRightHandSideConvergesWithoutAnIteration)
     const cg::CpuBackend backend;
     const auto info = cg::solve_into(A.view(), b.view(), x.view(), workspace, backend);
     EXPECT_EQ(info.status, cg::Status::converged);
-    EXPECT_EQ(info.iterations, 0);
+    EXPECT_EQ(info.iterations, 0u);
     EXPECT_EQ(info.residual_norm, 0);
 }
 
@@ -202,13 +203,13 @@ TEST(CGExplicit, ReportsIterationLimitAndTrueResidual)
     options.maxiter = 0;
     auto info = cg::solve_into(A.view(), b.view(), x.view(), workspace, backend, options);
     EXPECT_EQ(info.status, cg::Status::max_iterations);
-    EXPECT_EQ(info.iterations, 0);
-    EXPECT_EQ(info.matvecs, 1);
+    EXPECT_EQ(info.iterations, 0u);
+    EXPECT_EQ(info.matvecs, 1u);
     EXPECT_DOUBLE_EQ(info.residual_norm, std::sqrt(5.0));
     options.maxiter = 1;
     info = cg::solve_into(A.view(), b.view(), x.view(), workspace, backend, options);
     EXPECT_EQ(info.status, cg::Status::max_iterations);
-    EXPECT_EQ(info.iterations, 1);
+    EXPECT_EQ(info.iterations, 1u);
     cg::Vector check(2);
     EXPECT_DOUBLE_EQ(info.residual_norm,
                      std::sqrt(backend.residual(A.view(), b.view(), x.view(), check.view())));
@@ -223,8 +224,8 @@ TEST(CGExplicit, ReportsBreakdownAndNonfiniteData)
     const cg::CpuBackend backend;
     auto info = cg::solve_into(indefinite.view(), b.view(), x.view(), workspace, backend);
     EXPECT_EQ(info.status, cg::Status::non_positive_curvature);
-    EXPECT_EQ(info.iterations, 0);
-    EXPECT_EQ(info.matvecs, 2);
+    EXPECT_EQ(info.iterations, 0u);
+    EXPECT_EQ(info.matvecs, 2u);
     indefinite.data()[0] = std::numeric_limits<double>::quiet_NaN();
     info = cg::solve_into(indefinite.view(), b.view(), x.view(), workspace, backend);
     EXPECT_EQ(info.status, cg::Status::non_finite);
@@ -281,6 +282,174 @@ TEST(CGExplicit, ReusingWorkspaceResetsAllIterationState)
     EXPECT_EQ(second.status, cg::Status::converged);
     EXPECT_EQ(first.iterations, second.iterations);
     EXPECT_EQ(workspace.residual().data, pointer);
+}
+
+TEST(FusedOperations, MatchesReferenceVectorUpdatesIncludingSimdTails)
+{
+    for (const std::size_t size : {1u, 3u, 17u, 127u, 16385u})
+    {
+        cg::Vector x(size), r(size), p(size), ap(size);
+        for (std::size_t i = 0; i < size; ++i)
+        {
+            x.data()[i] = std::sin(static_cast<double>(i));
+            r.data()[i] = std::cos(static_cast<double>(i));
+            p.data()[i] = 0.1 + static_cast<double>(i % 7);
+            ap.data()[i] = -0.2 + static_cast<double>(i % 11);
+        }
+        cg::Vector reference_x = x;
+        cg::Vector reference_r = r;
+        const cg::CpuBackend fused(1, true);
+        const cg::CpuBackend reference(1, false);
+        const auto actual = fused.update_x_r_norm2(x.view(), r.view(), p.view(), ap.view(), 0.25);
+        const auto expected = reference.update_x_r_norm2(reference_x.view(), reference_r.view(),
+                                                         p.view(), ap.view(), 0.25);
+        EXPECT_NEAR(actual, expected, std::max(1.0, expected) * 1e-12);
+        for (std::size_t i = 0; i < size; ++i)
+        {
+            EXPECT_DOUBLE_EQ(x.data()[i], reference_x.data()[i]);
+            EXPECT_DOUBLE_EQ(r.data()[i], reference_r.data()[i]);
+        }
+        EXPECT_THROW(fused.update_x_r_norm2(x.view(), x.view(), p.view(), ap.view(), 0.25),
+                     std::invalid_argument);
+    }
+}
+
+TEST(FusedOperations, MatchesReferenceDenseReductionAndResidual)
+{
+    for (const std::size_t size : {1u, 3u, 17u, 129u})
+    {
+        const auto A = tridiagonal(size);
+        cg::Vector p(size), b(size), ap(size), reference_ap(size), r(size), reference_r(size);
+        for (std::size_t i = 0; i < size; ++i)
+        {
+            p.data()[i] = std::sin(static_cast<double>(i)) + 0.5;
+            b.data()[i] = std::cos(static_cast<double>(i));
+        }
+        const int threads = cg::CpuBackend::openmp_enabled() ? 2 : 1;
+        const cg::CpuBackend fused(threads, true);
+        const cg::CpuBackend reference(threads, false);
+        EXPECT_NEAR(fused.apply_dot(A.view(), p.view(), ap.view()),
+                    reference.apply_dot(A.view(), p.view(), reference_ap.view()), 1e-10);
+        EXPECT_NEAR(fused.residual(A.view(), b.view(), p.view(), r.view()),
+                    reference.residual(A.view(), b.view(), p.view(), reference_r.view()), 1e-10);
+        for (std::size_t i = 0; i < size; ++i)
+        {
+            EXPECT_DOUBLE_EQ(ap.data()[i], reference_ap.data()[i]);
+            EXPECT_DOUBLE_EQ(r.data()[i], reference_r.data()[i]);
+        }
+    }
+}
+
+TEST(CGRecurrence, SolvesAndVerifiesTrueResidualWithBothKernelPolicies)
+{
+    const auto A = tridiagonal(31);
+    cg::Vector truth(31), b(31);
+    for (std::size_t i = 0; i < truth.size(); ++i)
+    {
+        truth.data()[i] = 0.25 + std::sin(static_cast<double>(i));
+    }
+    const cg::CpuBackend reference;
+    reference.apply(A.view(), truth.view(), b.view());
+    for (const bool fused : {false, true})
+    {
+        cg::Vector x(31), check(31);
+        cg::Workspace workspace(31);
+        const cg::CpuBackend backend(1, fused);
+        cg::CgOptions options;
+        options.algorithm = cg::Algorithm::recurrence;
+        options.residual_refresh = 0;
+        options.rtol = 1e-10;
+        const auto info = cg::solve_into(A.view(), b.view(), x.view(), workspace, backend, options);
+        EXPECT_EQ(info.status, cg::Status::converged);
+        EXPECT_EQ(info.restarts, 0u);
+        EXPECT_EQ(info.matvecs, 2 + info.iterations);
+        EXPECT_DOUBLE_EQ(info.residual_norm,
+                         std::sqrt(backend.residual(A.view(), b.view(), x.view(), check.view())));
+        EXPECT_LE(info.residual_norm, options.rtol * std::sqrt(backend.norm2(b.view())));
+        for (std::size_t i = 0; i < x.size(); ++i)
+        {
+            EXPECT_NEAR(x.data()[i], truth.data()[i], 1e-7);
+        }
+    }
+}
+
+TEST(CGRecurrence, CountsRefreshMatvecsAndRestartsDirections)
+{
+    cg::DenseMatrix A(3, 3, {2, 0, 0, 0, 3, 0, 0, 0, 4});
+    cg::Vector b({1, 2, 3});
+    cg::Vector x(3), check(3);
+    cg::Workspace workspace(3);
+    const cg::CpuBackend backend;
+    cg::CgOptions options;
+    options.algorithm = cg::Algorithm::recurrence;
+    options.rtol = 0;
+    options.atol = 0;
+    options.residual_refresh = 1;
+    options.maxiter = 3;
+    const auto info = cg::solve_into(A.view(), b.view(), x.view(), workspace, backend, options);
+    EXPECT_EQ(info.status, cg::Status::max_iterations);
+    EXPECT_EQ(info.iterations, 3u);
+    EXPECT_EQ(info.restarts, 2u);
+    EXPECT_EQ(info.matvecs, 7u);
+    EXPECT_DOUBLE_EQ(info.residual_norm,
+                     std::sqrt(backend.residual(A.view(), b.view(), x.view(), check.view())));
+}
+
+TEST(CGRecurrence, ChecksInitialGuessIterationLimitAndBreakdown)
+{
+    cg::DenseMatrix A(2, 2, {4, 1, 1, 3});
+    cg::Vector b({5, 4}), x({1, 1});
+    cg::Workspace workspace(2);
+    const cg::CpuBackend backend;
+    cg::CgOptions options;
+    options.algorithm = cg::Algorithm::recurrence;
+    auto info = cg::solve_into(A.view(), b.view(), x.view(), workspace, backend, options);
+    EXPECT_EQ(info.status, cg::Status::converged);
+    EXPECT_EQ(info.iterations, 0u);
+    EXPECT_EQ(info.matvecs, 1u);
+    x.data()[0] = x.data()[1] = 0;
+    options.maxiter = 0;
+    info = cg::solve_into(A.view(), b.view(), x.view(), workspace, backend, options);
+    EXPECT_EQ(info.status, cg::Status::max_iterations);
+    EXPECT_EQ(info.matvecs, 1u);
+    options.maxiter = 1;
+    info = cg::solve_into(A.view(), b.view(), x.view(), workspace, backend, options);
+    EXPECT_EQ(info.status, cg::Status::max_iterations);
+    EXPECT_EQ(info.matvecs, 3u);
+    cg::DenseMatrix indefinite(2, 2, {-1, 0, 0, -1});
+    x.data()[0] = x.data()[1] = 0;
+    info = cg::solve_into(indefinite.view(), b.view(), x.view(), workspace, backend, options);
+    EXPECT_EQ(info.status, cg::Status::non_positive_curvature);
+    EXPECT_EQ(info.iterations, 0u);
+    EXPECT_EQ(info.matvecs, 3u);
+}
+
+TEST(CGRecurrence, DistinctWorkspacesCanSolveOnOneContextConcurrently)
+{
+    const auto A = tridiagonal(31);
+    cg::Vector b(31);
+    b.data()[0] = b.data()[30] = 1.0;
+    const cg::CpuBackend backend;
+    const auto solve = [&]
+    {
+        cg::Vector x(31);
+        cg::Workspace workspace(31);
+        cg::CgOptions options;
+        options.algorithm = cg::Algorithm::recurrence;
+        const auto info = cg::solve_into(A.view(), b.view(), x.view(), workspace, backend, options);
+        return std::make_pair(info, std::move(x));
+    };
+    auto first = std::async(std::launch::async, solve);
+    auto second = std::async(std::launch::async, solve);
+    const auto first_result = first.get();
+    const auto second_result = second.get();
+    EXPECT_EQ(first_result.first.status, cg::Status::converged);
+    EXPECT_EQ(second_result.first.status, cg::Status::converged);
+    for (std::size_t i = 0; i < b.size(); ++i)
+    {
+        EXPECT_NEAR(first_result.second.data()[i], 1.0, 1e-7);
+        EXPECT_DOUBLE_EQ(first_result.second.data()[i], second_result.second.data()[i]);
+    }
 }
 
 } // namespace
