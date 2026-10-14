@@ -27,6 +27,12 @@ size_t nested_columns(const std::vector<std::vector<double>> &rows)
     }
     return columns;
 }
+
+void validate_threads(int threads)
+{
+    if (threads < 1)
+        throw std::invalid_argument("Thread count must be positive");
+}
 } // namespace
 
 // Naive Matrix
@@ -267,19 +273,16 @@ Naive_Matrix Naive_Matrix::operator*(Naive_Matrix const &mat)
         }
     }
     return result;
-
-    return result;
 }
 
 Naive_Matrix Naive_Matrix::operator*(double const &other)
 {
     Naive_Matrix temp(m_nrow, m_ncol);
-    for (size_t i = 0; i < m_nrow; ++i)
+    if (temp.m_buffer == nullptr)
+        return temp;
+    for (size_t i = 0; i < size(); ++i)
     {
-        for (size_t j = 0; j < m_ncol; ++j)
-        {
-            temp(i, j) = (*this)(i, j) * other;
-        }
+        temp.m_buffer[i] = m_buffer[i] * other;
     }
     return temp;
 }
@@ -301,7 +304,7 @@ bool Naive_Matrix::operator==(Naive_Matrix const &mat) const
 
 double Naive_Matrix::operator()(size_t row, size_t col) const
 {
-    if (row >= m_nrow || col >= m_ncol)
+    if (m_buffer == nullptr || row >= m_nrow || col >= m_ncol)
     {
         throw std::out_of_range("Naive_Matrix::operator(): index out of range");
     }
@@ -311,7 +314,7 @@ double Naive_Matrix::operator()(size_t row, size_t col) const
 
 double &Naive_Matrix::operator()(size_t row, size_t col)
 {
-    if (row >= m_nrow || col >= m_ncol)
+    if (m_buffer == nullptr || row >= m_nrow || col >= m_ncol)
     {
         throw std::out_of_range("Naive_Matrix::operator(): index out of range");
     }
@@ -355,7 +358,6 @@ Accelerated_Matrix::Accelerated_Matrix(size_t nrow, size_t ncol) : m_nrow(nrow),
     if (size() != 0)
         memset(m_buffer, 0, size() * sizeof(double));
 }
-//
 
 Accelerated_Matrix::Accelerated_Matrix(Accelerated_Matrix const &mat)
     : m_nrow(mat.m_nrow), m_ncol(mat.m_ncol)
@@ -441,7 +443,6 @@ Accelerated_Matrix &Accelerated_Matrix::operator=(std::vector<std::vector<double
     if (size() == 0)
         return *this;
     size_t i;
-    // #pragma omp parallel for private(i) num_threads(number_of_threads)
     for (i = 0; i < m_nrow; ++i)
     {
         memcpy(m_buffer + i * m_ncol, vec2d[i].data(), m_ncol * sizeof(double));
@@ -473,7 +474,6 @@ Accelerated_Matrix Accelerated_Matrix::operator+(Accelerated_Matrix const &other
     }
     Accelerated_Matrix temp(m_nrow, m_ncol);
     size_t i, shape = m_nrow * m_ncol;
-    // #pragma omp parallel for private(i) num_threads(number_of_threads)
     for (i = 0; i < shape; ++i)
     {
         temp.m_buffer[i] = m_buffer[i] + other.m_buffer[i];
@@ -489,7 +489,6 @@ Accelerated_Matrix Accelerated_Matrix::operator-(Accelerated_Matrix const &other
     }
     Accelerated_Matrix temp(m_nrow, m_ncol);
     size_t i, shape = m_nrow * m_ncol;
-    // #pragma omp parallel for private(i)  num_threads(number_of_threads)
     for (i = 0; i < shape; ++i)
     {
         temp.m_buffer[i] = m_buffer[i] - other.m_buffer[i];
@@ -501,7 +500,6 @@ Accelerated_Matrix Accelerated_Matrix::operator-()
 {
     Accelerated_Matrix temp(m_nrow, m_ncol);
     size_t i, shape = m_nrow * m_ncol;
-    // #pragma omp parallel for private(i) num_threads(number_of_threads)
     for (i = 0; i < shape; ++i)
     {
         temp.m_buffer[i] = -m_buffer[i];
@@ -511,7 +509,7 @@ Accelerated_Matrix Accelerated_Matrix::operator-()
 
 Accelerated_Matrix Accelerated_Matrix::operator*(Accelerated_Matrix const &mat)
 {
-
+    validate_threads(number_of_threads);
     if (mat.nrow() == 1 && mat.ncol() == 1)
     {
         Accelerated_Matrix temp(m_nrow, m_ncol);
@@ -545,8 +543,6 @@ Accelerated_Matrix Accelerated_Matrix::operator*(Accelerated_Matrix const &mat)
         Accelerated_Matrix return_value(1, 1);
         double sum = .0f;
         size_t i;
-        // #pragma omp parallel for private(i) reduction(+:sum)
-        // num_threads(number_of_threads)
         for (i = 0; i < (*this).nrow(); ++i)
         {
             sum += (*this).m_buffer[i] * mat.m_buffer[i];
@@ -557,8 +553,6 @@ Accelerated_Matrix Accelerated_Matrix::operator*(Accelerated_Matrix const &mat)
 
     if (m_ncol != mat.m_nrow)
         throw std::invalid_argument("Matrix product size mismatch");
-    if (number_of_threads < 1)
-        throw std::invalid_argument("Thread count must be positive");
     Accelerated_Matrix result((*this).nrow(), mat.ncol());
     size_t tsize = 32;
     size_t max_i = (*this).nrow();
@@ -608,6 +602,7 @@ Accelerated_Matrix Accelerated_Matrix::operator*(Accelerated_Matrix const &mat)
 
 Accelerated_Matrix Accelerated_Matrix::operator*(double const &other)
 {
+    validate_threads(number_of_threads);
     Accelerated_Matrix temp(m_nrow, m_ncol);
     size_t i, shape = m_nrow * m_ncol;
 #pragma omp parallel for private(i) num_threads(number_of_threads)
@@ -635,7 +630,7 @@ bool Accelerated_Matrix::operator==(Accelerated_Matrix const &mat) const
 
 double Accelerated_Matrix::operator()(size_t row, size_t col) const
 {
-    if (row >= m_nrow || col >= m_ncol)
+    if (m_buffer == nullptr || row >= m_nrow || col >= m_ncol)
     {
         throw std::out_of_range("Accelerated_Matrix::operator(): index out of range");
     }
@@ -645,7 +640,7 @@ double Accelerated_Matrix::operator()(size_t row, size_t col) const
 
 double &Accelerated_Matrix::operator()(size_t row, size_t col)
 {
-    if (row >= m_nrow || col >= m_ncol)
+    if (m_buffer == nullptr || row >= m_nrow || col >= m_ncol)
     {
         throw std::out_of_range("Accelerated_Matrix::operator(): index out of range");
     }
@@ -662,8 +657,6 @@ double Accelerated_Matrix::norm()
     double sum = 0.0;
     size_t i;
     size_t shape = m_nrow * m_ncol;
-    // #pragma omp parallel for private(i) reduction(+:sum)
-    // num_threads(number_of_threads)
     for (i = 0; i < shape; ++i)
     {
         sum += m_buffer[i] * m_buffer[i];
@@ -686,7 +679,6 @@ void Accelerated_Matrix::reset_buffer(size_t nrow, size_t ncol)
     m_ncol = ncol;
 }
 
-//
 std::ostream &operator<<(std::ostream &ostr, Naive_Matrix const &mat)
 {
     for (size_t i = 0; i < mat.nrow(); ++i)
@@ -703,7 +695,8 @@ std::ostream &operator<<(std::ostream &ostr, Naive_Matrix const &mat)
 
 Naive_Matrix multiply_tile(Naive_Matrix const &mat1, Naive_Matrix const &mat2, size_t tsize)
 {
-
+    if (tsize == 0)
+        throw std::invalid_argument("Tile size must be positive");
     if (mat1.ncol() != mat2.nrow())
     {
         throw std::out_of_range("the number of first matrix column "
@@ -753,13 +746,13 @@ Naive_Matrix multiply_naive(Naive_Matrix const &mat1, Naive_Matrix const &mat2)
 
     Naive_Matrix ret(mat1.nrow(), mat2.ncol());
 
-    for (size_t j = 0; j < mat1.nrow(); ++j)
+    for (size_t row = 0; row < mat1.nrow(); ++row)
     {
-        for (size_t k = 0; k < ret.ncol(); ++k)
+        for (size_t inner = 0; inner < mat1.ncol(); ++inner)
         {
-            for (size_t i = 0; i < ret.ncol(); ++i)
+            for (size_t column = 0; column < mat2.ncol(); ++column)
             {
-                ret(i, k) += mat1(i, j) * mat2(j, k);
+                ret(row, column) += mat1(row, inner) * mat2(inner, column);
             }
         }
     }

@@ -1,0 +1,12 @@
+.git
+.venv
+.cache
+.deps
+build
+dist
+**/__pycache__
+**/*.pyc
+**/*.so
+**/*.o
+benchmarks/*.json
+benchmarks/compare_direct.py

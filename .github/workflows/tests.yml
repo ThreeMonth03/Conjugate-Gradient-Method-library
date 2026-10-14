@@ -97,4 +97,18 @@ jobs:
           build/wheel-smoke/bin/python -m pip install --cache-dir .cache/pip -c requirements/dev.lock dist/*.whl
           mkdir -p build/wheel-smoke/run
           cd build/wheel-smoke/run
-          ../bin/python -c 'import _cgpy, utils, cgpy; assert _cgpy.Matrix.Naive_Matrix(2, 2).nrow == 2; assert cgpy.solve([[2.]], [4.]).converged'
+          ../bin/python - <<'PY'
+          import importlib.util
+          import numpy as np
+          import _cgpy
+          import utils
+          import cgpy
+          assert importlib.util.find_spec('autograd') is None
+          assert _cgpy.Matrix.Naive_Matrix(2, 2).nrow == 2
+          matrix = cgpy.CSRMatrix([0, 2, 4], [0, 1, 0, 1], [4., 1., 1., 3.], (2, 2))
+          plan = cgpy.prepare(matrix, preconditioner='jacobi')
+          output = np.zeros(2)
+          info = plan.solve_into(np.array([1., 2.]), output, workspace=plan.create_workspace())
+          assert info.converged
+          np.testing.assert_allclose(output, [1 / 11, 7 / 11])
+          PY

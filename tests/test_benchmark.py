@@ -190,6 +190,9 @@ def test_replay_refuses_changed_inputs_or_candidates_before_timing(smoke_spec):
     spec = {**smoke_spec, "expected_candidates": {case_spec.name: ["native"]}}
     with pytest.raises(ValueError, match="eligible candidates changed"):
         collect_case(case_spec, spec)
+    spec = {**smoke_spec, "expected_round_orders": {case_spec.name: [["wrong"]]}}
+    with pytest.raises(ValueError, match="timing schedule changed"):
+        collect_case(case_spec, spec)
 
 
 def test_collector_artifact_roundtrip_and_raw_stats(smoke_spec, tmp_path):
@@ -258,7 +261,10 @@ def test_launcher_sets_child_thread_environment_and_replays(tmp_path):
         capture_output=True,
         text=True,
     )
-    assert load_artifact(replay)["cases"][0]["input_sha256"] == artifact["cases"][0]["input_sha256"]
+    replayed = load_artifact(replay)
+    assert replayed["cases"][0]["input_sha256"] == artifact["cases"][0]["input_sha256"]
+    assert replayed["spec"] == artifact["spec"]
+    assert replayed["cases"][0]["round_orders"] == artifact["cases"][0]["round_orders"]
 
 
 @pytest.mark.parametrize("algorithm", ("standard", "explicit"))

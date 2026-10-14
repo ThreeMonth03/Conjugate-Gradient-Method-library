@@ -1,437 +1,268 @@
-import sys
-import os
+"""Compatibility helpers for linear and nonlinear conjugate gradient methods."""
 
-# Get the absolute path of the directory containing the .so file
-dir_path = os.path.dirname(os.path.abspath(__file__)) + "/../cpp"
-# Add the directory to the Python path
-sys.path.append(dir_path)
+from functools import partial
+from math import hypot
 
-import math
 import numpy as np
-import random
-from autograd import grad
-import autograd.numpy as au
 from _cgpy import CG
-from _cgpy.Matrix import Naive_Matrix
-from _cgpy.Matrix import Accelerated_Matrix
+from _cgpy.Matrix import Accelerated_Matrix, Naive_Matrix
+
+_MAX_BACKTRACKS = 256
+_MAX_NONLINEAR_ITERATIONS = 10000
+_METHOD_SUFFIXES = {
+    "Fletcher_Reeves": "Fletcher_Reeves",
+    "Hager-Zhang": "Hager_Zhang",
+    "Dai-Yuan": "Dai_Yuan",
+}
+
+
+def grad(*args, **kwargs):
+    """Construct an autograd derivative when the optional dependency is used."""
+    from autograd import grad as autograd_grad
+
+    return autograd_grad(*args, **kwargs)
 
 
 def is_pos_def(x):
-    """
-    Functionality: Check if a matrix is positive definite
-    Parameters:
-    x: The input matrix.
-    """
+    """Return whether all eigenvalues are positive."""
     return np.all(np.linalg.eigvals(x) > 0)
 
 
 def generate_pos_def(n):
-    """
-    Functionality: Generate a random positive definite matrix
-    Parameters:
-    n: The dimension of the matrix.
-    """
+    """Generate a random Gram matrix of dimension n."""
     A = np.random.rand(n, n)
     return A.dot(A.T)
 
 
 def generate_symmetric(A):
-    """
-    Functionality: Generate a random symmetric matrix
-    Parameters:
-    n: The given matrix.
-    """
+    """Return the symmetric part of A."""
     return (A + A.T) / 2
 
 
 def custom_linear_CG(x, a, b, epsilon=5e-7, epoch=10000000, num_threads=3):
-    """
-    Functionality: Solve the linear system Ax = b using conjugate gradient method by calling the C++ library
-    Parameters:
-    x: The initial point.
-    a: The matrix A.
-    b: The vector b.
-    epsilon: The tolerance.
-    epoch: The maximum number of iterations.
-    num_threads: The number of threads used in the C++ library.
-    """
-    mat_x_min = None
+    """Solve Ax=b using the legacy absolute tolerance and return a NumPy vector."""
     if num_threads <= 0:
-        num_threads = 1
-    if num_threads != 1:
-        mat_a = Accelerated_Matrix(a)
-        mat_b = Accelerated_Matrix(b)
-        mat_x = Accelerated_Matrix(x)
-        mat_x.set_number_of_threads(num_threads)
-        # mat_a.set_number_of_threads(num_threads)
-        # mat_b.set_number_of_threads(num_threads)
-        linear_cg_model = CG.linear_CG(epsilon, epoch, num_threads)
-        mat_x_min = linear_cg_model.solve_by_Accelerated_Matrix(mat_a, mat_b, mat_x)
-
-    else:
-        mat_a = Naive_Matrix(a)
-        mat_b = Naive_Matrix(b)
-        mat_x = Naive_Matrix(x)
-        linear_cg_model = CG.linear_CG(epsilon, epoch)
-        mat_x_min = linear_cg_model.solve_by_Naive_Matrix(mat_a, mat_b, mat_x)
-    return np.array(mat_x_min.tolist())
+        raise ValueError("num_threads must be positive")
+    matrix_type = Naive_Matrix if num_threads == 1 else Accelerated_Matrix
+    solver = CG.linear_CG(epsilon, epoch, num_threads)
+    solve = solver.solve_by_Naive_Matrix if num_threads == 1 else solver.solve_by_Accelerated_Matrix
+    return np.array(solve(matrix_type(a), matrix_type(b), matrix_type(x)).tolist())
 
 
 def np_linear_CG(x, A, b, epsilon, epoch=10000000):
-    """
-    Functionality: Solve the linear system Ax = b using conjugate gradient method by calling the numpy library
-    Parameters:
-    x: The initial point.
-    A: The matrix A.
-    b: The vector b.
-    epsilon: The tolerance.
-    epoch: The maximum number of iterations.
-    """
-    res = A.dot(x) - b
-    delta = -res
-    count = 0
-    while True:
-        if (np.linalg.norm(res) <= epsilon) or (count >= epoch):
+    """Solve Ax=b with the legacy explicit-residual NumPy formulation."""
+    if not np.isfinite(epsilon) or epsilon < 0 or epoch < 0:
+        raise ValueError("epsilon and epoch must be finite and nonnegative")
+    residual = A.dot(x) - b
+    direction = -residual
+    for _ in range(epoch):
+        if not np.all(np.isfinite(residual)):
+            raise RuntimeError("Linear CG encountered a non-finite residual")
+        if hypot(*np.ravel(residual)) <= epsilon:
             return x
-
-        D = A.dot(delta)
-        beta = -(res.dot(delta)) / (delta.dot(D))
-        x = x + beta * delta
-
-        res = A.dot(x) - b
-        chi = res.dot(D) / (delta.dot(D))
-        delta = chi * delta - res
-
-        count += 1
-        # print("A", A)
-        # print("B", b)
-        # print("x", x)
-        # print("res", res)
-        # print("delta", delta)
-        # print("D", D)
-        # print("beta", beta)
-        # print("chi", chi)
-        # print("norm", np.linalg.norm(res))
-        # print("------------------")
+        product = A.dot(direction)
+        denominator = direction.dot(product)
+        if not np.isfinite(denominator) or denominator <= 0:
+            raise RuntimeError("Linear CG requires finite positive curvature")
+        step = -residual.dot(direction) / denominator
+        x = x + step * direction
+        residual = A.dot(x) - b
+        coefficient = residual.dot(product) / denominator
+        direction = coefficient * direction - residual
+    if not np.all(np.isfinite(residual)):
+        raise RuntimeError("Linear CG encountered a non-finite residual")
+    return x
 
 
 def nonlinear_func_1(x):
-    """
-    Functionality: f(x) = x1^4 - 2*x1^2*x2 + x1^2 + x2^2 - 2*x1 + 1
-    Parameters:
-    x: The input vector.
-    """
+    """Return the two-variable example whose minimum is at (1, 1)."""
     return x[0] ** 4 - 2 * x[0] ** 2 * x[1] + x[0] ** 2 + x[1] ** 2 - 2 * x[0] + 1
 
 
 def nonlinear_func_2(x):
-    """
-    Functionality: f(x) = x1^4 + x2^4 + x3^4 + x4^4 ...+ xn^4
-    Parameters:
-    x: The input vector.
-    """
+    """Return sqrt(sum(x**4)), the higher-dimensional legacy example."""
     x = np.array(x)
-    return (np.sum(x**4)) ** 0.5
+    return np.sum(x**4) ** 0.5
+
+
+def _line_search(f, df, x, d, alpha, beta, trial):
+    if not (0 < alpha < 1 and 0 < beta < 1):
+        raise ValueError("alpha and beta must lie strictly between zero and one")
+    slope = float(np.dot(df(x), d))
+    value = float(f(x))
+    if not np.isfinite(slope) or not np.isfinite(value):
+        raise RuntimeError("Line search requires a finite objective and gradient")
+    if slope == 0 and np.all(np.asarray(d) == 0):
+        return 1.0
+    if slope >= 0:
+        raise RuntimeError("Line search requires a descent direction")
+    step = 1.0
+    for _ in range(_MAX_BACKTRACKS):
+        candidate = trial(step)
+        candidate_value = float(f(candidate))
+        if np.isfinite(candidate_value) and candidate_value <= value + alpha * step * slope:
+            return step
+        if np.array_equal(candidate, x):
+            break
+        step *= beta
+    raise RuntimeError("Line search failed to find a finite decreasing step")
 
 
 def custom_naive_line_search(f, df, x, d, alpha=5e-4, beta=0.8):
-    """
-    Functionality: Perform a backtracking line search to find the step size.
-    Parameters:
-    f: The objective function.
-    df: The gradient of the objective function.
-    x: The current point.
-    d: The search direction.
-    alpha: The fraction of decrease in f we expect.
-    beta: The fraction by which we decrease t if the previous t doesn't work.
-    """
-    Mat_df_x = Naive_Matrix(df(x))  # df(x)
-    Mat_d = Naive_Matrix(d)  # d
-    Mat_df_x_dot_d_mul_alpha = (Mat_df_x @ Mat_d)[0, 0] * alpha  # df(x).dot(d) * alpha
-    f_x = f(x)  # f(x)
-
-    t = 1.0
-    Mat_x_p_t_d = Naive_Matrix(x) + Mat_d * t  # x + t * d
-
-    while f(Mat_x_p_t_d.tolist()) > (Mat_df_x_dot_d_mul_alpha * t + f_x):
-        t *= beta
-        Mat_x_p_t_d = Naive_Matrix(x) + Mat_d * t
-    return t
+    """Find an Armijo step with Naive_Matrix vector operations."""
+    point, direction = Naive_Matrix(x), Naive_Matrix(d)
+    return _line_search(f, df, x, d, alpha, beta, lambda step: (point + direction * step).tolist())
 
 
 def custom_accelerated_line_search(f, df, x, d, alpha=5e-4, beta=0.8, num_threads=1):
-    """
-    Functionality: Perform a backtracking line search to find the step size.
-    Parameters:
-    f: The objective function.
-    df: The gradient of the objective function.
-    x: The current point.
-    d: The search direction.
-    alpha: The fraction of decrease in f we expect.
-    beta: The fraction by which we decrease t if the previous t doesn't work.
-    """
-    ##print("num_threads", num_threads)
-    Mat_df_x = Accelerated_Matrix(df(x))  # df(x)
-    Mat_d = Accelerated_Matrix(d)  # d
-    Mat_df_x.set_number_of_threads(num_threads)
-    # Mat_d.set_number_of_threads(num_threads)
-    Mat_df_x_dot_d_mul_alpha = (Mat_df_x @ Mat_d)[0, 0] * alpha  # df(x).dot(d) * alpha
-    f_x = f(x)  # f(x)
-
-    t = 1.0
-    Mat_x_p_t_d = Accelerated_Matrix(x) + Mat_d * t  # x + t * d
-    # Mat_x_p_t_d.set_number_of_threads(num_threads)
-
-    while f(Mat_x_p_t_d.tolist()) > (Mat_df_x_dot_d_mul_alpha * t + f_x):
-        t *= beta
-        Mat_x_p_t_d = Accelerated_Matrix(x) + Mat_d * t
-    return t
+    """Find an Armijo step with Accelerated_Matrix vector operations."""
+    if num_threads == -1:
+        num_threads = 1
+    if num_threads < 1:
+        raise ValueError("num_threads must be positive or -1")
+    point, direction = Accelerated_Matrix(x), Accelerated_Matrix(d)
+    point.set_number_of_threads(num_threads)
+    direction.set_number_of_threads(num_threads)
+    return _line_search(f, df, x, d, alpha, beta, lambda step: (point + direction * step).tolist())
 
 
 def np_line_search(f, df, x, d, alpha=5e-4, beta=0.8):
-    """
-    Functionality: Perform a backtracking line search to find the step size.
-    Parameters:
-    f: The objective function.
-    df: The gradient of the objective function.
-    x: The current point.
-    d: The search direction.
-    alpha: The fraction of decrease in f we expect.
-    beta: The fraction by which we decrease t if the previous t doesn't work.
-    """
-    t = 1.0
-    while f(x + t * d) > f(x) + alpha * t * np.dot(df(x), d):
-        t *= beta
-    return t
+    """Find an Armijo step with NumPy vector operations."""
+    return _line_search(f, df, x, d, alpha, beta, lambda step: x + step * d)
 
 
-def custom_nonlinear_CG(
-    X, tol, alpha, beta, f, Df, method="Fletcher_Reeves", num_threads=-1
-):
-    """
-    Functionality: Solve the nonlinear system using conjugate gradient method by calling the c++ library
-    Parameters:
-    X: The initial point.
-    tol: The tolerance.
-    alpha: The fraction of decrease in f we expect.
-    beta: The fraction by which we decrease t if the previous t doesn't work.
-    f: The objective function.
-    Df: The gradient of the objective function.
-    method: The method used to update the search direction.
-    num_threads: The number of threads used in the C++ library.
-    """
+def _supported_method(method):
+    if method not in _METHOD_SUFFIXES:
+        raise AssertionError("method not supported")
+    return _METHOD_SUFFIXES[method]
+
+
+def _native_direction(method, matrix_type, num_threads=1):
+    suffix = _supported_method(method)
+    accelerated = matrix_type is Accelerated_Matrix
+    prefix = "Accelerated" if accelerated else "Naive"
+    update = getattr(CG.nonlinear_CG, f"{prefix}_{suffix}_next_iteration")
+
+    def next_direction(current, following, direction):
+        arguments = [matrix_type(value) for value in (current, following, direction)]
+        result = update(*arguments, num_threads) if accelerated else update(*arguments)
+        return np.array(result.tolist())
+
+    return next_direction
+
+
+def _nonlinear_cg(X, tol, alpha, beta, f, Df, update, line_search):
+    if not np.isfinite(tol) or tol <= 0:
+        raise ValueError("tol must be finite and positive")
+    point = np.array(X, dtype=np.float64, copy=True)
+    if not np.all(np.isfinite(point)):
+        raise ValueError("The initial point must contain finite values")
+
+    def objective(x):
+        value = float(f(x))
+        if not np.isfinite(value):
+            raise RuntimeError("Nonlinear CG encountered a non-finite objective")
+        return value
+
+    def gradient(x):
+        value = np.asarray(Df(x), dtype=np.float64)
+        if value.shape != point.shape:
+            raise ValueError("Gradient shape must match the current point")
+        if not np.all(np.isfinite(value)):
+            raise RuntimeError("Nonlinear CG encountered a non-finite gradient")
+        return value
+
+    current = gradient(point)
+    direction = -current
+    for _ in range(_MAX_NONLINEAR_ITERATIONS):
+        if hypot(*np.ravel(current)) < tol:
+            return point, objective(point)
+        if not np.all(np.isfinite(direction)) or np.dot(current, direction) >= 0:
+            direction = -current
+        step = line_search(f, Df, point, direction, alpha, beta)
+        if step is None:
+            return point, objective(point)
+        if not np.isfinite(step) or step <= 0:
+            raise RuntimeError("Nonlinear CG received an invalid line-search step")
+        following_point = point + step * direction
+        if not np.all(np.isfinite(following_point)):
+            raise RuntimeError("Nonlinear CG encountered a non-finite point")
+        if np.array_equal(following_point, point):
+            raise RuntimeError("Nonlinear CG stagnated before reaching the gradient tolerance")
+        following = gradient(following_point)
+        if hypot(*np.ravel(following)) < tol:
+            return following_point, objective(following_point)
+        direction = np.asarray(update(current, following, direction), dtype=np.float64)
+        point, current = following_point, following
+    raise RuntimeError("Nonlinear CG exceeded its iteration limit")
+
+
+def custom_nonlinear_CG(X, tol, alpha, beta, f, Df, method="Fletcher_Reeves", num_threads=-1):
+    """Return (x, f(x)) using the selected legacy native direction update."""
     if num_threads == 1:
-        return custom_naive_nonlinear_CG(X, tol, alpha, beta, f, Df, method=method)
-
-    else:
-        return custom_accelerated_nonlinear_CG(
-            X, tol, alpha, beta, f, Df, method=method, num_threads=num_threads
-        )
+        return custom_naive_nonlinear_CG(X, tol, alpha, beta, f, Df, method)
+    return custom_accelerated_nonlinear_CG(X, tol, alpha, beta, f, Df, method, num_threads)
 
 
 def custom_naive_nonlinear_CG(X, tol, alpha, beta, f, Df, method="Fletcher_Reeves"):
-    """
-    Functionality: Solve the nonlinear system using conjugate gradient method and naive matrix by calling the c++ library
-    Parameters:
-    X: The initial point.
-    tol: The tolerance.
-    alpha: The fraction of decrease in f we expect.
-    beta: The fraction by which we decrease t if the previous t doesn't work.
-    f: The objective function.
-    Df: The gradient of the objective function.
-    method: The method used to update the search direction.
-    """
-    method_dict = {}
-    method_dict = {
-        "Fletcher_Reeves": CG.nonlinear_CG.Naive_Fletcher_Reeves_next_iteration,
-        "Hager-Zhang": CG.nonlinear_CG.Naive_Hager_Zhang_next_iteration,
-        "Dai-Yuan": CG.nonlinear_CG.Naive_Dai_Yuan_next_iteration,
-    }
-
-    if method in method_dict:
-        method_func = method_dict[method]
-    else:
-        raise AssertionError("method not supported")
-
-    NORM = np.linalg.norm
-    next_Df = Df(X)
-    delta = -next_Df
-
-    while True:
-        start_point = X
-        step = custom_naive_line_search(
-            f=f, df=Df, x=start_point, d=delta, alpha=alpha, beta=beta
-        )
-        if step != None:
-            next_X = X + step * delta
-        elif step != step:  # IsNaN
-            raise AssertionError(
-                "It diverges, please try another start point or another hyperparameter."
-            )
-        else:
-            return X, f(X)
-        if NORM(Df(next_X)) < tol:
-            return next_X, f(next_X)
-
-        else:
-            X = next_X
-            cur_Df = next_Df
-            next_Df = Df(X)
-            Mat_cur_Df = Naive_Matrix(cur_Df)
-            Mat_next_Df = Naive_Matrix(next_Df)
-            Mat_delta = Naive_Matrix(delta)
-            Mat_delta = method_func(Mat_cur_Df, Mat_next_Df, Mat_delta)
-            delta = np.array(Mat_delta.tolist())
+    """Run nonlinear CG with native Naive_Matrix direction updates."""
+    return _nonlinear_cg(
+        X,
+        tol,
+        alpha,
+        beta,
+        f,
+        Df,
+        _native_direction(method, Naive_Matrix),
+        custom_naive_line_search,
+    )
 
 
 def custom_accelerated_nonlinear_CG(
     X, tol, alpha, beta, f, Df, method="Fletcher_Reeves", num_threads=-1
 ):
-    """
-    Functionality: Solve the nonlinear system using conjugate gradient method and accelerated matrix by calling the c++ library
-    Parameters:
-    X: The initial point.
-    tol: The tolerance.
-    alpha: The fraction of decrease in f we expect.
-    beta: The fraction by which we decrease t if the previous t doesn't work.
-    f: The objective function.
-    Df: The gradient of the objective function.
-    method: The method used to update the search direction.
-    num_threads: The number of threads used in the C++ library.
-    """
-    method_dict = {}
-    method_dict = {
-        "Fletcher_Reeves": CG.nonlinear_CG.Accelerated_Fletcher_Reeves_next_iteration,
-        "Hager-Zhang": CG.nonlinear_CG.Accelerated_Hager_Zhang_next_iteration,
-        "Dai-Yuan": CG.nonlinear_CG.Accelerated_Dai_Yuan_next_iteration,
-    }
-
-    if method in method_dict:
-        method_func = method_dict[method]
-    else:
-        raise AssertionError("method not supported")
-
-    NORM = np.linalg.norm
-    next_Df = Df(X)
-    delta = -next_Df
-
-    while True:
-        start_point = X
-        step = custom_naive_line_search(
-            f=f, df=Df, x=start_point, d=delta, alpha=alpha, beta=beta
-        )
-        if step != None:
-            next_X = X + step * delta
-        elif step != step:  # IsNaN
-            raise AssertionError(
-                "It diverges, please try another start point or another hyperparameter."
-            )
-        else:
-            return X, f(X)
-
-        if NORM(Df(next_X)) < tol:
-            return next_X, f(next_X)
-
-        else:
-            X = next_X
-            cur_Df = next_Df
-            next_Df = Df(X)
-            Mat_cur_Df = Accelerated_Matrix(cur_Df)
-            Mat_next_Df = Accelerated_Matrix(next_Df)
-            Mat_delta = Accelerated_Matrix(delta)
-            Mat_delta = method_func(Mat_cur_Df, Mat_next_Df, Mat_delta, num_threads)
-            delta = np.array(Mat_delta.tolist())
+    """Run nonlinear CG with native accelerated updates and line search."""
+    if num_threads != -1 and num_threads < 1:
+        raise ValueError("num_threads must be positive or -1")
+    return _nonlinear_cg(
+        X,
+        tol,
+        alpha,
+        beta,
+        f,
+        Df,
+        _native_direction(method, Accelerated_Matrix, num_threads),
+        partial(custom_accelerated_line_search, num_threads=num_threads),
+    )
 
 
 def np_nonlinear_CG(X, tol, alpha, beta, f, Df, method="Fletcher_Reeves"):
-    """
-    Functionality: Solve the nonlinear system using conjugate gradient method by calling the numpy library
-    Parameters:
-    X: The initial point.
-    tol: The tolerance.
-    alpha: The fraction of decrease in f we expect.
-    beta: The fraction by which we decrease t if the previous t doesn't work.
-    f: The objective function.
-    Df: The gradient of the objective function.
-    method: The method used to update the search direction.
-    """
-    method_dict = {
+    """Run nonlinear CG with NumPy direction updates and line search."""
+    _supported_method(method)
+    methods = {
         "Fletcher_Reeves": Fletcher_Reeves_next_iteration,
         "Hager-Zhang": Hager_Zhang_next_iteration,
         "Dai-Yuan": Dai_Yuan_next_iteration,
     }
-
-    NORM = np.linalg.norm
-    next_Df = Df(X)
-    delta = -next_Df
-
-    if method in method_dict:
-        method_func = method_dict[method]
-    else:
-        raise AssertionError("method not supported")
-
-    while True:
-        start_point = X
-        step = np_line_search(
-            f=f, df=Df, x=start_point, d=delta, alpha=alpha, beta=beta
-        )
-        if step != None:
-            next_X = X + step * delta
-        elif step != step:  # IsNaN
-            raise AssertionError(
-                "It diverges, please try another start point or another hyperparameter."
-            )
-        else:
-            return X, f(X)
-
-        if NORM(Df(next_X)) < tol:
-            return next_X, f(next_X)
-
-        else:
-            X = next_X
-            cur_Df = next_Df
-            next_Df = Df(X)
-            delta = method_func(cur_Df, next_Df, delta)
-            delta = np.array(delta.tolist())
+    return _nonlinear_cg(X, tol, alpha, beta, f, Df, methods[method], np_line_search)
 
 
 def Fletcher_Reeves_next_iteration(cur_Df, next_Df, delta):
-    """
-    Functionality: Update the search direction using Fletcher Reeves method
-    Parameters:
-    cur_Df: The gradient at the current point.
-    next_Df: The gradient at the next point.
-    delta: The search direction.
-    """
-    chi = np.linalg.norm(next_Df) ** 2 / np.linalg.norm(cur_Df) ** 2
-    delta = -next_Df + chi * delta
-    return delta
+    """Update the direction with the Fletcher-Reeves coefficient."""
+    coefficient = np.linalg.norm(next_Df) ** 2 / np.linalg.norm(cur_Df) ** 2
+    return -next_Df + coefficient * delta
 
 
 def Hager_Zhang_next_iteration(cur_Df, next_Df, delta):
-    """
-    Functionality: Update the search direction using Hager Zhang method
-    Parameters:
-    cur_Df: The gradient at the current point.
-    next_Df: The gradient at the next point.
-    delta: The search direction.
-    """
-    Q = next_Df - cur_Df
-    M = Q - delta * (np.linalg.norm(Q) ** 2) * 2 / (delta.dot(Q))
-    N = next_Df / (delta.dot(Q))
-    chi = M.dot(N)
-    delta = -next_Df + chi * delta
-    return delta
+    """Update the direction with the Hager-Zhang coefficient."""
+    difference = next_Df - cur_Df
+    projection = delta.dot(difference)
+    corrected = difference - delta * np.linalg.norm(difference) ** 2 * 2 / projection
+    coefficient = corrected.dot(next_Df / projection)
+    return -next_Df + coefficient * delta
 
 
 def Dai_Yuan_next_iteration(cur_Df, next_Df, delta):
-    """
-    Functionality: Update the search direction using Dai Yuan method
-    Parameters:
-    cur_Df: The gradient at the current point.
-    next_Df: The gradient at the next point.
-    delta: The search direction.
-    """
-    chi = np.linalg.norm(next_Df) ** 2 / delta.dot(next_Df - cur_Df)
-    delta = -next_Df + chi * delta
-    return delta
+    """Update the direction with the Dai-Yuan coefficient."""
+    coefficient = np.linalg.norm(next_Df) ** 2 / delta.dot(next_Df - cur_Df)
+    return -next_Df + coefficient * delta

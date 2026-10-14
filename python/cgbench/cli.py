@@ -114,10 +114,24 @@ def _run_worker(spec, output):
         "metric": "sparse_solver_comparison"
         if spec.get("comparison") == "sparse-solvers"
         else "time_to_solution",
-        "spec": spec,
+        "spec": {
+            key: value
+            for key, value in spec.items()
+            if key
+            not in (
+                "expected_hashes",
+                "expected_candidates",
+                "resolved_sampling",
+                "expected_round_orders",
+            )
+        },
         "environment": environment_metadata(),
         "cases": cases,
     }
+    if spec.get("expected_hashes"):
+        data["replay_validation"] = (
+            "matched input hashes, eligible candidates, resolved sampling and actual timing schedule"
+        )
     write_artifact(data, output)
     print_summary(data)
     print(f"Saved {Path(output).resolve()}")
@@ -228,6 +242,9 @@ def main(argv=None):
     }
     spec["resolved_sampling"] = {
         case["case"]["name"]: case["sampling"] for case in artifact["cases"]
+    }
+    spec["expected_round_orders"] = {
+        case["case"]["name"]: case["round_orders"] for case in artifact["cases"]
     }
     # Preserve each saved cycle count (the worker resolves the same candidate
     # set); unavailable candidates and versions remain visible in metadata.

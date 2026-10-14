@@ -1,20 +1,38 @@
-FROM pytorch/pytorch:2.0.1-cuda11.7-cudnn8-devel
+FROM python:3.12-slim-bookworm
 
-ARG PIP_CONF="/workspace/config"
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends build-essential git ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
-# set timezone
-ENV TZ=Asia/Taipei
-RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+WORKDIR /workspace/cg
+ENV PIP_CACHE_DIR=/workspace/cg/.cache/pip \
+    PYTHONUNBUFFERED=1 \
+    CC=gcc \
+    CXX=g++
 
-RUN apt update && \
-    apt upgrade -y && \
-    apt install -y \
-        curl \
-        vim \
-        git \
-        fish 
-RUN apt-get update
-RUN apt-get install -y libomp-dev
-COPY config/ $PIP_CONF
-RUN pip install -r ${PIP_CONF}/requirements.txt
-RUN pip install -U pytest
+COPY requirements/ requirements/
+COPY contrib/docker/config/requirements.txt contrib/docker/config/requirements.txt
+RUN python -m venv .venv \
+    && .venv/bin/python -m pip install -r contrib/docker/config/requirements.txt
+
+ARG CG_WITH_BENCHMARKS=0
+RUN if [ "$CG_WITH_BENCHMARKS" = "1" ]; then \
+        .venv/bin/python -m pip install -r requirements/benchmark.lock; \
+    fi
+
+COPY CMakeLists.txt CMakePresets.json Makefile pyproject.toml README.md .clang-format .clang-tidy ./
+COPY cpp/matrix/*.cpp cpp/matrix/*.hpp cpp/matrix/
+COPY cpp/cg_method/*.cpp cpp/cg_method/*.hpp cpp/cg_method/
+COPY cpp/pybind/*.cpp cpp/pybind/
+COPY include/cg/*.hpp include/cg/
+COPY src/*.cpp src/
+COPY bindings/*.cpp bindings/
+COPY python/*.py python/
+COPY python/cgpy/*.py python/cgpy/
+COPY python/cgbench/*.py python/cgbench/
+COPY tests/*.py tests/
+COPY tests/cpp/*.cpp tests/cpp/
+COPY demo/*.py demo/
+COPY benchmarks/README.md benchmarks/
+
+CMD ["make", "test"]
