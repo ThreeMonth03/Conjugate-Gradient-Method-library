@@ -20,15 +20,15 @@ set(CG_BLAS_INCLUDE "${CG_BLAS_ROOT}/private/include")
 set(CG_BLAS_ARCHIVE "${CG_BLAS_ROOT}/private/lib/libcgpy_openblas.a")
 file(MAKE_DIRECTORY "${CG_BLAS_INCLUDE}")
 
-# CORE2 keeps the common x86-64 code at the SSE2 baseline; Haswell kernels are
-# selected only at runtime on supporting CPUs. Other Linux architectures use
+# CORE2 kernels require SSE3/SSSE3; Haswell kernels are selected only at runtime
+# on supporting CPUs. Other Linux architectures use
 # OpenBLAS's portable native target detection.
 set(CG_BLAS_ARCH_ARGS)
 set(CG_BLAS_BASELINE "native target detection")
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
     list(APPEND CG_BLAS_ARCH_ARGS
         -DTARGET=CORE2 -DDYNAMIC_ARCH=ON -DDYNAMIC_LIST=CORE2,HASWELL)
-    set(CG_BLAS_BASELINE "CORE2 SSE2 baseline, runtime CORE2/HASWELL")
+    set(CG_BLAS_BASELINE "CORE2 SSE3/SSSE3 baseline, runtime CORE2/HASWELL")
 endif()
 set(CG_BLAS_PROVIDER_INFO "OpenBLAS 0.3.30, sequential, USE_LOCKING=1, LP64, BLAS-only, prefix=cgpy_, ${CG_BLAS_BASELINE}")
 

@@ -122,6 +122,25 @@ def test_provider_metadata_describes_actual_build():
 
 
 @pytest.mark.parametrize("scope", ["api", "prepared"])
+@pytest.mark.parametrize("candidate", ["native", "native-cg", "native-pcg"])
+def test_native_profile_candidates_keep_native_kernel_despite_conflicting_options(scope, candidate):
+    matrix, rhs, initial, _ = make_case(SUITES["smoke"][0], 42)
+    options = {
+        "algorithm": "standard",
+        "fused": True,
+        "rtol": 1e-8,
+        "atol": 1e-12,
+        "maxiter": 2000,
+        "residual_refresh": 50,
+        "dense_kernel": "blas",
+    }
+    arrays = matrix, rhs, initial
+    executor = make_executor(candidate, arrays, options, scope, 1)
+    assert executor.benchmark_metadata()["dense_kernel"] == "native"
+    assert check_outcome(executor(), arrays, options)["eligible"]
+
+
+@pytest.mark.parametrize("scope", ["api", "prepared"])
 def test_profile_blas_candidate_uses_public_api_and_shared_accuracy_gate(scope):
     matrix, rhs, initial, _ = make_case(SUITES["smoke"][0], 42)
     options = {
@@ -131,6 +150,7 @@ def test_profile_blas_candidate_uses_public_api_and_shared_accuracy_gate(scope):
         "atol": 1e-12,
         "maxiter": 2000,
         "residual_refresh": 50,
+        "dense_kernel": "native",
     }
     arrays = matrix, rhs, initial
     if not cgpy.blas_enabled():

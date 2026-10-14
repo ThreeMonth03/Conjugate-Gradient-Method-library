@@ -63,7 +63,7 @@ make test PRESET=cpu-blas
 
 Then call `cgpy.solve(A, b, dense_kernel="blas", num_threads=1)` or pass the same kernel to `prepare` / `solve_into`. `cgpy.blas_enabled()` and `cgpy.build_info()['blas']` describe the imported extension. BLAS requires dense storage and one thread; CSR and unavailable BLAS builds reject that selection. `dense_kernel="native"` remains the default, and `fused` independently controls supported vector operations.
 
-The Linux build uses a pinned private sequential OpenBLAS under `build/_deps`; the wheel includes it. See [build details](docs/build.rst) for toolchain requirements and native/BLAS distribution checks. Preset selection affects a source build; reinstall to change an installed wheel.
+The Linux build uses a pinned private sequential OpenBLAS under `build/_deps`; the wheel includes it. On x86-64, the BLAS-enabled extension requires SSE3/SSSE3 even when importing it; other architectures use the native build target. See [build details](docs/build.rst) for toolchain requirements and native/BLAS distribution checks. Preset selection affects a source build; reinstall to change an installed wheel.
 
 ## Documentation
 

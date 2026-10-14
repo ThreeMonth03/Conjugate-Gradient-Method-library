@@ -504,7 +504,7 @@ def make_executor(name, arrays, options, scope, threads):
         name, preconditioner = aliases[name]
         options = {**options, "preconditioner": preconditioner}
     if name == "native":
-        return NativeExecutor(arrays, options, scope, threads)
+        return NativeExecutor(arrays, {**options, "dense_kernel": "native"}, scope, threads)
     if name == "numpy-out":
         if hasattr(arrays[0], "indptr"):
             raise ValueError("numpy-out requires dense inputs; use scipy-out for CSR")

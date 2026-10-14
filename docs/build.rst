@@ -50,6 +50,14 @@ no Fortran compiler or LAPACK build. Initial dependency downloads require
 network access. Wheel builds statically include the provider and use private
 symbol names, so installed wheels do not depend on that source/build directory.
 
+On x86-64, a BLAS-enabled binary or wheel requires a CPU supporting SSE3 and
+SSSE3 (the CORE2 kernel baseline). The provider dispatches between CORE2 and
+Haswell kernels on supported CPUs. This requirement applies to the entire
+BLAS-enabled extension, including import; selecting the native kernel does
+not remove it. Other Linux architectures use the provider's native build
+target and require a compatible CPU when relocating the wheel. These wheels
+are local platform builds; no manylinux portability is claimed.
+
 Inspect ``cgpy.blas_enabled()`` and ``cgpy.build_info()`` in the process that
 will run the solve. See :doc:`api` for the runtime contract.
 
