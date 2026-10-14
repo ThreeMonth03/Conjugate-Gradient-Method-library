@@ -1,10 +1,10 @@
 [build-system]
-requires = ["scikit-build-core==0.11.6", "pybind11==3.0.1"]
+requires = ["scikit-build-core==0.11.6", "pybind11==3.0.1", "cmake==3.31.10", "ninja==1.13.0"]
 build-backend = "scikit_build_core.build"
 
 [project]
 name = "cgpy"
-version = "0.2.0"
+version = "0.3.0"
 description = "CPU conjugate gradient solvers with a native C++ implementation"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -17,11 +17,25 @@ legacy = ["autograd>=1.8"]
 cmake.version = ">=3.24"
 build-dir = "build/wheel/{wheel_tag}"
 wheel.packages = ["python/cgpy", "python/cgbench"]
+# An explicit source-file allowlist excludes untracked research files, virtual
+# environments, caches and local provider/build artifacts from every sdist.
+sdist.exclude = ["**"]
+sdist.include = [
+    "/CMakeLists.txt", "/CMakePresets.json", "/Makefile", "/pyproject.toml",
+    "/README.md", "/.gitignore", "/LICENSE*",
+    "/cmake/*.cmake", "/include/cg/*.hpp", "/include/cg/detail/*.hpp",
+    "/src/*.cpp", "/bindings/*.cpp", "/cpp/*/*.cpp", "/cpp/*/*.hpp",
+    "/python/cgpy/**/*.py", "/python/cgbench/**/*.py", "/python/utils.py", "/python/README.md",
+    "/tests/*.py", "/tests/cpp/*.cpp", "/scripts/*.py", "/demo/*.py",
+    "/requirements/*.lock", "/docs/*.rst", "/docs/*.md", "/docs/conf.py",
+    "/docs/_static/*.css", "/benchmarks/README.md",
+]
 
 [tool.scikit-build.cmake.define]
 BUILD_TESTING = "OFF"
 CG_BUILD_PYTHON = "ON"
 CG_ENABLE_OPENMP = "OFF"
+CG_ENABLE_BLAS = "OFF"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

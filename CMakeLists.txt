@@ -1,11 +1,12 @@
 cmake_minimum_required(VERSION 3.24)
-project(cgpy VERSION 0.2.0 LANGUAGES CXX)
+project(cgpy VERSION 0.3.0 LANGUAGES CXX)
 
 include(CTest)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(CG_BUILD_PYTHON "Build the Python extension modules" ON)
 option(CG_ENABLE_OPENMP "Enable OpenMP CPU operations" OFF)
+option(CG_ENABLE_BLAS "Build the private sequential OpenBLAS dense backend" OFF)
 option(CG_ENABLE_SANITIZERS "Enable address and undefined-behavior sanitizers" OFF)
 option(CG_ENABLE_CLANG_TIDY "Run clang-tidy while compiling project sources" OFF)
 
@@ -22,11 +23,20 @@ target_include_directories(cg_legacy PUBLIC
 )
 target_link_libraries(cg_legacy PUBLIC Threads::Threads)
 
-add_library(cg_core STATIC src/storage.cpp src/backend.cpp src/solver.cpp src/csr.cpp src/preconditioner.cpp)
+add_library(cg_core STATIC src/storage.cpp src/backend.cpp src/solver.cpp src/csr.cpp src/preconditioner.cpp src/blas.cpp)
 target_compile_features(cg_core PUBLIC cxx_std_17)
 set_target_properties(cg_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_include_directories(cg_core PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>")
 target_link_libraries(cg_legacy PUBLIC cg_core)
+if(CG_ENABLE_BLAS)
+    include(cmake/CGOpenBLAS.cmake)
+    target_link_libraries(cg_core PRIVATE cg_private_blas)
+    target_compile_definitions(cg_core PUBLIC CG_ENABLE_BLAS=1)
+    target_compile_definitions(cg_core PRIVATE
+        cblas_dgemv=cgpy_cblas_dgemv
+        CG_BLAS_PROVIDER_INFO="${CG_BLAS_PROVIDER_INFO}"
+    )
+endif()
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(cg_core PRIVATE -Wall -Wextra -Wpedantic)
 endif()
@@ -106,7 +116,7 @@ if(BUILD_TESTING)
     set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
     set(BUILD_GMOCK OFF CACHE BOOL "" FORCE)
     FetchContent_MakeAvailable(googletest)
-    add_executable(cg_gtests tests/cpp/test_legacy.cpp tests/cpp/test_core.cpp tests/cpp/test_csr.cpp tests/cpp/test_pcg.cpp)
+    add_executable(cg_gtests tests/cpp/test_legacy.cpp tests/cpp/test_core.cpp tests/cpp/test_csr.cpp tests/cpp/test_pcg.cpp tests/cpp/test_blas.cpp)
     target_link_libraries(cg_gtests PRIVATE cg_legacy cg_core GTest::gtest_main)
     include(GoogleTest)
     gtest_discover_tests(cg_gtests PROPERTIES LABELS cpp)

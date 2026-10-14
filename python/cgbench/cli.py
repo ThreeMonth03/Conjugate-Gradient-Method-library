@@ -9,6 +9,7 @@ from pathlib import Path
 
 IMPLEMENTATIONS = (
     "native",
+    "native-blas",
     "numpy-out",
     "scipy-out",
     "torch-eager-out",
@@ -188,6 +189,11 @@ def main(argv=None):
             or any(name not in IMPLEMENTATIONS for name in names)
         ):
             raise SystemExit("implementations must be unique names: " + ",".join(IMPLEMENTATIONS))
+        if "native-blas" in names:
+            if any(case.storage != "dense" for case in SUITES[arguments.suite]):
+                raise SystemExit("native-blas requires a dense suite")
+            if arguments.threads != 1:
+                raise SystemExit("native-blas currently requires --threads 1")
         if any(
             name in ("scipy-cg", "scipy-pcg", "scipy-lu-total", "scipy-lu-reuse") for name in names
         ):

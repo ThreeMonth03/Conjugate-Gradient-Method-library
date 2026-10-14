@@ -89,6 +89,8 @@ bool overlaps(const CsrMatrix &A, ConstVectorView x)
 
 void CpuBackend::apply(const CsrMatrix &A, ConstVectorView x, VectorView output) const
 {
+    if (dense_kernel() == DenseKernel::blas)
+        throw std::invalid_argument("BLAS dense kernels do not support CSR matrices");
     validate_apply(A, x, output);
     const auto *indptr = A.indptr().data();
     const auto *indices = A.indices().data();
@@ -110,6 +112,8 @@ void CpuBackend::apply(const CsrMatrix &A, ConstVectorView x, VectorView output)
 
 double CpuBackend::apply_dot(const CsrMatrix &A, ConstVectorView p, VectorView ap) const
 {
+    if (dense_kernel() == DenseKernel::blas)
+        throw std::invalid_argument("BLAS dense kernels do not support CSR matrices");
     validate_apply(A, p, ap);
     if (p.size != ap.size)
     {
@@ -144,6 +148,8 @@ double CpuBackend::apply_dot(const CsrMatrix &A, ConstVectorView p, VectorView a
 double CpuBackend::residual(const CsrMatrix &A, ConstVectorView b, ConstVectorView x, VectorView r,
                             bool b_minus_ax) const
 {
+    if (dense_kernel() == DenseKernel::blas)
+        throw std::invalid_argument("BLAS dense kernels do not support CSR matrices");
     detail::validate(b);
     validate_apply(A, x, r);
     if (b.size != r.size || detail::overlaps(b, r))

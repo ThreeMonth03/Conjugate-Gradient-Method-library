@@ -1,6 +1,18 @@
 # Conjugate Gradient Method Library
 
-CPU conjugate gradient solvers for nonempty, real symmetric positive-definite systems `Ax = b`. The C++17 core supports dense and canonical CSR matrices, reusable workspace, fused operations, optional OpenMP, and Jacobi preconditioned CG. Python exposes a convenience API and a strict in-place API. Legacy linear and nonlinear methods remain available through `utils` and `_cgpy`.
+CPU conjugate gradient solvers for nonempty, real symmetric positive-definite systems `Ax = b`. The C++17 core supports dense and canonical CSR matrices, reusable workspace, fused operations, optional OpenMP, an optional dense BLAS kernel, and Jacobi preconditioned CG. Python exposes a convenience API and a strict in-place API. Legacy linear and nonlinear methods remain available through `utils` and `_cgpy`.
+
+## Install with pip
+
+Build this checkout with an existing Python 3.10+ interpreter and C++17 compiler:
+
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install --cache-dir .cache/pip .
+.venv/bin/python -c 'import cgpy; print(cgpy.build_info())'
+```
+
+Pip installs the declared build dependencies in an isolated temporary environment. The default package uses the native CPU kernel; NumPy is its runtime dependency. A built wheel can be installed with `.venv/bin/python -m pip install --cache-dir .cache/pip dist/cgpy-*.whl` without a compiler. See [installation](docs/install.rst) for editable installs and optional legacy derivatives.
 
 ## Local development
 
@@ -13,7 +25,7 @@ python3 -m venv .venv
 make test
 ```
 
-`make pytest` runs Python tests, `make gtest` runs native GoogleTest cases, and `make lint` checks Python lint/formatting and C++ formatting. `make gtest PRESET=cpu-asan` runs the native tests under AddressSanitizer and UndefinedBehaviorSanitizer. `make wheel` builds a wheel under `dist/`; `make demo` runs the examples.
+`make pytest` runs Python tests, `make gtest` runs native GoogleTest cases, and `make lint` checks Python lint/formatting and C++ formatting. `make gtest PRESET=cpu-asan` runs the native tests under AddressSanitizer and UndefinedBehaviorSanitizer. `make wheel` builds an isolated wheel under `dist/`; `make sdist` builds a source archive, and `make test-dist` verifies an installed wheel built from that archive. `make demo` runs the examples.
 
 The default build uses one CPU thread. `make test PRESET=cpu-openmp` enables OpenMP. For an editable installation that supports `num_threads > 1`, add `--config-settings=cmake.define.CG_ENABLE_OPENMP=ON` to the editable install command. Presets build into separate directories; selecting an OpenMP preset for a Make target does not change an already installed wheel.
 
@@ -39,6 +51,30 @@ The stopping rule is `||b - A @ x||2 <= max(atol, rtol * ||b||2)`. Reported resi
 See [Python and C++ interfaces](python/README.md) for options, ownership, and failure statuses.
 See [architecture](docs/architecture.md) for storage, workspace, backend, and fusion boundaries.
 
+## Optional dense BLAS
+
+Build and select BLAS explicitly:
+
+```bash
+make test PRESET=cpu-blas
+.venv/bin/python -m pip install --cache-dir .cache/pip \
+    --config-settings=cmake.define.CG_ENABLE_BLAS=ON .
+```
+
+Then call `cgpy.solve(A, b, dense_kernel="blas", num_threads=1)` or pass the same kernel to `prepare` / `solve_into`. `cgpy.blas_enabled()` and `cgpy.build_info()['blas']` describe the imported extension. BLAS requires dense storage and one thread; CSR and unavailable BLAS builds reject that selection. `dense_kernel="native"` remains the default, and `fused` independently controls supported vector operations.
+
+The Linux build uses a pinned private sequential OpenBLAS under `build/_deps`; the wheel includes it. See [build details](docs/build.rst) for toolchain requirements and native/BLAS distribution checks. Preset selection affects a source build; reinstall to change an installed wheel.
+
+## Documentation
+
+```bash
+.venv/bin/python -m pip install --cache-dir .cache/pip -r requirements/docs.lock
+make docs
+make doctest
+```
+
+Open `build/docs/html/index.html`. Sphinx imports the actual extension, renders NumPy-style docstrings and runs its examples; warnings fail the build. Documentation builds use local assets and require no network access once dependencies and the extension are available. The [Sphinx guide](docs/index.rst) covers API, installation, building and benchmark contracts.
+
 ## Reproducible comparisons
 
 Install the separate CPU benchmark dependencies into the same local environment:
@@ -49,6 +85,8 @@ make pyprof
 make pyprof PRESET=cpu-openmp PYPROF_THREADS=4
 make pyprof PYPROF_SCOPE=api
 make pyprof PYPROF_SUITE=cpu-dense-f64-v1
+make pyprof PRESET=cpu-blas PYPROF_SUITE=cpu-dense-f64-v1 PYPROF_THREADS=1 \
+    PYPROF_ARGS='--implementations native,native-blas,numpy-out,torch-eager-out'
 make pyprof PYPROF_ARGS='--warmups 3 --seed 20261015'
 ```
 

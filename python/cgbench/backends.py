@@ -35,10 +35,13 @@ class NativeExecutor:
             )
         self.options = dict(options)
         self.preconditioner = self.options.pop("preconditioner", "none")
+        self.dense_kernel = self.options.pop("dense_kernel", "native")
+        if self.dense_kernel == "blas" and not cgpy.blas_enabled():
+            raise ImportError("native-blas requires a BLAS-enabled cgpy build")
         self.scope = scope
         self.threads = threads
         self.setup_metadata = {"preconditioner": self.preconditioner}
-        settings = {"preconditioner": self.preconditioner} if self.preconditioner != "none" else {}
+        settings = {"preconditioner": self.preconditioner, "dense_kernel": self.dense_kernel}
         if scope == "prepared":
             start = time.perf_counter_ns()
             self.solver = cgpy.prepare(self.matrix, num_threads=threads, **settings)
@@ -68,9 +71,7 @@ class NativeExecutor:
             )
             x = self.x
         else:
-            settings = (
-                {"preconditioner": self.preconditioner} if self.preconditioner != "none" else {}
-            )
+            settings = {"preconditioner": self.preconditioner, "dense_kernel": self.dense_kernel}
             info = self.cgpy.solve(
                 self.matrix,
                 self.rhs,
@@ -92,6 +93,8 @@ class NativeExecutor:
         return {
             **self.setup_metadata,
             "implementation_role": "native",
+            "dense_kernel": self.dense_kernel,
+            "blas": self.cgpy.build_info()["blas"] if self.dense_kernel == "blas" else None,
             "solver_family": "pcg" if self.preconditioner == "jacobi" else "cg",
             "setup_in_timed_call": self.scope == "api",
             "setup_measurement": "native plan setup outside timing; API setup repeats inside every timed solve",
@@ -477,6 +480,10 @@ class ReferenceExecutor:
 
 
 def make_executor(name, arrays, options, scope, threads):
+    if name == "native-blas":
+        if hasattr(arrays[0], "indptr"):
+            raise ValueError("native-blas requires dense inputs")
+        return NativeExecutor(arrays, {**options, "dense_kernel": "blas"}, scope, threads)
     if name in ("scipy-lu-total", "scipy-lu-reuse"):
         from .sparse_solvers import SparseLUExecutor
 
