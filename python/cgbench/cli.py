@@ -7,7 +7,30 @@ import subprocess
 import sys
 from pathlib import Path
 
-IMPLEMENTATIONS = ("native", "numpy-out", "scipy-out", "torch-eager-out")
+IMPLEMENTATIONS = (
+    "native",
+    "numpy-out",
+    "scipy-out",
+    "torch-eager-out",
+    "native-cg",
+    "native-pcg",
+    "scipy-cg",
+    "scipy-pcg",
+    "torch-cg",
+    "torch-pcg",
+    "scipy-reference-cg",
+    "scipy-reference-pcg",
+    "scipy-lu-total",
+    "scipy-lu-reuse",
+)
+SPARSE_SOLVERS = (
+    "native-cg",
+    "native-pcg",
+    "scipy-cg",
+    "scipy-pcg",
+    "scipy-lu-total",
+    "scipy-lu-reuse",
+)
 
 
 def _positive(value):
@@ -47,6 +70,7 @@ def parser():
     run.add_argument("--atol", type=float, default=1e-12)
     run.add_argument("--maxiter", type=_nonnegative, default=2000)
     run.add_argument("--residual-refresh", type=_nonnegative, default=50)
+    run.add_argument("--preconditioner", choices=("none", "jacobi"), default="none")
     run.add_argument("--output", default="build/benchmarks/cpu.json")
     compare = commands.add_parser("compare")
     compare.add_argument("artifacts", nargs="+")
@@ -87,7 +111,9 @@ def _run_worker(spec, output):
     cases = [collect_case(CaseSpec(**entry), spec) for entry in spec["cases"]]
     data = {
         "schema_version": 1,
-        "metric": "time_to_solution",
+        "metric": "sparse_solver_comparison"
+        if spec.get("comparison") == "sparse-solvers"
+        else "time_to_solution",
         "spec": spec,
         "environment": environment_metadata(),
         "cases": cases,
@@ -97,7 +123,7 @@ def _run_worker(spec, output):
     print(f"Saved {Path(output).resolve()}")
     failed = any(
         entry["status"] == "invalid"
-        or (entry["name"] == "native" and entry["status"] == "ineligible")
+        or (entry["name"].startswith("native") and entry["status"] == "ineligible")
         for case in cases
         for entry in case["results"]
     )
@@ -124,9 +150,16 @@ def main(argv=None):
         default_reference = (
             "scipy-out" if SUITES[arguments.suite][0].storage == "csr" else "numpy-out"
         )
+        comparison = (
+            "sparse-solvers"
+            if arguments.suite in ("sparse-solvers", "smoke-sparse-solvers", "sparse-solvers-large")
+            else "implementations"
+        )
         names = (
             arguments.implementations.split(",")
             if arguments.implementations
+            else list(SPARSE_SOLVERS)
+            if comparison == "sparse-solvers"
             else ["native", default_reference, "torch-eager-out"]
         )
         if (
@@ -139,7 +172,12 @@ def main(argv=None):
             math.isfinite(value) and value >= 0 for value in (arguments.rtol, arguments.atol)
         ):
             raise SystemExit("rtol and atol must be finite and nonnegative")
+        if arguments.algorithm != "standard" and (
+            arguments.preconditioner == "jacobi" or any(name.endswith("pcg") for name in names)
+        ):
+            raise SystemExit("Jacobi PCG requires --algorithm standard")
         spec = {
+            "comparison": comparison,
             "suite": arguments.suite,
             "cases": [case.to_dict() for case in SUITES[arguments.suite]],
             "implementations": names,
@@ -158,6 +196,7 @@ def main(argv=None):
                 "maxiter": arguments.maxiter,
                 "residual_refresh": arguments.residual_refresh,
                 "fused": True,
+                "preconditioner": arguments.preconditioner,
             },
         }
         return _launch(spec, arguments.output)
