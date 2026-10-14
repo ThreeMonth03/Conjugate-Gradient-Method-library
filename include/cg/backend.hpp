@@ -3,13 +3,15 @@
 
 #include "cg/storage.hpp"
 
-namespace cg {
+namespace cg
+{
 
 // All methods are synchronous. Thread settings are local to this context and
 // never change OpenMP's process-wide defaults. Inputs must remain alive and
 // unmodified by other threads until the operation returns.
-class CpuBackend {
-public:
+class CpuBackend
+{
+  public:
     explicit CpuBackend(int threads = 1, bool fused = true);
     int threads() const noexcept { return threads_; }
     bool fused() const noexcept { return fused_; }
@@ -24,14 +26,14 @@ public:
     void apply(DenseMatrixView A, ConstVectorView x, VectorView output) const;
     double apply_dot(DenseMatrixView A, ConstVectorView p, VectorView ap) const;
     // The residual sign is explicit to preserve the legacy algorithm exactly.
-    double residual(DenseMatrixView A, ConstVectorView b, ConstVectorView x,
-                    VectorView r, bool b_minus_ax = true) const;
-    double update_x_r_norm2(VectorView x, VectorView r, ConstVectorView p,
-                           ConstVectorView ap, double alpha) const;
+    double residual(DenseMatrixView A, ConstVectorView b, ConstVectorView x, VectorView r,
+                    bool b_minus_ax = true) const;
+    double update_x_r_norm2(VectorView x, VectorView r, ConstVectorView p, ConstVectorView ap,
+                            double alpha) const;
     void update_direction(ConstVectorView r, VectorView p, double beta,
                           double residual_scale = 1.0) const;
 
-private:
+  private:
     int threads_;
     bool fused_;
 };

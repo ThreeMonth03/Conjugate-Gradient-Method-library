@@ -4,58 +4,64 @@
 #include <cstddef>
 #include <vector>
 
-namespace cg {
+namespace cg
+{
 
-struct ConstVectorView {
-    const double* data = nullptr;
+struct ConstVectorView
+{
+    const double *data = nullptr;
     std::size_t size = 0;
 };
 
-struct VectorView {
-    double* data = nullptr;
+struct VectorView
+{
+    double *data = nullptr;
     std::size_t size = 0;
 
     operator ConstVectorView() const noexcept { return {data, size}; }
 };
 
-struct DenseMatrixView {
-    const double* data = nullptr;
+struct DenseMatrixView
+{
+    const double *data = nullptr;
     std::size_t rows = 0;
     std::size_t cols = 0;
     std::size_t row_stride = 0;
 
     DenseMatrixView() = default;
-    DenseMatrixView(const double* data, std::size_t rows, std::size_t cols,
+    DenseMatrixView(const double *data, std::size_t rows, std::size_t cols,
                     std::size_t row_stride = 0);
 };
 
-class Vector {
-public:
+class Vector
+{
+  public:
     explicit Vector(std::size_t size = 0);
     explicit Vector(std::vector<double> values);
     std::size_t size() const noexcept { return values_.size(); }
     std::size_t capacity() const noexcept { return values_.capacity(); }
-    double* data() noexcept { return values_.data(); }
-    const double* data() const noexcept { return values_.data(); }
+    double *data() noexcept { return values_.data(); }
+    const double *data() const noexcept { return values_.data(); }
     VectorView view() noexcept { return {data(), size()}; }
     ConstVectorView view() const noexcept { return {data(), size()}; }
     void resize(std::size_t size);
 
-private:
+  private:
     std::vector<double> values_;
 };
 
-class DenseMatrix {
-public:
+class DenseMatrix
+{
+  public:
     DenseMatrix(std::size_t rows, std::size_t cols);
     DenseMatrix(std::size_t rows, std::size_t cols, std::vector<double> values);
     std::size_t rows() const noexcept { return rows_; }
     std::size_t cols() const noexcept { return cols_; }
-    double* data() noexcept { return values_.data(); }
-    const double* data() const noexcept { return values_.data(); }
+    double *data() noexcept { return values_.data(); }
+    const double *data() const noexcept { return values_.data(); }
     DenseMatrixView view() const { return {data(), rows_, cols_}; }
 
-private:
+  private:
     std::size_t rows_;
     std::size_t cols_;
     std::vector<double> values_;
@@ -63,8 +69,9 @@ private:
 
 // One workspace belongs to one active solve. Reuse it between calls; distinct
 // workspaces are required for simultaneous solves, including on one backend.
-class Workspace {
-public:
+class Workspace
+{
+  public:
     explicit Workspace(std::size_t size = 0);
     void prepare(std::size_t size);
     std::size_t size() const noexcept { return r_.size(); }
@@ -74,14 +81,15 @@ public:
     VectorView product() noexcept { return ap_.view(); }
     VectorView scratch() noexcept { return scratch_.view(); }
 
-private:
+  private:
     Vector r_;
     Vector p_;
     Vector ap_;
     Vector scratch_;
 };
 
-namespace detail {
+namespace detail
+{
 void validate(ConstVectorView view);
 void validate(DenseMatrixView view);
 bool overlaps(ConstVectorView a, ConstVectorView b);

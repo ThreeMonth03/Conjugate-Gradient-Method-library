@@ -7,37 +7,44 @@
 #include <stdexcept>
 #include <vector>
 
-namespace {
+namespace
+{
 
 using cg::ConstVectorView;
 using cg::VectorView;
 
-cg::DenseMatrix tridiagonal(std::size_t n) {
+cg::DenseMatrix tridiagonal(std::size_t n)
+{
     cg::DenseMatrix A(n, n);
-    for (std::size_t i = 0; i < n; ++i) {
+    for (std::size_t i = 0; i < n; ++i)
+    {
         A.data()[i * n + i] = 2.0;
-        if (i != 0) {
+        if (i != 0)
+        {
             A.data()[i * n + i - 1] = -1.0;
         }
-        if (i + 1 != n) {
+        if (i + 1 != n)
+        {
             A.data()[i * n + i + 1] = -1.0;
         }
     }
     return A;
 }
 
-TEST(Storage, OwnsItsValuesAndHasConstViews) {
+TEST(Storage, OwnsItsValuesAndHasConstViews)
+{
     std::vector<double> source{1.0, 2.0, 3.0};
     cg::Vector owned(source);
     source[0] = 100.0;
     EXPECT_EQ(owned.data()[0], 1.0);
-    const auto& immutable = owned;
+    const auto &immutable = owned;
     ConstVectorView view = immutable.view();
     EXPECT_EQ(view.size, 3);
     EXPECT_EQ(view.data[2], 3.0);
 }
 
-TEST(Storage, ChecksShapeAndOverflowBeforeAccess) {
+TEST(Storage, ChecksShapeAndOverflowBeforeAccess)
+{
     EXPECT_THROW((cg::DenseMatrix(2, 3, {1.0})), std::invalid_argument);
     EXPECT_THROW((cg::DenseMatrixView(nullptr, 2, 2)), std::invalid_argument);
     double value = 0.0;
@@ -46,9 +53,10 @@ TEST(Storage, ChecksShapeAndOverflowBeforeAccess) {
                  std::invalid_argument);
 }
 
-TEST(Workspace, ReusesStorageAcrossSameAndSmallerSizes) {
+TEST(Workspace, ReusesStorageAcrossSameAndSmallerSizes)
+{
     cg::Workspace workspace(32);
-    const auto* pointer = workspace.residual().data;
+    const auto *pointer = workspace.residual().data;
     const auto capacity = workspace.capacity();
     workspace.prepare(32);
     EXPECT_EQ(workspace.residual().data, pointer);
@@ -63,23 +71,28 @@ TEST(Workspace, ReusesStorageAcrossSameAndSmallerSizes) {
     EXPECT_GE(workspace.capacity(), 64);
 }
 
-TEST(Backend, ValidatesThreadCountAndKeepsContextLocal) {
+TEST(Backend, ValidatesThreadCountAndKeepsContextLocal)
+{
     EXPECT_THROW(cg::CpuBackend(0), std::invalid_argument);
     EXPECT_THROW(cg::CpuBackend(-1), std::invalid_argument);
     const cg::CpuBackend first(1, false);
     const cg::CpuBackend second(1, true);
     EXPECT_FALSE(first.fused());
     EXPECT_TRUE(second.fused());
-    if (!cg::CpuBackend::openmp_enabled()) {
+    if (!cg::CpuBackend::openmp_enabled())
+    {
         EXPECT_THROW(cg::CpuBackend(2), std::invalid_argument);
-    } else {
+    }
+    else
+    {
         const cg::CpuBackend parallel(2);
         EXPECT_EQ(first.threads(), 1);
         EXPECT_EQ(parallel.threads(), 2);
     }
 }
 
-TEST(Backend, HandlesPaddedRowMajorStorage) {
+TEST(Backend, HandlesPaddedRowMajorStorage)
+{
     const std::vector<double> values{1, 2, 99, 3, 4, 99};
     const cg::DenseMatrixView A(values.data(), 2, 2, 3);
     const cg::Vector input({2, 3});
@@ -91,7 +104,8 @@ TEST(Backend, HandlesPaddedRowMajorStorage) {
     EXPECT_DOUBLE_EQ(backend.apply_dot(A, input.view(), output.view()), 70);
 }
 
-TEST(Backend, SupportsExactInPlaceAxpbyAndRejectsPartialOverlap) {
+TEST(Backend, SupportsExactInPlaceAxpbyAndRejectsPartialOverlap)
+{
     cg::Vector x({1, 2, 3});
     cg::Vector y({4, 5, 6});
     const cg::CpuBackend backend;
@@ -101,14 +115,13 @@ TEST(Backend, SupportsExactInPlaceAxpbyAndRejectsPartialOverlap) {
     backend.axpy(2.0, x.view(), x.view());
     EXPECT_DOUBLE_EQ(x.data()[2], 9);
     EXPECT_THROW(backend.copy({x.data(), 2}, {x.data() + 1, 2}), std::invalid_argument);
-    EXPECT_THROW(backend.axpy(1.0, {x.data(), 2}, {x.data() + 1, 2}),
-                 std::invalid_argument);
-    EXPECT_THROW(backend.axpby(1.0, {x.data(), 2}, 1.0, {y.data(), 2},
-                              {x.data() + 1, 2}),
+    EXPECT_THROW(backend.axpy(1.0, {x.data(), 2}, {x.data() + 1, 2}), std::invalid_argument);
+    EXPECT_THROW(backend.axpby(1.0, {x.data(), 2}, 1.0, {y.data(), 2}, {x.data() + 1, 2}),
                  std::invalid_argument);
 }
 
-TEST(Backend, RejectsDimensionsNullPointersAndMatvecAliasing) {
+TEST(Backend, RejectsDimensionsNullPointersAndMatvecAliasing)
+{
     cg::DenseMatrix A(2, 2, {1, 0, 0, 1});
     cg::Vector x({1, 2});
     cg::Vector y(2);
@@ -120,7 +133,8 @@ TEST(Backend, RejectsDimensionsNullPointersAndMatvecAliasing) {
     EXPECT_DOUBLE_EQ(backend.dot({}, {}), 0.0);
 }
 
-TEST(Backend, ResidualSignIsExplicit) {
+TEST(Backend, ResidualSignIsExplicit)
+{
     cg::DenseMatrix A(2, 2, {2, 0, 0, 3});
     cg::Vector b({5, 9});
     cg::Vector x({1, 2});
@@ -133,7 +147,8 @@ TEST(Backend, ResidualSignIsExplicit) {
     EXPECT_DOUBLE_EQ(r.data()[0], -3);
 }
 
-TEST(CGExplicit, SolvesFromAnIndependentInitialGuess) {
+TEST(CGExplicit, SolvesFromAnIndependentInitialGuess)
+{
     cg::DenseMatrix A(2, 2, {4, 1, 1, 3});
     cg::Vector b({1, 2});
     cg::Vector x({0.5, -0.25});
@@ -150,7 +165,8 @@ TEST(CGExplicit, SolvesFromAnIndependentInitialGuess) {
     EXPECT_LE(info.residual_norm, options.rtol * std::sqrt(5.0));
 }
 
-TEST(CGExplicit, ChecksInitialResidualAndZeroRightHandSide) {
+TEST(CGExplicit, ChecksInitialResidualAndZeroRightHandSide)
+{
     cg::DenseMatrix A(2, 2, {4, 1, 1, 3});
     cg::Vector b({5, 4});
     cg::Vector x({1, 1});
@@ -162,7 +178,8 @@ TEST(CGExplicit, ChecksInitialResidualAndZeroRightHandSide) {
     EXPECT_EQ(info.matvecs, 1);
 }
 
-TEST(CGExplicit, ZeroRightHandSideConvergesWithoutAnIteration) {
+TEST(CGExplicit, ZeroRightHandSideConvergesWithoutAnIteration)
+{
     cg::DenseMatrix A(2, 2, {4, 1, 1, 3});
     cg::Vector b(2);
     cg::Vector x(2);
@@ -174,7 +191,8 @@ TEST(CGExplicit, ZeroRightHandSideConvergesWithoutAnIteration) {
     EXPECT_EQ(info.residual_norm, 0);
 }
 
-TEST(CGExplicit, ReportsIterationLimitAndTrueResidual) {
+TEST(CGExplicit, ReportsIterationLimitAndTrueResidual)
+{
     cg::DenseMatrix A(2, 2, {4, 1, 1, 3});
     cg::Vector b({1, 2});
     cg::Vector x(2);
@@ -196,7 +214,8 @@ TEST(CGExplicit, ReportsIterationLimitAndTrueResidual) {
                      std::sqrt(backend.residual(A.view(), b.view(), x.view(), check.view())));
 }
 
-TEST(CGExplicit, ReportsBreakdownAndNonfiniteData) {
+TEST(CGExplicit, ReportsBreakdownAndNonfiniteData)
+{
     cg::DenseMatrix indefinite(2, 2, {-1, 0, 0, -1});
     cg::Vector b({1, 2});
     cg::Vector x(2);
@@ -211,7 +230,8 @@ TEST(CGExplicit, ReportsBreakdownAndNonfiniteData) {
     EXPECT_EQ(info.status, cg::Status::non_finite);
 }
 
-TEST(CGExplicit, ValidatesOptionsStorageAndWorkspace) {
+TEST(CGExplicit, ValidatesOptionsStorageAndWorkspace)
+{
     cg::DenseMatrix A(2, 2, {4, 1, 1, 3});
     cg::Vector b({1, 2});
     cg::Vector x(2);
@@ -236,10 +256,12 @@ TEST(CGExplicit, ValidatesOptionsStorageAndWorkspace) {
                  std::invalid_argument);
 }
 
-TEST(CGExplicit, ReusingWorkspaceResetsAllIterationState) {
+TEST(CGExplicit, ReusingWorkspaceResetsAllIterationState)
+{
     const auto A = tridiagonal(31);
     cg::Vector truth(31);
-    for (std::size_t i = 0; i < truth.size(); ++i) {
+    for (std::size_t i = 0; i < truth.size(); ++i)
+    {
         truth.data()[i] = 0.25 + std::sin(static_cast<double>(i));
     }
     cg::Vector b(31);
@@ -247,10 +269,11 @@ TEST(CGExplicit, ReusingWorkspaceResetsAllIterationState) {
     cg::Workspace workspace(31);
     const cg::CpuBackend backend;
     backend.apply(A.view(), truth.view(), b.view());
-    const auto* pointer = workspace.residual().data;
+    const auto *pointer = workspace.residual().data;
     const auto first = cg::solve_into(A.view(), b.view(), x.view(), workspace, backend);
     EXPECT_EQ(first.status, cg::Status::converged);
-    for (std::size_t i = 0; i < x.size(); ++i) {
+    for (std::size_t i = 0; i < x.size(); ++i)
+    {
         EXPECT_NEAR(x.data()[i], truth.data()[i], 1e-6);
         x.data()[i] = 0;
     }

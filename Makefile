@@ -5,7 +5,7 @@ BUILD_DIR ?= $(CURDIR)/build/$(PRESET)
 JOBS ?= 2
 RUFF := $(CURDIR)/.venv/bin/ruff
 CLANG_FORMAT := $(CURDIR)/.venv/bin/clang-format
-CPP_FILES := $(wildcard cpp/*/*.cpp cpp/*/*.hpp tests/cpp/*.cpp)
+CPP_FILES := $(wildcard cpp/*/*.cpp cpp/*/*.hpp include/cg/*.hpp src/*.cpp bindings/*.cpp tests/cpp/*.cpp)
 CMAKE_ARGS ?=
 
 .DEFAULT_GOAL := all
@@ -30,13 +30,13 @@ gtest: configure
 	$(CURDIR)/.venv/bin/ctest --test-dir $(BUILD_DIR) --output-on-failure -L cpp
 
 lint:
-	$(RUFF) check .
-	$(RUFF) format --check .
+	$(RUFF) check python tests
+	$(RUFF) format --check python tests
 	$(CLANG_FORMAT) --dry-run --Werror $(CPP_FILES)
 
 format:
-	$(RUFF) check --fix .
-	$(RUFF) format .
+	$(RUFF) check --fix python tests
+	$(RUFF) format python tests
 	$(CLANG_FORMAT) -i $(CPP_FILES)
 
 wheel:
