@@ -46,6 +46,8 @@ const char *status_name(Status status) noexcept;
 // Inputs are validated once, and no vector storage is allocated by the solve.
 SolveInfo solve_into(DenseMatrixView A, ConstVectorView b, VectorView x, Workspace &workspace,
                      const CpuBackend &backend, const CgOptions &options = {});
+SolveInfo solve_into(const CsrMatrix &A, ConstVectorView b, VectorView x, Workspace &workspace,
+                     const CpuBackend &backend, const CgOptions &options = {});
 
 } // namespace cg
 

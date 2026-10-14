@@ -1,5 +1,7 @@
 #include "cg/solver.hpp"
 
+#include "cg/csr.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
@@ -9,17 +11,25 @@ namespace cg
 namespace
 {
 
-void validate_solve(DenseMatrixView A, ConstVectorView b, VectorView x, Workspace &workspace,
+std::size_t rows(DenseMatrixView A) { return A.rows; }
+std::size_t rows(const CsrMatrix &A) { return A.rows(); }
+std::size_t cols(DenseMatrixView A) { return A.cols; }
+std::size_t cols(const CsrMatrix &A) { return A.cols(); }
+void validate_matrix(DenseMatrixView A) { detail::validate(A); }
+void validate_matrix(const CsrMatrix &) {} // Validated, immutable owning storage.
+
+template <class Matrix>
+void validate_solve(const Matrix &A, ConstVectorView b, VectorView x, Workspace &workspace,
                     const CgOptions &options)
 {
-    detail::validate(A);
+    validate_matrix(A);
     detail::validate(b);
     detail::validate(x);
-    if (A.rows == 0 || A.rows != A.cols || b.size != A.rows || x.size != A.rows)
+    if (rows(A) == 0 || rows(A) != cols(A) || b.size != rows(A) || x.size != rows(A))
     {
         throw std::invalid_argument("CG requires a nonempty square matrix and matching vectors");
     }
-    if (workspace.size() != A.rows)
+    if (workspace.size() != rows(A))
     {
         throw std::invalid_argument(
             "prepare the workspace for the matrix dimension before solving");
@@ -50,7 +60,8 @@ void validate_solve(DenseMatrixView A, ConstVectorView b, VectorView x, Workspac
     }
 }
 
-SolveInfo solve_explicit(DenseMatrixView A, ConstVectorView b, VectorView x, Workspace &workspace,
+template <class Matrix>
+SolveInfo solve_explicit(const Matrix &A, ConstVectorView b, VectorView x, Workspace &workspace,
                          const CpuBackend &backend, const CgOptions &options)
 {
     SolveInfo info;
@@ -124,7 +135,8 @@ SolveInfo solve_explicit(DenseMatrixView A, ConstVectorView b, VectorView x, Wor
     return info;
 }
 
-SolveInfo solve_recurrence(DenseMatrixView A, ConstVectorView b, VectorView x, Workspace &workspace,
+template <class Matrix>
+SolveInfo solve_recurrence(const Matrix &A, ConstVectorView b, VectorView x, Workspace &workspace,
                            const CpuBackend &backend, const CgOptions &options)
 {
     SolveInfo info;
@@ -247,6 +259,15 @@ const char *status_name(Status status) noexcept
 }
 
 SolveInfo solve_into(DenseMatrixView A, ConstVectorView b, VectorView x, Workspace &workspace,
+                     const CpuBackend &backend, const CgOptions &options)
+{
+    validate_solve(A, b, x, workspace, options);
+    return options.algorithm == Algorithm::explicit_residual
+               ? solve_explicit(A, b, x, workspace, backend, options)
+               : solve_recurrence(A, b, x, workspace, backend, options);
+}
+
+SolveInfo solve_into(const CsrMatrix &A, ConstVectorView b, VectorView x, Workspace &workspace,
                      const CpuBackend &backend, const CgOptions &options)
 {
     validate_solve(A, b, x, workspace, options);

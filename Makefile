@@ -7,9 +7,16 @@ RUFF := $(CURDIR)/.venv/bin/ruff
 CLANG_FORMAT := $(CURDIR)/.venv/bin/clang-format
 CPP_FILES := $(wildcard cpp/*/*.cpp cpp/*/*.hpp include/cg/*.hpp src/*.cpp bindings/*.cpp tests/cpp/*.cpp)
 CMAKE_ARGS ?=
+PYPROF_SUITE ?= cpu-csr-f64-v1
+PYPROF_THREADS ?= 1
+PYPROF_SCOPE ?= prepared
+PYPROF_ROUNDS ?= 30
+PYPROF_REPETITIONS ?= 5
+PYPROF_OUTPUT ?= $(BUILD_DIR)/benchmarks/$(PYPROF_SUITE)-t$(PYPROF_THREADS)-$(PYPROF_SCOPE).json
+PYPROF_ARGS ?=
 
 .DEFAULT_GOAL := all
-.PHONY: all configure build test pytest gtest lint format wheel clean
+.PHONY: all configure build test pytest gtest lint format wheel clean pyprof
 
 all: build
 
@@ -41,6 +48,12 @@ format:
 
 wheel:
 	PIP_CACHE_DIR=$(CURDIR)/.cache/pip $(PYTHON) -m build --wheel --no-isolation
+
+pyprof: build
+	PYTHONPATH=$(BUILD_DIR)/python:$(CURDIR)/python $(PYTHON) -m cgbench run \
+		--suite $(PYPROF_SUITE) --threads $(PYPROF_THREADS) --scope $(PYPROF_SCOPE) \
+		--rounds $(PYPROF_ROUNDS) --repetitions $(PYPROF_REPETITIONS) \
+		--output $(PYPROF_OUTPUT) $(PYPROF_ARGS)
 
 clean:
 	$(CMAKE) -E rm -rf $(BUILD_DIR)
