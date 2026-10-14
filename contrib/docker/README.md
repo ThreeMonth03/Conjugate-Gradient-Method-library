@@ -12,6 +12,8 @@ docker run --rm -it cg-cpu bash
 
 The default command is `make test`. Python tools are installed in `/workspace/cg/.venv`; downloads and build outputs stay under that container's project directory. Compiler, Git, and their package dependencies are installed inside the image. It uses no GPU runtime and mounts no host directories.
 
+CUDA source files are included so the source layout stays complete, but this image builds with CUDA disabled. Follow the [CUDA guide](../../docs/cuda.rst) for the separate local toolkit/runtime environment and real-device tests; the CPU container does not validate GPU execution.
+
 Include the optional CPU benchmark dependencies when building a benchmark image:
 
 ```bash

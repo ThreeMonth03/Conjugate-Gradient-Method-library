@@ -1,0 +1,3 @@
+# Public NVIDIA CUDA 12 runtime libraries, installed only in a local CUDA environment.
+nvidia-cuda-runtime-cu12==12.8.90; sys_platform == "linux"
+nvidia-cublas-cu12==12.8.4.1; sys_platform == "linux"

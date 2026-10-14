@@ -7,6 +7,8 @@ from dataclasses import dataclass
 
 from .numerics import l2_from_square
 
+CUDA_IMPLEMENTATIONS = ("cuda-native", "cuda-cublas", "torch-cuda-eager")
+
 
 @dataclass
 class Outcome:
@@ -371,7 +373,10 @@ class ReferenceExecutor:
 
         def result(status, rho):
             residual_norm = norm(rho, residual)
-            return Outcome(ops.export(x), status, iterations, matvecs, residual_norm)
+            # CUDA keeps the solution resident until an untimed correctness
+            # gate explicitly downloads it. CPU exports retain their behavior.
+            output = ops.outcome_x(x) if hasattr(ops, "outcome_x") else ops.export(x)
+            return Outcome(output, status, iterations, matvecs, residual_norm)
 
         def finish(status):
             final_rho = rho if explicit else true_residual()
@@ -479,7 +484,19 @@ class ReferenceExecutor:
         return result("converged" if math.sqrt(rho) <= tolerance else "max_iterations", rho)
 
 
-def make_executor(name, arrays, options, scope, threads):
+def make_executor(name, arrays, options, scope, threads, *, device="cpu", cuda_device=0):
+    if name in CUDA_IMPLEMENTATIONS:
+        if device != "cuda":
+            raise ValueError("CUDA candidates require --device cuda")
+        from .cuda_backends import CudaNativeExecutor, TorchCudaExecutor
+
+        if name == "torch-cuda-eager":
+            return TorchCudaExecutor(arrays, options, scope, threads, cuda_device)
+        return CudaNativeExecutor(
+            arrays, options, scope, cuda_device, "cublas" if name == "cuda-cublas" else "native"
+        )
+    if device != "cpu":
+        raise ValueError("CPU candidates require --device cpu; CUDA never falls back to CPU")
     if name == "native-blas":
         if hasattr(arrays[0], "indptr"):
             raise ValueError("native-blas requires dense inputs")

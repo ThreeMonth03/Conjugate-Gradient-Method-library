@@ -63,3 +63,38 @@ retain the complete scope notes, reproducible commands and original artifacts.
 Those recorded runs predate the optional BLAS kernel and remain unchanged.
 The separate `explicit dense BLAS results <https://github.com/ThreeMonth03/Conjugate-Gradient-Method-library/blob/main/benchmarks/blas-results.md>`_
 cover both kernel modes and both scopes, with raw artifacts and timing limits.
+
+Explicit CUDA comparisons
+-------------------------
+
+Build as described in :doc:`cuda`, then install GPU comparison dependencies
+into the separate environment. Select the device and all candidates:
+
+.. code-block:: bash
+
+   .venv-cuda/bin/python -m pip install --cache-dir .cache/pip -r requirements/cuda-benchmark.lock
+   make pyprof PRESET=cuda-release PYTHON="$PWD/.venv-cuda/bin/python" \
+       PYPROF_SUITE=smoke-cuda-dense \
+       PYPROF_ARGS='--device cuda --cuda-device 0 --implementations cuda-native,cuda-cublas,torch-cuda-eager'
+   make pyprof PRESET=cuda-release PYTHON="$PWD/.venv-cuda/bin/python" \
+       PYPROF_SUITE=smoke-cuda-csr PYPROF_SCOPE=api \
+       PYPROF_ARGS='--device cuda --cuda-device 0 --implementations cuda-native,torch-cuda-eager'
+
+Use ``cuda-dense-f64-v1`` or ``cuda-csr-f64-v1`` for the corresponding full
+fixture suites. CPU remains the CLI default; ``--device cuda`` requires an
+explicit implementation list. cuBLAS accepts only dense operators. Algorithm,
+fusion, refresh and preconditioner flags retain their explicit meanings.
+
+Both GPU scopes start with resident device inputs. ``prepared`` caches matrix,
+workspace and Jacobi setup; ``api`` allocates output/workspace and constructs
+Jacobi per call. Each timed call restores the initial device vector. The timer
+fences before the repeated-call block and after its last call, so completed
+wall time includes host dispatch, iteration scalar synchronization and final
+completion. This is not a GPU-event-only kernel measurement.
+
+Host-to-device setup and correctness-gate downloads remain outside solve
+timing. The artifact records upload/setup separately; neither scope is an
+end-to-end host-to-host comparison. Retain GPU/driver/runtime/compiler metadata,
+the actual loaded CUDA binary hash and device mapping with results. Logical
+CUDA device ordinals need not match physical ``nvidia-smi`` indices. Shared CI
+compiles CUDA without a GPU; execution proof requires an available device.

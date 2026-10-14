@@ -1,6 +1,6 @@
 # Conjugate Gradient Method Library
 
-CPU conjugate gradient solvers for nonempty, real symmetric positive-definite systems `Ax = b`. The C++17 core supports dense and canonical CSR matrices, reusable workspace, fused operations, optional OpenMP, an optional dense BLAS kernel, and Jacobi preconditioned CG. Python exposes a convenience API and a strict in-place API. Legacy linear and nonlinear methods remain available through `utils` and `_cgpy`.
+Conjugate gradient solvers for nonempty, real symmetric positive-definite systems `Ax = b`. The C++17 core supports dense and canonical CSR matrices, reusable workspace, fused operations, optional OpenMP, an optional dense BLAS kernel, and Jacobi preconditioned CG. An explicit optional CUDA backend provides device storage, native kernels and dense cuBLAS. Python exposes convenience and strict in-place APIs. Legacy linear and nonlinear methods remain available through `utils` and `_cgpy`.
 
 ## Install with pip
 
@@ -65,6 +65,23 @@ Then call `cgpy.solve(A, b, dense_kernel="blas", num_threads=1)` or pass the sam
 
 The Linux build uses a pinned private sequential OpenBLAS under `build/_deps`; the wheel includes it. On x86-64, the BLAS-enabled extension requires SSE3/SSSE3 even when importing it; other architectures use the native build target. See [build details](docs/build.rst) for toolchain requirements and native/BLAS distribution checks. Preset selection affects a source build; reinstall to change an installed wheel.
 
+## Optional CUDA
+
+Use a separate project environment, an existing compatible NVIDIA driver and host compiler. The Linux x86-64 bootstrap installs a pinned CUDA 12.8 toolkit inside the checkout; the preset targets architecture 75 and uses `/usr/bin/g++-13`.
+
+```bash
+python3 -m venv .venv-cuda
+.venv-cuda/bin/python -m pip install --cache-dir .cache/pip \
+    -r requirements/test.lock -r requirements/cuda.lock
+.venv-cuda/bin/python scripts/setup_cuda.py --prefix .deps/cuda-12.8
+CG_REQUIRE_CUDA=1 make test PRESET=cuda-release PYTHON="$PWD/.venv-cuda/bin/python"
+make test-dist DIST_CUDA=ON DIST_DIR=dist/cuda PYTHON="$PWD/.venv-cuda/bin/python"
+```
+
+Import `from cgpy import cuda`, check `cuda.enabled()` / `cuda.is_available()`, then explicitly upload with `cuda.DenseMatrix.from_host(A)` and `cuda.Vector.from_host(b)`. `cuda.solve(device_A, device_b, dense_kernel="native")` returns a device-owned result; call `result.x.to_host()` for a copy. Dense `dense_kernel="cublas"` and canonical CSR `dense_kernel="native"` use the same stopping rule; Jacobi supports the standard algorithm. CUDA functions are synchronous and require separate workspace/output for overlapping calls.
+
+The default CPU wheel has no CUDA runtime dependency. A CUDA-enabled wheel requires its `[cuda]` extra, which pins public NVIDIA runtime/cuBLAS packages; it does not depend on PyTorch-private libraries or the build toolkit's RPATH. See the [CUDA guide](docs/cuda.rst) for source/wheel installation, explicit architecture/compiler overrides, borrowed streams, device interoperability and resident benchmark scope.
+
 ## Documentation
 
 ```bash
@@ -98,5 +115,16 @@ Performance depends on matrix structure, conditioning, hardware, thread count, a
 
 The [recorded CPU results](benchmarks/results.md) include every measured case, original timing artifacts, and commands to reproduce or replay them.
 The [dense BLAS results](benchmarks/blas-results.md) compare both explicit kernels with NumPy and PyTorch in prepared and API scopes, including complete raw timings and uncertainty limits.
+
+For GPU comparisons, install `requirements/cuda-benchmark.lock` into `.venv-cuda` and select every candidate explicitly:
+
+```bash
+.venv-cuda/bin/python -m pip install --cache-dir .cache/pip -r requirements/cuda-benchmark.lock
+make pyprof PRESET=cuda-release PYTHON="$PWD/.venv-cuda/bin/python" \
+    PYPROF_SUITE=smoke-cuda-dense \
+    PYPROF_ARGS='--device cuda --cuda-device 0 --implementations cuda-native,cuda-cublas,torch-cuda-eager'
+```
+
+CUDA prepared/API scopes use resident inputs and include completed solve wall time. Host upload and correctness download remain outside timing; these are not end-to-end host-to-host measurements. CPU benchmark defaults are unchanged.
 
 An optional [CPU Docker environment](contrib/docker/README.md) keeps the compiler and dependencies inside a container.

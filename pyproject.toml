@@ -4,14 +4,15 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "cgpy"
-version = "0.3.0"
-description = "CPU conjugate gradient solvers with a native C++ implementation"
+version = "0.4.0"
+description = "Conjugate gradient solvers with native CPU and optional CUDA implementations"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = ["numpy>=1.24"]
 
 [project.optional-dependencies]
 legacy = ["autograd>=1.8"]
+cuda = ["nvidia-cuda-runtime-cu12==12.8.90; sys_platform == 'linux'", "nvidia-cublas-cu12==12.8.4.1; sys_platform == 'linux'"]
 
 [tool.scikit-build]
 cmake.version = ">=3.24"
@@ -24,7 +25,7 @@ sdist.include = [
     "/CMakeLists.txt", "/CMakePresets.json", "/Makefile", "/pyproject.toml",
     "/README.md", "/.gitignore", "/.clang-format", "/.clang-tidy", "/LICENSE*",
     "/cmake/*.cmake", "/include/cg/*.hpp", "/include/cg/detail/*.hpp",
-    "/src/*.cpp", "/bindings/*.cpp", "/cpp/*/*.cpp", "/cpp/*/*.hpp",
+    "/src/*.cpp", "/src/*.cu", "/bindings/*.cpp", "/cpp/*/*.cpp", "/cpp/*/*.hpp",
     "/python/cgpy/**/*.py", "/python/cgbench/**/*.py", "/python/utils.py", "/python/README.md",
     "/tests/*.py", "/tests/cpp/*.cpp", "/scripts/*.py", "/demo/*.py",
     "/requirements/*.lock", "/docs/*.rst", "/docs/*.md", "/docs/conf.py",
@@ -36,6 +37,7 @@ BUILD_TESTING = "OFF"
 CG_BUILD_PYTHON = "ON"
 CG_ENABLE_OPENMP = "OFF"
 CG_ENABLE_BLAS = "OFF"
+CG_ENABLE_CUDA = "OFF"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -92,6 +92,31 @@ assert result.converged
 
 CSR stores row pointers, column indices, and values without converting the operator to dense storage. Row pointers start at zero, are monotone, and end at the number of values. Column indices must be in range, sorted within each row, and unique. Canonicalize a SciPy CSR matrix with `sum_duplicates()` and `sort_indices()` before wrapping its arrays if needed.
 
+## CUDA interface
+
+`from cgpy import cuda` works with CPU-only wheels. `cuda.enabled()` checks whether the optional extension/runtime loads; `cuda.is_available(device=0)` checks a usable GPU. Both CPU and CUDA interfaces require explicit backend selection. See the [CUDA guide](../docs/cuda.rst) for a project-local toolkit, separate `.venv-cuda`, source/wheel installs and architecture settings.
+
+```python
+from cgpy import cuda
+
+device_b = cuda.Vector.from_host(b, device=0)
+prepared = cuda.prepare_host(
+    np.array([[4.0, 1.0], [1.0, 3.0]]),
+    device=0, dense_kernel="native", preconditioner="jacobi",
+)
+workspace = prepared.create_workspace()
+device_x = prepared.create_vector()
+info = prepared.solve_into(device_b, device_x, workspace=workspace, rtol=1e-10)
+assert info.converged
+print(device_x.to_host())
+```
+
+Host transfer is explicit. `cuda.prepare` accepts a device matrix; `prepare_host` uploads and snapshots host dense or `cgpy.CSRMatrix` storage. Device `solve` returns `cuda.SolveResult` with an owned `Vector`. Device `solve_into` borrows compatible CUDA Array Interface arrays and uses supplied output/workspace. `dense_kernel="native"` uses project kernels; `"cublas"` selects dense GEMV and rejects CSR. Jacobi supports `algorithm="standard"`; vector fusion remains an independent option.
+
+Calls finish on the selected borrowed stream before returning. Keep nondefault streams alive, and use a distinct workspace/output for each overlapping solve. External arrays must be contiguous float64, writable for output, disjoint and free from conflicting mutation. CUDA Array Interface v3 producer dependencies are honored; v2 producers need caller-established readiness or explicit synchronization. No call changes PyTorch's current stream or converts host pointers to device pointers.
+
+CUDA benchmark prepared/API scopes use resident inputs and exclude host upload and verification download. They measure completed wall time, including host dispatch and iteration scalar synchronization. Transfer/setup metadata is reported separately; neither scope measures end-to-end host-to-host performance.
+
 ## C++ core
 
 The native source interface uses the headers under `include/cg/` and the CMake `cg_core` target. Views borrow caller-owned storage; keep it alive until the synchronous solve returns. The workspace and output must be disjoint from the inputs. The example explicitly selects the recurrence because the native options retain the legacy explicit algorithm as their default.

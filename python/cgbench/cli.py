@@ -7,6 +7,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from .backends import CUDA_IMPLEMENTATIONS
+
 IMPLEMENTATIONS = (
     "native",
     "native-blas",
@@ -23,7 +25,7 @@ IMPLEMENTATIONS = (
     "scipy-reference-pcg",
     "scipy-lu-total",
     "scipy-lu-reuse",
-)
+) + CUDA_IMPLEMENTATIONS
 SPARSE_SOLVERS = (
     "native-cg",
     "native-pcg",
@@ -52,7 +54,7 @@ def parser():
     from .cases import SUITES
 
     result = argparse.ArgumentParser(
-        description="Reproducible CPU CG comparisons (also run by make pyprof)"
+        description="Reproducible explicit CPU/CUDA CG comparisons (also run by make pyprof)"
     )
     commands = result.add_subparsers(dest="command", required=True)
     run = commands.add_parser("run")
@@ -61,6 +63,8 @@ def parser():
         "--implementations", help="comma-separated candidates; default follows suite storage"
     )
     run.add_argument("--scope", choices=("api", "prepared"), default="prepared")
+    run.add_argument("--device", choices=("cpu", "cuda"), default="cpu")
+    run.add_argument("--cuda-device", type=_nonnegative, default=0)
     run.add_argument("--threads", type=_positive, default=1)
     run.add_argument("--seed", type=_nonnegative, default=20261015)
     run.add_argument("--warmups", type=_nonnegative, default=3)
@@ -96,6 +100,8 @@ def _launch(spec, output):
     env = dict(os.environ)
     env.update({name: str(spec["threads"]) for name in THREAD_VARIABLES})
     env.update(OMP_DYNAMIC="FALSE", MKL_DYNAMIC="FALSE")
+    if spec.get("device", "cpu") == "cuda":
+        env.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
     command = [
         sys.executable,
         "-m",
@@ -115,6 +121,10 @@ def _run_worker(spec, output):
     from .cases import CaseSpec
     from .collector import collect_case
 
+    if spec.get("device", "cpu") == "cuda":
+        from .cuda_backends import preflight_cuda
+
+        preflight_cuda(spec["implementations"], spec.get("cuda_device", 0))
     cases = [collect_case(CaseSpec(**entry), spec) for entry in spec["cases"]]
     data = {
         "schema_version": 1,
@@ -132,7 +142,9 @@ def _run_worker(spec, output):
                 "expected_round_orders",
             )
         },
-        "environment": environment_metadata(),
+        "environment": environment_metadata(
+            device=spec.get("device", "cpu"), cuda_device=spec.get("cuda_device", 0)
+        ),
         "cases": cases,
     }
     if spec.get("expected_hashes"):
@@ -144,7 +156,10 @@ def _run_worker(spec, output):
     print(f"Saved {Path(output).resolve()}")
     failed = any(
         entry["status"] == "invalid"
-        or (entry["name"].startswith("native") and entry["status"] == "ineligible")
+        or (
+            (entry["name"].startswith("native") or spec.get("device", "cpu") == "cuda")
+            and entry["status"] == "ineligible"
+        )
         for case in cases
         for entry in case["results"]
     )
@@ -189,6 +204,20 @@ def main(argv=None):
             or any(name not in IMPLEMENTATIONS for name in names)
         ):
             raise SystemExit("implementations must be unique names: " + ",".join(IMPLEMENTATIONS))
+        if arguments.device == "cuda":
+            if not arguments.implementations:
+                raise SystemExit("--device cuda requires explicit --implementations")
+            if any(name not in CUDA_IMPLEMENTATIONS for name in names):
+                raise SystemExit("--device cuda requires CUDA candidates; CPU fallback is disabled")
+            comparison = "implementations"
+        elif any(name in CUDA_IMPLEMENTATIONS for name in names) or arguments.suite.startswith(
+            ("cuda-", "smoke-cuda-")
+        ):
+            raise SystemExit("CUDA candidates and suite aliases require --device cuda")
+        if "cuda-cublas" in names and any(
+            case.storage != "dense" for case in SUITES[arguments.suite]
+        ):
+            raise SystemExit("cuda-cublas requires a dense suite")
         if "native-blas" in names:
             if any(case.storage != "dense" for case in SUITES[arguments.suite]):
                 raise SystemExit("native-blas requires a dense suite")
@@ -229,6 +258,8 @@ def main(argv=None):
                 "preconditioner": arguments.preconditioner,
             },
         }
+        if arguments.device == "cuda":
+            spec.update(device="cuda", cuda_device=arguments.cuda_device)
         return _launch(spec, arguments.output)
     from .artifacts import load_artifact, print_summary
 

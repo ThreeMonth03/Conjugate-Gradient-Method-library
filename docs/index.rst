@@ -2,9 +2,10 @@ Conjugate Gradient Method Library
 =================================
 
 ``cgpy`` solves nonempty real symmetric positive-definite systems ``A x = b``
-with a C++17 CPU core. It supports dense and canonical CSR storage, CG and
-Jacobi PCG, reusable workspace, optional OpenMP, and an optional dense BLAS
-kernel. Symmetry and positive definiteness are caller preconditions.
+with a C++17 core. It supports dense and canonical CSR storage, CG and
+Jacobi PCG, reusable workspace, optional OpenMP, an optional dense BLAS
+kernel, and an explicit optional CUDA backend. Symmetry and positive
+definiteness are caller preconditions.
 
 .. toctree::
    :maxdepth: 2
@@ -12,6 +13,7 @@ kernel. Symmetry and positive definiteness are caller preconditions.
    install
    build
    api
+   cuda
    architecture
    benchmarks
 

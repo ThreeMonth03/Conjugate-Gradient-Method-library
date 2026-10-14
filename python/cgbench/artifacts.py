@@ -27,7 +27,7 @@ def _command(arguments, cwd):
         return None
 
 
-def environment_metadata():
+def environment_metadata(*, device="cpu", cuda_device=0):
     """Record actual library/thread/build information, with missing data explicit."""
     from importlib.metadata import PackageNotFoundError, version
 
@@ -121,12 +121,30 @@ def environment_metadata():
             "interop_threads": torch.get_num_interop_threads(),
             "config": torch.__config__.show(),
         }
+    if device == "cuda":
+        from .cuda_metadata import cuda_metadata
+
+        metadata["cuda"] = cuda_metadata(cuda_device)
     return metadata
 
 
 def validate_artifact(data):
     if data.get("schema_version") != 1 or not isinstance(data.get("cases"), list):
         raise ValueError("unsupported benchmark artifact")
+    spec = data.get("spec", {})
+    device = spec.get("device", "cpu")
+    if device not in ("cpu", "cuda"):
+        raise ValueError("artifact device must be cpu or cuda")
+    if device == "cuda":
+        from .backends import CUDA_IMPLEMENTATIONS
+
+        ordinal = spec.get("cuda_device")
+        if type(ordinal) is not int or ordinal < 0:
+            raise ValueError("artifact CUDA device must be a nonnegative integer")
+        if any(name not in CUDA_IMPLEMENTATIONS for name in spec.get("implementations", [])):
+            raise ValueError("CUDA artifact cannot contain CPU candidates")
+        if spec.get("scope") not in ("api", "prepared"):
+            raise ValueError("CUDA artifact must use an explicit resident scope")
     for case in data["cases"]:
         sampling = case["sampling"]
         rounds, repetitions = sampling["rounds"], sampling["repetitions"]
@@ -244,12 +262,16 @@ def print_summary(data):
             "Stored input/factor/preconditioner array bytes are not peak process memory. Percentiles summarize round-average latency."
         )
         return
+    baseline = "cuda-native" if data.get("spec", {}).get("device", "cpu") == "cuda" else "native"
     native = {
         row["case"]: row["median_ns"]
         for row in rows
-        if row["implementation"] == "native" and row["status"] == "measured"
+        if row["implementation"] == baseline and row["status"] == "measured"
     }
-    print("case implementation status median_ms p5_ms p95_ms iterations matvecs native_speedup")
+    print(
+        "case implementation status median_ms p5_ms p95_ms iterations matvecs "
+        + ("cuda_native_speedup" if baseline == "cuda-native" else "native_speedup")
+    )
     for row in rows:
         if row["status"] == "measured":
             native_time = native.get(row["case"])

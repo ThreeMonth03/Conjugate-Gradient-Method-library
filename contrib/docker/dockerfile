@@ -27,7 +27,7 @@ COPY cpp/pybind/*.cpp cpp/pybind/
 COPY include/cg/*.hpp include/cg/
 COPY include/cg/detail/*.hpp include/cg/detail/
 COPY cmake/*.cmake cmake/
-COPY src/*.cpp src/
+COPY src/*.cpp src/*.cu src/
 COPY bindings/*.cpp bindings/
 COPY python/*.py python/
 COPY python/cgpy/*.py python/cgpy/
