@@ -206,3 +206,95 @@ def test_legacy_autograd_import_is_lazy(monkeypatch):
 def test_legacy_python_wrapper_rejects_invalid_threads(threads):
     with pytest.raises(ValueError, match="num_threads"):
         utils.custom_linear_CG(np.zeros(1), np.array([[2.0]]), np.array([4.0]), num_threads=threads)
+
+
+@pytest.mark.parametrize(
+    "search",
+    [utils.np_line_search, utils.custom_naive_line_search, utils.custom_accelerated_line_search],
+)
+def test_legacy_line_search_bounds_invalid_and_nonfinite_trials(search):
+    point = np.array([1.0])
+    direction = -point
+
+    def objective(x):
+        return float(np.dot(x, x) / 2)
+
+    def derivative(x):
+        return np.asarray(x)
+
+    with pytest.raises(ValueError, match="between zero and one"):
+        search(objective, derivative, point, direction, beta=1.0)
+    calls = []
+
+    def unavailable_away_from_current(x):
+        calls.append(x)
+        return 0.0 if np.array_equal(x, point) else np.nan
+
+    with pytest.raises(RuntimeError, match="finite decreasing step"):
+        search(unavailable_away_from_current, derivative, point, direction)
+    assert len(calls) <= utils._MAX_BACKTRACKS + 1
+    assert search(objective, derivative, np.zeros(1), np.zeros(1)) == 1.0
+
+
+def test_accelerated_nonlinear_uses_accelerated_line_search(monkeypatch):
+    calls = []
+    original = utils.custom_accelerated_line_search
+
+    def accelerated(*args, **kwargs):
+        calls.append(kwargs["num_threads"])
+        return original(*args, **kwargs)
+
+    def unexpected_naive(*args, **kwargs):
+        raise AssertionError("accelerated solver routed to the naive line search")
+
+    monkeypatch.setattr(utils, "custom_accelerated_line_search", accelerated)
+    monkeypatch.setattr(utils, "custom_naive_line_search", unexpected_naive)
+    point, value = utils.custom_accelerated_nonlinear_CG(
+        np.array([1.0, 2.0]),
+        1e-10,
+        0.1,
+        0.8,
+        lambda x: np.dot(x, x) / 2,
+        lambda x: np.asarray(x),
+        num_threads=2,
+    )
+    np.testing.assert_array_equal(point, np.zeros(2))
+    assert value == 0.0 and calls == [2]
+
+
+@pytest.mark.parametrize(
+    "solver",
+    [utils.np_nonlinear_CG, utils.custom_naive_nonlinear_CG, utils.custom_accelerated_nonlinear_CG],
+)
+def test_legacy_nonlinear_initial_convergence_method_validation_and_iteration_limit(
+    solver, monkeypatch
+):
+    def objective(x):
+        return np.dot(x, x) / 2
+
+    def derivative(x):
+        return np.asarray(x)
+
+    point, value = solver(np.zeros(2), 1e-10, 0.1, 0.8, objective, derivative)
+    np.testing.assert_array_equal(point, np.zeros(2))
+    assert value == 0.0
+    with pytest.raises(AssertionError, match="method not supported"):
+        solver(np.ones(2), 1e-10, 0.1, 0.8, objective, derivative, method="unsupported")
+    with pytest.raises(RuntimeError, match="non-finite gradient"):
+        solver(np.ones(2), 1e-10, 0.1, 0.8, objective, lambda x: np.full(2, np.nan))
+    monkeypatch.setattr(utils, "_MAX_NONLINEAR_ITERATIONS", 2)
+    with pytest.raises(RuntimeError, match="iteration limit"):
+        solver(np.zeros(1), 1e-10, 0.1, 0.8, lambda x: -x[0], lambda x: np.array([-1.0]))
+
+
+def test_legacy_nonlinear_rejects_nan_line_search_step(monkeypatch):
+    monkeypatch.setattr(utils, "np_line_search", lambda *args, **kwargs: np.nan)
+    with pytest.raises(RuntimeError, match="invalid line-search step"):
+        utils.np_nonlinear_CG(
+            np.ones(1),
+            1e-10,
+            0.1,
+            0.8,
+            lambda x: x[0] ** 2,
+            lambda x: 2 * x,
+        )
