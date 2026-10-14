@@ -66,6 +66,12 @@ def parser():
     run.add_argument("--repetitions", type=_positive, default=3)
     run.add_argument("--rounds", type=_positive, default=30)
     run.add_argument("--algorithm", choices=("standard", "explicit"), default="standard")
+    run.add_argument(
+        "--fused",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="select native fused kernels or their separate-operation reference path",
+    )
     run.add_argument("--rtol", type=float, default=1e-8)
     run.add_argument("--atol", type=float, default=1e-12)
     run.add_argument("--maxiter", type=_nonnegative, default=2000)
@@ -213,7 +219,7 @@ def main(argv=None):
                 "atol": arguments.atol,
                 "maxiter": arguments.maxiter,
                 "residual_refresh": arguments.residual_refresh,
-                "fused": True,
+                "fused": arguments.fused,
                 "preconditioner": arguments.preconditioner,
             },
         }
