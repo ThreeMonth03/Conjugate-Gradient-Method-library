@@ -13,7 +13,7 @@ result = cgpy.solve(
 )
 ```
 
-`A` is a nonempty square dense array or `cgpy.CSRMatrix`. `b` and `x0` are one-dimensional vectors matching its size. Dense array-like inputs are normalized to C-contiguous float64 arrays. Compatible inputs can be borrowed for this synchronous call, so do not modify them concurrently. The output owns its storage; `A`, `b`, and `x0` are preserved. An omitted `x0` selects a zero initial guess.
+`A` is a nonempty square dense array or `cgpy.CSRMatrix`. `b` and `x0` are one-dimensional vectors matching its size. Dense array-like inputs are normalized to aligned C-contiguous float64 arrays. Compatible inputs can be borrowed for this synchronous call, so do not modify them concurrently. The output owns its storage; `A`, `b`, and `x0` are preserved. An omitted `x0` selects a zero initial guess.
 
 | Option | Contract |
 | --- | --- |
@@ -70,7 +70,7 @@ info = cgpy.solve_into(
 )
 ```
 
-This function treats `x` as both initial guess and output and returns `SolveInfo`. Dense `A`, `b`, and `x` must already be C-contiguous float64 NumPy arrays; `x` must be writable. It performs no implicit dtype or layout conversion. Keep `x` disjoint from the matrix and `b`. Inputs and output must remain alive and free from conflicting mutation until the synchronous call returns. A workspace cannot serve overlapping calls; concurrent solves require separate workspaces and output arrays. Long native computation releases the Python GIL.
+This function treats `x` as both initial guess and output and returns `SolveInfo`. Dense `A`, `b`, and `x` must already be aligned C-contiguous float64 NumPy arrays; `x` must be writable. It performs no implicit dtype or layout conversion. Keep `x` disjoint from the matrix and `b`. Inputs and output must remain alive and free from conflicting mutation until the synchronous call returns. A workspace cannot serve overlapping calls; concurrent solves require separate workspaces and output arrays. Long native computation releases the Python GIL.
 
 Use `prepare` to reuse matrix and Jacobi setup. A standalone `solve` or `solve_into` call with `preconditioner="jacobi"` prepares the diagonal for that call.
 

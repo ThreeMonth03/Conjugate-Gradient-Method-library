@@ -51,7 +51,7 @@ make pyprof PYPROF_SUITE=cpu-dense-f64-v1
 make pyprof PYPROF_ARGS='--warmups 3 --seed 20261015'
 ```
 
-The default sparse solver suite compares native CG and Jacobi PCG, reference CG and PCG, and SuperLU factorization plus solve versus factorization reuse. The dense suite compares CG implementations using NumPy and eager CPU PyTorch. Direct and iterative methods have different setup costs and iteration counts; retain each result's scope and solver labels when comparing them.
+The default sparse solver suite compares native CG and Jacobi PCG, SciPy CG and PCG, and SuperLU factorization plus solve versus factorization reuse. The dense suite compares CG implementations using NumPy and eager CPU PyTorch. Direct and iterative methods have different setup costs and iteration counts; retain each result's scope and solver labels when comparing them. Native and official SciPy iterative policies are labeled separately; matching-policy reference adapters are available through the CLI.
 
 The CLI and pytest use the same cases and validation fixtures. Candidates must satisfy an independently checked true residual before timing. Timed rounds use complete Williams cycles to balance execution order. JSON artifacts include raw timings, schedules, input hashes, solver options, and environment/build metadata. `PYPROF_OUTPUT` selects the artifact path; `PYPROF_ARGS` forwards additional CLI arguments. See [benchmark details](benchmarks/README.md) for scopes and replay.
 
