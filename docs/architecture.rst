@@ -12,8 +12,12 @@ storage does not select a solver or change process-wide thread settings.
 * ``backend.hpp`` supplies synchronous primitive and fused CPU operations,
   local native thread settings, and dense-kernel selection.
 * ``preconditioner.hpp`` validates and owns the immutable Jacobi inverse.
-* ``solver.hpp`` owns the recurrence, stopping rule, refresh/restart policy,
-  statuses and operation counts.
+* ``solver.hpp`` defines CPU solver entry points, statuses and operation
+  counts; ``detail/solver_engine.hpp`` shares the recurrence, stopping rule and
+  refresh/restart policy between CPU and CUDA.
+* ``cuda.hpp`` defines device ownership/views, borrowed stream context,
+  workspace and explicit native/cuBLAS kernels. CUDA SDK details are private
+  to the optional build.
 * The binding validates arrays, retains owners, guards workspace concurrency
   and releases the GIL around the native solve.
 * ``cgpy`` provides conversion and result ownership. ``cgbench`` provides
@@ -32,6 +36,11 @@ Candidate convergence and final results are verified even with periodic
 refresh disabled. Stable norm evaluation avoids false zero from squared-sum
 underflow; required inner products still use ordinary double arithmetic.
 
-CUDA remains a later extension requiring device storage/views, stream and
-completion semantics, device workspace, and separate transfer/setup timing.
-CPU borrowed pointers must not be reinterpreted as device pointers.
+The optional CUDA target uses explicit device storage/views and a borrowed
+stream context. Workspace owns vectors, reductions, pinned scalars and a
+cuBLAS handle; the shared solver engine invokes device operations and retains
+the same true-residual policy. Public calls synchronize before returning and
+restore the caller's current device. CPU pointers are never reinterpreted as
+device pointers. Device prepared/API benchmarks separate host transfer/setup
+from completed resident solve timing. See :doc:`cuda` for ownership, stream,
+runtime installation and interoperability contracts.

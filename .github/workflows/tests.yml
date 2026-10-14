@@ -1,10 +1,15 @@
-name: CPU checks
+name: Solver checks
 
 on:
   push:
     branches: [main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      cuda_gpu_tests:
+        description: Run CUDA tests on an explicitly configured self-hosted GPU runner
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -122,3 +127,68 @@ jobs:
           .venv/bin/python -m pip install --cache-dir .cache/pip -r requirements/packaging.lock
       - name: Build source distribution and isolated wheel, then test relocated installation
         run: make test-dist DIST_BLAS=${{ matrix.blas }} JOBS=2
+
+  cuda-build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install project-local build tools and public CUDA runtime wheels
+        run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install --cache-dir .cache/pip -r requirements/test.lock -r requirements/cuda.lock
+      - name: Install the pinned compiler toolkit inside the project
+        run: .venv/bin/python scripts/setup_cuda.py --prefix .deps/cuda-12.8
+      - name: Compile CUDA and run tests with explicit no-device skips
+        run: make test PRESET=cuda-release JOBS=2
+      - name: Build CUDA API documentation and execute available examples
+        run: |
+          .venv/bin/python -m pip install --cache-dir .cache/pip -r requirements/docs.lock
+          make docs doctest PRESET=cuda-release JOBS=2
+      - name: Verify a relocated CUDA wheel with only its declared runtime packages
+        run: make test-dist DIST_CUDA=ON DIST_DIR=dist/cuda JOBS=2
+
+  cuda-gpu:
+    if: github.event_name == 'workflow_dispatch' && inputs.cuda_gpu_tests
+    runs-on: [self-hosted, linux, x64, gpu]
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install project-local tools and CUDA comparison dependencies
+        run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install --cache-dir .cache/pip -r requirements/test.lock -r requirements/cuda-benchmark.lock
+          .venv/bin/python scripts/setup_cuda.py --prefix .deps/cuda-12.8
+      - name: Build and require a real CUDA device
+        run: |
+          make build PRESET=cuda-release JOBS=2
+          PYTHONPATH="$PWD/build/cuda-release/python:$PWD/python" .venv/bin/python - <<'PY'
+          from cgpy import cuda
+          assert cuda.enabled() and cuda.is_available(), 'This job requires a real CUDA device'
+          print(cuda.build_info())
+          print(cuda.runtime_info())
+          PY
+      - name: Execute native and Python CUDA tests
+        env:
+          CG_REQUIRE_CUDA: '1'
+        run: make test PRESET=cuda-release JOBS=2
+      - name: Exercise explicit resident CUDA benchmark modes
+        run: |
+          make pyprof PRESET=cuda-release PYPROF_SUITE=smoke-cuda-dense PYPROF_ROUNDS=6 PYPROF_REPETITIONS=1 JOBS=2 PYPROF_ARGS='--device cuda --cuda-device 0 --implementations cuda-native,cuda-cublas,torch-cuda-eager'
+          .venv/bin/python - <<'PY'
+          import json
+          from pathlib import Path
+          artifact = json.loads(Path('build/cuda-release/benchmarks/smoke-cuda-dense-t1-prepared.json').read_text())
+          for case in artifact['cases']:
+              assert len(case['results']) == 3
+              assert all(result['status'] == 'measured' for result in case['results'])
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cuda-gpu-smoke
+          path: build/cuda-release/benchmarks/*.json

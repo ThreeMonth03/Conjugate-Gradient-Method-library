@@ -1,4 +1,4 @@
-"""Correctness-gated Williams scheduling and raw CPU timing samples."""
+"""Correctness-gated Williams scheduling and completed wall timing samples."""
 
 import math
 import time
@@ -46,9 +46,15 @@ def time_candidates(executors, sampling, clock=time.perf_counter_ns):
         row = rows[index % len(rows)]
         orders.append(list(row))
         for name in row:
+            execute = executors[name]
+            synchronize = getattr(execute, "synchronize", None)
+            if synchronize is not None:
+                synchronize()
             start = clock()
             for _ in range(sampling["repetitions"]):
-                executors[name]()
+                execute()
+            if synchronize is not None:
+                synchronize()
             elapsed[name].append(int(clock() - start))
     return orders, elapsed
 
@@ -84,6 +90,13 @@ def check_outcome(outcome, arrays, options):
     }
 
 
+def _check_executor_outcome(execute, outcome, arrays, options):
+    # Explicit GPU downloads occur only at untimed eligibility gates.
+    if hasattr(execute, "host_outcome"):
+        outcome = execute.host_outcome(outcome)
+    return check_outcome(outcome, arrays, options)
+
+
 def collect_case(case_spec, run_spec):
     """Use exactly the case builder and solver adapters exercised by pytest."""
     from .backends import make_executor
@@ -100,8 +113,18 @@ def collect_case(case_spec, run_spec):
     options = run_spec["solver"]
     for name in run_spec["implementations"]:
         try:
-            execute = make_executor(name, arrays, options, run_spec["scope"], run_spec["threads"])
+            execute = make_executor(
+                name,
+                arrays,
+                options,
+                run_spec["scope"],
+                run_spec["threads"],
+                device=run_spec.get("device", "cpu"),
+                cuda_device=run_spec.get("cuda_device", 0),
+            )
         except ImportError as exc:
+            if run_spec.get("device", "cpu") == "cuda":
+                raise RuntimeError(f"Requested CUDA candidate {name} is unavailable") from exc
             results.append(
                 {
                     "name": name,
@@ -112,7 +135,7 @@ def collect_case(case_spec, run_spec):
             )
             continue
         outcome = execute()
-        correctness = check_outcome(outcome, arrays, options)
+        correctness = _check_executor_outcome(execute, outcome, arrays, options)
         eligible = correctness.pop("eligible")
         entry = {
             "name": name,
@@ -146,7 +169,7 @@ def collect_case(case_spec, run_spec):
     for entry in results:
         name = entry["name"]
         if name in candidates:
-            after = check_outcome(candidates[name](), arrays, options)
+            after = _check_executor_outcome(candidates[name], candidates[name](), arrays, options)
             if not after.pop("eligible"):
                 entry.update(after)
                 entry["status"] = "invalid"

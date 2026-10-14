@@ -3,7 +3,10 @@ Installation
 
 Use Python 3.10 or newer. The default package uses the native CPU kernel and
 requires NumPy at runtime. Nonlinear legacy helpers additionally use the
-optional ``autograd`` dependency. Development and documentation commands below
+optional ``autograd`` dependency. CUDA is disabled in the default build and
+adds no NVIDIA runtime dependency to a CPU wheel. See :doc:`cuda` for explicit
+CUDA builds and installation with the pinned public-runtime extra.
+Development and documentation commands below
 keep Python tools, downloads and build products inside the checkout.
 
 Install a built wheel

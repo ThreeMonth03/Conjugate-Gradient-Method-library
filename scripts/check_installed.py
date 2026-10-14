@@ -11,8 +11,10 @@ from pathlib import Path
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--blas", choices=("OFF", "ON"), required=True)
+    parser.add_argument("--cuda", choices=("OFF", "ON"), default="OFF")
     options = parser.parse_args()
     expected_blas = options.blas == "ON"
+    expected_cuda = options.cuda == "ON"
     # Load NumPy first to exercise coexistence with its independent BLAS.
     # Dynamic import keeps the intentional order independent of import sorting.
     np = importlib.import_module("numpy")
@@ -68,13 +70,58 @@ def main():
     result = cgpy.solve(csr, rhs, preconditioner="jacobi", dense_kernel="native")
     assert result.converged
     np.testing.assert_allclose(result.x, expected)
+    from cgpy import cuda
+
+    assert cuda.enabled() is expected_cuda
+    modules = [_cgcore, _cgpy]
+    if expected_cuda:
+        assert cuda.build_info()
+        gpu_module = importlib.import_module("_cgcuda")
+        assert Path(gpu_module.__file__).resolve().is_relative_to(Path(sys.prefix).resolve())
+        modules.append(gpu_module)
+        if cuda.is_available():
+            gpu_matrix = cuda.DenseMatrix.from_host(matrix)
+            gpu_rhs = cuda.Vector.from_host(rhs)
+            for mode in ("native", "cublas"):
+                for algorithm in ("standard", "explicit"):
+                    for fused in (False, True):
+                        answer = cuda.solve(
+                            gpu_matrix,
+                            gpu_rhs,
+                            dense_kernel=mode,
+                            algorithm=algorithm,
+                            fused=fused,
+                        )
+                        assert answer.converged
+                        np.testing.assert_allclose(answer.x.to_host(), expected)
+                plan = cuda.prepare(gpu_matrix, dense_kernel=mode, preconditioner="jacobi")
+                output = plan.create_vector()
+                solved = plan.solve_into(gpu_rhs, output, workspace=plan.create_workspace())
+                assert solved.converged
+                np.testing.assert_allclose(output.to_host(), expected)
+            gpu_csr = cuda.CSRMatrix.from_host(csr)
+            answer = cuda.solve(gpu_csr, gpu_rhs, preconditioner="jacobi")
+            assert answer.converged
+            np.testing.assert_allclose(answer.x.to_host(), expected)
+            print("Installed CUDA wheel: native/cuBLAS/CSR/Jacobi device checks passed.")
+        else:
+            print("Installed CUDA wheel imported; device checks skipped: no usable GPU.")
+    else:
+        assert importlib.util.find_spec("_cgcuda") is None
+        assert not cuda.is_available()
+        assert importlib.util.find_spec("nvidia") is None
     if sys.platform == "linux":
-        for module in (_cgcore, _cgpy):
+        for module in modules:
             dynamic = subprocess.run(
                 ["readelf", "-d", module.__file__], capture_output=True, text=True, check=True
             ).stdout
             assert "openblas" not in dynamic.lower()
             assert "_deps" not in dynamic and "RUNPATH" not in dynamic and "RPATH" not in dynamic
+            assert "/cuda" not in dynamic and "/torch" not in dynamic
+            if module.__name__ != "_cgcuda":
+                assert "libcudart" not in dynamic and "libcublas" not in dynamic
+            else:
+                assert "libcudart.so.12" in dynamic and "libcublas.so.12" in dynamic
             exports = subprocess.run(
                 ["nm", "-D", "--defined-only", module.__file__],
                 capture_output=True,
@@ -82,7 +129,9 @@ def main():
                 check=True,
             ).stdout
             assert "cblas_" not in exports and "cgpy_" not in exports and "gotoblas" not in exports
-    print(f"Installed {cgpy.__file__}; BLAS={expected_blas}; native/dense/CSR checks passed.")
+    print(
+        f"Installed {cgpy.__file__}; BLAS={expected_blas}; CUDA={expected_cuda}; native/dense/CSR checks passed."
+    )
 
 
 if __name__ == "__main__":

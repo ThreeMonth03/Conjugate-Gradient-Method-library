@@ -106,6 +106,13 @@ imports. Native and BLAS wheels have the same package version and wheel tag;
 use separate output directories to retain both artifacts. Runtime-only
 installs need NumPy; the legacy derivative dependency stays optional.
 
+CUDA builds use ``PRESET=cuda-release`` and ``DIST_CUDA=ON`` explicitly, with
+their own compatible local toolkit and runtime dependencies. See :doc:`cuda`
+for complete commands and architecture/host-compiler overrides. CPU wheels
+retain ``CG_ENABLE_CUDA=OFF``. Distribution checks require CUDA sources in the
+sdist, inspect installed ELF dependencies/RPATH, and execute GPU smoke solves
+when a usable device exists; GPUless installation checks report that skip.
+
 Sphinx documentation
 --------------------
 

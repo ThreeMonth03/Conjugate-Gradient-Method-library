@@ -1,4 +1,4 @@
-"""Sphinx configuration for the imported native CPU package."""
+"""Sphinx configuration for the imported CPU and optional CUDA package."""
 
 from importlib.metadata import version as distribution_version
 from pathlib import Path
@@ -29,7 +29,7 @@ napoleon_numpy_docstring = True
 napoleon_google_docstring = False
 napoleon_use_rtype = False
 napoleon_use_ivar = True
-doctest_global_setup = "import numpy as np\nimport cgpy"
+doctest_global_setup = "import numpy as np\nimport cgpy\nfrom cgpy import cuda"
 
 # Import failures must stop the build. Make supplies the chosen native build
 # and source package through PYTHONPATH; installed-wheel builds need no override.

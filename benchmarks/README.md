@@ -1,8 +1,28 @@
-# CPU CG benchmarks
+# CG benchmarks
 
 `make pyprof` runs the `cgbench` runner. `make pytest` exercises the same case
 builder, solver adapters, correctness gate, Williams scheduler and artifact
-writer. All dependencies belong in the project `.venv` / local build tree.
+writer. CPU dependencies belong in `.venv`; CUDA dependencies and the pinned
+toolkit use `.venv-cuda` and `.deps/cuda-12.8`.
+
+CUDA comparisons select their device and implementations explicitly:
+
+```bash
+make pyprof PRESET=cuda-release PYTHON="$PWD/.venv-cuda/bin/python" \
+  PYPROF_SUITE=cuda-dense-f64-v1 PYPROF_SCOPE=prepared \
+  PYPROF_ARGS="--device cuda --implementations cuda-native,cuda-cublas,torch-cuda-eager"
+make pyprof PRESET=cuda-release PYTHON="$PWD/.venv-cuda/bin/python" \
+  PYPROF_SUITE=cuda-csr-f64-v1 PYPROF_SCOPE=prepared \
+  PYPROF_ARGS="--device cuda --implementations cuda-native,torch-cuda-eager --preconditioner jacobi"
+```
+
+Install `requirements/cuda-benchmark.lock` in `.venv-cuda` for PyTorch CUDA.
+Both scopes measure resident GPU inputs with completion fences; `prepared`
+reuses workspace and preconditioner, while `api` charges their construction.
+Uploads and correctness downloads are outside timed calls. See the
+[CUDA guide](../docs/cuda.rst) for setup, stream ownership and timing details.
+The [recorded CUDA results](cuda-results.md) retain all eight comparisons,
+including setup-sensitive losses, raw timing distributions and replay commands.
 
 See [recorded CPU results](results.md) for complete measurements, raw artifacts,
 hardware provenance, and reproduction commands.

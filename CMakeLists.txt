@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(cgpy VERSION 0.3.0 LANGUAGES CXX)
+project(cgpy VERSION 0.4.0 LANGUAGES CXX)
 
 include(CTest)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -7,6 +7,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 option(CG_BUILD_PYTHON "Build the Python extension modules" ON)
 option(CG_ENABLE_OPENMP "Enable OpenMP CPU operations" OFF)
 option(CG_ENABLE_BLAS "Build the private sequential OpenBLAS dense backend" OFF)
+option(CG_ENABLE_CUDA "Build the optional CUDA backend and Python extension" OFF)
 option(CG_ENABLE_SANITIZERS "Enable address and undefined-behavior sanitizers" OFF)
 option(CG_ENABLE_CLANG_TIDY "Run clang-tidy while compiling project sources" OFF)
 
@@ -56,6 +57,9 @@ if(CG_ENABLE_OPENMP)
 endif()
 
 if(CG_ENABLE_SANITIZERS)
+    if(CG_ENABLE_CUDA)
+        message(FATAL_ERROR "CG_ENABLE_SANITIZERS is supported by CPU-only builds")
+    endif()
     if(NOT CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         message(FATAL_ERROR "CG_ENABLE_SANITIZERS requires GCC or Clang")
     endif()
@@ -72,6 +76,42 @@ if(CG_ENABLE_CLANG_TIDY)
     find_program(CG_CLANG_TIDY NAMES clang-tidy REQUIRED)
     set_target_properties(cg_legacy PROPERTIES CXX_CLANG_TIDY "${CG_CLANG_TIDY}")
     set_target_properties(cg_core PROPERTIES CXX_CLANG_TIDY "${CG_CLANG_TIDY}")
+endif()
+
+if(CG_ENABLE_CUDA)
+    if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        message(FATAL_ERROR "CG_ENABLE_CUDA currently supports native Linux builds")
+    endif()
+    if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+        set(CMAKE_CUDA_ARCHITECTURES "75" CACHE STRING "Explicit CUDA target architectures")
+    endif()
+    if(NOT CMAKE_CUDA_ARCHITECTURES OR CMAKE_CUDA_ARCHITECTURES MATCHES "native|all")
+        message(FATAL_ERROR "Set an explicit numeric CMAKE_CUDA_ARCHITECTURES list (default: 75)")
+    endif()
+    if(NOT CMAKE_CUDA_COMPILER AND CUDAToolkit_ROOT)
+        set(CMAKE_CUDA_COMPILER "${CUDAToolkit_ROOT}/bin/nvcc" CACHE FILEPATH "CUDA compiler")
+    endif()
+    enable_language(CUDA)
+    find_package(CUDAToolkit 12.8 REQUIRED)
+    if(CUDAToolkit_VERSION VERSION_GREATER_EQUAL "13.0")
+        message(FATAL_ERROR "CG_ENABLE_CUDA requires CUDA Toolkit >=12.8 and <13 to match the cu12 runtime packages")
+    endif()
+    if(CMAKE_CUDA_COMPILER_VERSION VERSION_LESS "12.8" OR CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL "13.0")
+        message(FATAL_ERROR "The selected nvcc compiler must also be CUDA >=12.8 and <13")
+    endif()
+    add_library(cg_cuda STATIC src/cuda_storage.cu src/cuda_backend.cu src/cuda_solver.cu)
+    target_compile_features(cg_cuda PUBLIC cxx_std_17)
+    set_target_properties(cg_cuda PROPERTIES
+        POSITION_INDEPENDENT_CODE ON
+        CUDA_STANDARD 17
+        CUDA_STANDARD_REQUIRED ON
+        CUDA_RUNTIME_LIBRARY Shared
+        CXX_VISIBILITY_PRESET hidden
+        CUDA_VISIBILITY_PRESET hidden
+        VISIBILITY_INLINES_HIDDEN ON
+    )
+    target_include_directories(cg_cuda PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>")
+    target_link_libraries(cg_cuda PUBLIC cg_core CUDA::cudart CUDA::cublas)
 endif()
 
 if(CG_BUILD_PYTHON)
@@ -101,6 +141,26 @@ if(CG_BUILD_PYTHON)
     )
     set_target_properties(_cgcore PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/python")
     install(TARGETS _cgcore LIBRARY DESTINATION . RUNTIME DESTINATION .)
+    if(CG_ENABLE_CUDA)
+        pybind11_add_module(_cgcuda MODULE bindings/cuda.cpp)
+        target_link_libraries(_cgcuda PRIVATE cg_cuda)
+        string(REPLACE ";" "," CG_CUDA_ARCHITECTURES_INFO "${CMAKE_CUDA_ARCHITECTURES}")
+        string(TOUPPER "${CMAKE_BUILD_TYPE}" CG_CUDA_BUILD_CONFIG)
+        set_target_properties(_cgcuda PROPERTIES
+            LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/python"
+            INSTALL_RPATH ""
+            INSTALL_RPATH_USE_LINK_PATH OFF
+        )
+        target_compile_definitions(_cgcuda PRIVATE
+            CG_CUDA_TOOLKIT_VERSION="${CUDAToolkit_VERSION}"
+            CG_CUDA_ARCHITECTURES="${CG_CUDA_ARCHITECTURES_INFO}"
+            CG_CUDA_COMPILER="${CMAKE_CUDA_COMPILER_ID} ${CMAKE_CUDA_COMPILER_VERSION}"
+            CG_CUDA_HOST_COMPILER="${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}"
+            CG_CUDA_BUILD_TYPE="${CMAKE_BUILD_TYPE}"
+            CG_CUDA_BUILD_FLAGS="${CMAKE_CUDA_FLAGS} ${CMAKE_CUDA_FLAGS_${CG_CUDA_BUILD_CONFIG}}"
+        )
+        install(TARGETS _cgcuda LIBRARY DESTINATION .)
+    endif()
     install(FILES python/utils.py DESTINATION .)
 endif()
 
@@ -120,6 +180,13 @@ if(BUILD_TESTING)
     target_link_libraries(cg_gtests PRIVATE cg_legacy cg_core GTest::gtest_main)
     include(GoogleTest)
     gtest_discover_tests(cg_gtests PROPERTIES LABELS cpp)
+    add_custom_target(cg_native_tests DEPENDS cg_gtests)
+    if(CG_ENABLE_CUDA)
+        add_executable(cg_cuda_gtests tests/cpp/test_cuda.cpp)
+        target_link_libraries(cg_cuda_gtests PRIVATE cg_cuda GTest::gtest_main)
+        gtest_discover_tests(cg_cuda_gtests PROPERTIES LABELS "cpp;cuda")
+        add_dependencies(cg_native_tests cg_cuda_gtests)
+    endif()
 
     if(CG_BUILD_PYTHON)
         add_test(NAME pytest

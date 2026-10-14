@@ -41,6 +41,11 @@ SUITES = {
     ),
 }
 SUITES["cpu-dense-f64-v1"] = SUITES["cpu"]
+# Device aliases preserve exactly the CPU fixture specification and hash.
+SUITES["cuda-dense-f64-v1"] = SUITES["cpu-dense-f64-v1"]
+SUITES["cuda-csr-f64-v1"] = SUITES["cpu-csr-f64-v1"]
+SUITES["smoke-cuda-dense"] = SUITES["smoke"]
+SUITES["smoke-cuda-csr"] = SUITES["smoke-csr"]
 SUITES["sparse-solvers"] = tuple(
     CaseSpec(
         f"scaled-poisson-{dimensions}d-{grid}",
