@@ -1,19 +1,15 @@
-import sys
-import os
+"""Legacy linear and nonlinear helpers backed by the shared native solver."""
 
-# Get the absolute path of the directory containing the .so file
-dir_path = os.path.dirname(os.path.abspath(__file__)) + "/../cpp"
-# Add the directory to the Python path
-sys.path.append(dir_path)
-
-import math
 import numpy as np
-import random
-from autograd import grad
-import autograd.numpy as au
 from _cgpy import CG
-from _cgpy.Matrix import Naive_Matrix
-from _cgpy.Matrix import Accelerated_Matrix
+from _cgpy.Matrix import Accelerated_Matrix, Naive_Matrix
+
+
+def grad(*args, **kwargs):
+    """Construct an autograd derivative when the optional dependency is used."""
+    from autograd import grad as autograd_grad
+
+    return autograd_grad(*args, **kwargs)
 
 
 def is_pos_def(x):
@@ -57,7 +53,7 @@ def custom_linear_CG(x, a, b, epsilon=5e-7, epoch=10000000, num_threads=3):
     """
     mat_x_min = None
     if num_threads <= 0:
-        num_threads = 1
+        raise ValueError("num_threads must be positive")
     if num_threads != 1:
         mat_a = Accelerated_Matrix(a)
         mat_b = Accelerated_Matrix(b)
@@ -205,9 +201,7 @@ def np_line_search(f, df, x, d, alpha=5e-4, beta=0.8):
     return t
 
 
-def custom_nonlinear_CG(
-    X, tol, alpha, beta, f, Df, method="Fletcher_Reeves", num_threads=-1
-):
+def custom_nonlinear_CG(X, tol, alpha, beta, f, Df, method="Fletcher_Reeves", num_threads=-1):
     """
     Functionality: Solve the nonlinear system using conjugate gradient method by calling the c++ library
     Parameters:
@@ -259,10 +253,8 @@ def custom_naive_nonlinear_CG(X, tol, alpha, beta, f, Df, method="Fletcher_Reeve
 
     while True:
         start_point = X
-        step = custom_naive_line_search(
-            f=f, df=Df, x=start_point, d=delta, alpha=alpha, beta=beta
-        )
-        if step != None:
+        step = custom_naive_line_search(f=f, df=Df, x=start_point, d=delta, alpha=alpha, beta=beta)
+        if step is not None:
             next_X = X + step * delta
         elif step != step:  # IsNaN
             raise AssertionError(
@@ -317,10 +309,8 @@ def custom_accelerated_nonlinear_CG(
 
     while True:
         start_point = X
-        step = custom_naive_line_search(
-            f=f, df=Df, x=start_point, d=delta, alpha=alpha, beta=beta
-        )
-        if step != None:
+        step = custom_naive_line_search(f=f, df=Df, x=start_point, d=delta, alpha=alpha, beta=beta)
+        if step is not None:
             next_X = X + step * delta
         elif step != step:  # IsNaN
             raise AssertionError(
@@ -372,10 +362,8 @@ def np_nonlinear_CG(X, tol, alpha, beta, f, Df, method="Fletcher_Reeves"):
 
     while True:
         start_point = X
-        step = np_line_search(
-            f=f, df=Df, x=start_point, d=delta, alpha=alpha, beta=beta
-        )
-        if step != None:
+        step = np_line_search(f=f, df=Df, x=start_point, d=delta, alpha=alpha, beta=beta)
+        if step is not None:
             next_X = X + step * delta
         elif step != step:  # IsNaN
             raise AssertionError(

@@ -1,5 +1,6 @@
 #include <_cg_method.hpp>
 #include <algorithm>
+#include <cg/solver.hpp>
 #include <cmath>
 
 namespace cg_method
@@ -15,80 +16,49 @@ int max_threads()
     return 1;
 #endif
 }
+
+template <class MatrixType>
+void solve_legacy(const MatrixType &A, const MatrixType &b, MatrixType &x, double epsilon,
+                  int epoch, int threads, bool parallel)
+{
+    if (epoch < 0)
+        throw std::invalid_argument("Maximum iteration count must be nonnegative");
+    if (threads < 1)
+        throw std::invalid_argument("Thread count must be positive");
+    if (!std::isfinite(epsilon) || epsilon < 0.0)
+        throw std::invalid_argument("Residual tolerance must be finite and nonnegative");
+    if (A.nrow() == 0 || A.nrow() != A.ncol() || b.ncol() != 1 || x.ncol() != 1 ||
+        b.nrow() != A.nrow() || x.nrow() != A.nrow())
+        throw std::invalid_argument(
+            "CG requires a nonempty square matrix and matching column vectors");
+
+    const int effective_threads = parallel && cg::CpuBackend::openmp_enabled() ? threads : 1;
+    const cg::CpuBackend backend(effective_threads);
+    cg::Workspace workspace(A.nrow());
+    cg::CgOptions options;
+    options.algorithm = cg::Algorithm::explicit_residual;
+    options.rtol = 0.0;
+    options.atol = epsilon;
+    options.maxiter = static_cast<std::size_t>(epoch);
+    cg::solve_into({A.data(), A.nrow(), A.ncol()}, {b.data(), b.size()}, {x.data(), x.size()},
+                   workspace, backend, options);
+}
 } // namespace
 
-Matrix::Naive_Matrix linear_CG::solve_by_Naive_Matrix(Matrix::Naive_Matrix A,
-                                                      Matrix::Naive_Matrix b,
+Matrix::Naive_Matrix linear_CG::solve_by_Naive_Matrix(const Matrix::Naive_Matrix &A,
+                                                      const Matrix::Naive_Matrix &b,
                                                       Matrix::Naive_Matrix x)
 {
-    /*
-    Functionality: solve linear equation Ax = b by Conjugate Gradient method
-    Parameter:
-        A: Naive_Matrix, the coefficient matrix
-        b: Naive_Matrix, the right hand side
-        x: Naive_Matrix, the initial guess
-    */
-    Matrix::Naive_Matrix res;
-    Matrix::Naive_Matrix delta;
-    Matrix::Naive_Matrix D;
-    res = A * x - b; // 1d array
-    delta = -res;    // 1d array
-    for (int i = 0; i < epoch; ++i)
-    {
-        if (res.norm() < epsilon)
-        {
-            break;
-        }
-        D = A * delta;                                   // 1d array
-        beta = -(res * delta)(0, 0) / (delta * D)(0, 0); // scalar
-        x = x + (delta * beta);                          // 1d array
-        res = A * x - b;                                 // 1d array
-        chi = (res * D)(0, 0) / (delta * D)(0, 0);       // scalar
-        delta = delta * chi - res;                       // 1d array
-    }
+    solve_legacy(A, b, x, epsilon, epoch, number_of_threads, false);
     return x;
 }
 
-Matrix::Accelerated_Matrix linear_CG::solve_by_Accelerated_Matrix(Matrix::Accelerated_Matrix A,
-                                                                  Matrix::Accelerated_Matrix b,
-                                                                  Matrix::Accelerated_Matrix x)
+Matrix::Accelerated_Matrix
+linear_CG::solve_by_Accelerated_Matrix(const Matrix::Accelerated_Matrix &A,
+                                       const Matrix::Accelerated_Matrix &b,
+                                       Matrix::Accelerated_Matrix x)
 {
-    /*
-    Functionality: solve linear equation Ax = b by Conjugate Gradient method
-    Parameter:
-        A: Accelerated_Matrix, the coefficient matrix
-        b: Accelerated_Matrix, the right hand side
-        x: Accelerated_Matrix, the initial guess
-    */
-    Matrix::Accelerated_Matrix res;
-    Matrix::Accelerated_Matrix delta;
-    Matrix::Accelerated_Matrix D;
-    if (number_of_threads == 0)
-    {
-        throw std::out_of_range("CG method Number of thread is 0.");
-    }
-    A.set_number_of_threads() = number_of_threads;
-    // b.set_number_of_threads() = number_of_threads;
-    // x.set_number_of_threads() = number_of_threads;
-    // res.set_number_of_threads() = number_of_threads;
-    // delta.set_number_of_threads() = number_of_threads;
-    // D.set_number_of_threads() = number_of_threads;
-
-    res = A * x - b; // 1d array
-    delta = -res;    // 1d array
-    for (int i = 0; i < epoch; ++i)
-    {
-        if (res.norm() < epsilon)
-        {
-            break;
-        }
-        D = A * delta;                                   // 1d array
-        beta = -(res * delta)(0, 0) / (delta * D)(0, 0); // scalar
-        x = x + (delta * beta);                          // 1d array
-        res = A * x - b;                                 // 1d array
-        chi = (res * D)(0, 0) / (delta * D)(0, 0);       // scalar
-        delta = delta * chi - res;                       // 1d array
-    }
+    solve_legacy(A, b, x, epsilon, epoch, number_of_threads, true);
     return x;
 }
 

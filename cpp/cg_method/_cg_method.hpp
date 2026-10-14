@@ -17,10 +17,11 @@ class linear_CG
     linear_CG() = default;
     linear_CG(double epsilon, int epoch, int number_of_threads)
         : epsilon(epsilon), epoch(epoch), number_of_threads(number_of_threads) {};
-    Matrix::Naive_Matrix solve_by_Naive_Matrix(Matrix::Naive_Matrix A, Matrix::Naive_Matrix b,
+    Matrix::Naive_Matrix solve_by_Naive_Matrix(const Matrix::Naive_Matrix &A,
+                                               const Matrix::Naive_Matrix &b,
                                                Matrix::Naive_Matrix x);
-    Matrix::Accelerated_Matrix solve_by_Accelerated_Matrix(Matrix::Accelerated_Matrix A,
-                                                           Matrix::Accelerated_Matrix b,
+    Matrix::Accelerated_Matrix solve_by_Accelerated_Matrix(const Matrix::Accelerated_Matrix &A,
+                                                           const Matrix::Accelerated_Matrix &b,
                                                            Matrix::Accelerated_Matrix x);
     double const &get_epsilon() const { return epsilon; }
     double &set_epsilon() { return epsilon; }
@@ -31,10 +32,8 @@ class linear_CG
 
   private:
     double epsilon = 5e-7;
-    double beta = 0;
-    double chi = 0;
     int epoch = 10000000;
-    int number_of_threads = std::thread::hardware_concurrency();
+    int number_of_threads = 1;
 };
 
 class nonlinear_CG

@@ -1,21 +1,6 @@
-import sys
-import os
-
-# Get the absolute path of the directory containing the .so file
-dir_path = os.path.dirname(os.path.abspath(__file__)) + "/../cpp"
-# Add the directory to the Python path
-sys.path.append(dir_path)
-# Get the absolute path of the directory containing the utils.py
-dir_path = os.path.dirname(os.path.abspath(__file__)) + "/../python"
-# Add the directory to the Python path
-sys.path.append(dir_path)
-
-import pytest
-import math
-from _cgpy.Matrix import Naive_Matrix
-from _cgpy.Matrix import Accelerated_Matrix
-import time
 import numpy as np
+import pytest
+from _cgpy.Matrix import Accelerated_Matrix, Naive_Matrix
 
 ## Test Naive Matrix
 
