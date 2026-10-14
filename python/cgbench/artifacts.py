@@ -268,10 +268,8 @@ def print_summary(data):
         for row in rows
         if row["implementation"] == baseline and row["status"] == "measured"
     }
-    print(
-        "case implementation status median_ms p5_ms p95_ms iterations matvecs "
-        + ("cuda_native_speedup" if baseline == "cuda-native" else "native_speedup")
-    )
+    ratio_name = "cuda_native_speedup" if baseline == "cuda-native" else "native_speedup"
+    print("case implementation status median_ms p5_ms p95_ms iterations matvecs " + ratio_name)
     for row in rows:
         if row["status"] == "measured":
             native_time = native.get(row["case"])
@@ -283,5 +281,5 @@ def print_summary(data):
             print(f"{row['case']} {row['implementation']} {row['status']}: {row['reason']}")
     print("Percentiles describe per-round average ns/call, not individual-call latency.")
     print(
-        "native_speedup = this implementation's median / native median; >1 means native is faster."
+        f"{ratio_name} = this implementation's median / {baseline} median; >1 means {baseline} is faster."
     )

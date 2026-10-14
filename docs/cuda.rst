@@ -45,8 +45,14 @@ Optional Compute Sanitizer checks use the same local toolkit:
 
    .venv-cuda/bin/python scripts/setup_cuda.py --sanitizer
    .deps/cuda-12.8/bin/compute-sanitizer --tool memcheck --error-exitcode 1 build/cuda-release/cg_cuda_gtests
-   .deps/cuda-12.8/bin/compute-sanitizer --tool racecheck --error-exitcode 1 build/cuda-release/cg_cuda_gtests
+   .deps/cuda-12.8/bin/compute-sanitizer --tool racecheck --force-blocking-launches --error-exitcode 1 build/cuda-release/cg_cuda_gtests
    .deps/cuda-12.8/bin/compute-sanitizer --tool synccheck --error-exitcode 1 build/cuda-release/cg_cuda_gtests
+
+The recorded WSL2 run needed serialized racecheck launches because its default
+mode stalled on the concurrent-stream test. This setting checks kernel shared
+memory hazards under serialization; it does not establish race freedom for
+overlapping launches. Normal execution, memcheck and synccheck also exercise
+the concurrent-stream test without this flag.
 
 To build a relocatable local CUDA wheel:
 

@@ -1,0 +1,469 @@
+{
+  "cases": [
+    {
+      "case": {
+        "condition_scale": 100.0,
+        "name": "dense-16",
+        "size": 16
+      },
+      "cycle_rows": 6,
+      "dtype": "float64",
+      "input_sha256": "04ecf41eb3c9f6f3bb0045a1a52164ba25df96e9a79703936ea16f4a94476a0d",
+      "input_storage_basis": "shared input NumPy/SciPy arrays, including original index dtype; excludes native owning copies and workspace",
+      "input_stored_bytes": 2304,
+      "layout": "C",
+      "nnz": null,
+      "results": [
+        {
+          "iterations": 18,
+          "matvecs": 20,
+          "name": "cuda-native",
+          "reason": null,
+          "reported_residual_norm": 1.0213384237432014e-07,
+          "residual_threshold": 9.367903825655504e-07,
+          "round_elapsed_ns": [
+            2407163,
+            2108154,
+            2052965,
+            2076457,
+            2078110,
+            2132180
+          ],
+          "setup": {
+            "api_setup_scope": "output/workspace allocations and per-call Jacobi; matrix upload/snapshot excluded",
+            "control_scope": "synchronous native solve; host dispatch and scalar checks included",
+            "cuda_device": 0,
+            "dense_kernel": "native",
+            "device": "cuda",
+            "fused": true,
+            "host_upload_setup_elapsed_ns": 1624785,
+            "implementation_role": "native",
+            "preconditioner": "none",
+            "preconditioner_setup_elapsed_ns": 0,
+            "preconditioner_stored_bytes": 0,
+            "reset_scope": "device x0 copy included in every invocation",
+            "resident_adapter_setup_elapsed_ns": 10849968,
+            "residual_policy": "standard with residual_refresh=50",
+            "setup_in_timed_call": false,
+            "setup_measurement": "single untimed completed GPU setup probe",
+            "setup_probe_scope": "operator snapshot and Jacobi probe; reusable output/workspace only for prepared scope",
+            "stream": 0,
+            "timing": "wall completion; stream fence before block and after last invocation",
+            "transfer_scope": "input uploads and correctness output downloads excluded"
+          },
+          "solver_status": "converged",
+          "status": "measured",
+          "true_residual_norm": 1.0213384275541674e-07
+        },
+        {
+          "iterations": 18,
+          "matvecs": 20,
+          "name": "cuda-cublas",
+          "reason": null,
+          "reported_residual_norm": 9.618917423703335e-08,
+          "residual_threshold": 9.367903825655504e-07,
+          "round_elapsed_ns": [
+            2430764,
+            2356030,
+            2076922,
+            2149088,
+            2182687,
+            2084044
+          ],
+          "setup": {
+            "api_setup_scope": "output/workspace allocations and per-call Jacobi; matrix upload/snapshot excluded",
+            "control_scope": "synchronous native solve; host dispatch and scalar checks included",
+            "cuda_device": 0,
+            "dense_kernel": "cublas",
+            "device": "cuda",
+            "fused": true,
+            "host_upload_setup_elapsed_ns": 300513,
+            "implementation_role": "native",
+            "preconditioner": "none",
+            "preconditioner_setup_elapsed_ns": 0,
+            "preconditioner_stored_bytes": 0,
+            "reset_scope": "device x0 copy included in every invocation",
+            "resident_adapter_setup_elapsed_ns": 1670870,
+            "residual_policy": "standard with residual_refresh=50",
+            "setup_in_timed_call": false,
+            "setup_measurement": "single untimed completed GPU setup probe",
+            "setup_probe_scope": "operator snapshot and Jacobi probe; reusable output/workspace only for prepared scope",
+            "stream": 0,
+            "timing": "wall completion; stream fence before block and after last invocation",
+            "transfer_scope": "input uploads and correctness output downloads excluded"
+          },
+          "solver_status": "converged",
+          "status": "measured",
+          "true_residual_norm": 9.618917425099096e-08
+        },
+        {
+          "iterations": 18,
+          "matvecs": 20,
+          "name": "torch-cuda-eager",
+          "reason": null,
+          "reported_residual_norm": 9.618917423703335e-08,
+          "residual_threshold": 9.367903825655504e-07,
+          "round_elapsed_ns": [
+            4433972,
+            6141601,
+            4497841,
+            4158751,
+            4287758,
+            5288355
+          ],
+          "setup": {
+            "api_setup_scope": "output/workspace tensor allocations and per-call Jacobi; matrix upload excluded",
+            "control_scope": "CPU eager CG control and GPU scalar synchronizations included; numerical-range fallback may download residual",
+            "cuda_device": 0,
+            "device": "cuda",
+            "host_upload_setup_elapsed_ns": 577172,
+            "implementation_role": "same_policy_reference",
+            "precision": "float64; TF32 disabled; no mixed precision",
+            "preconditioner": "none",
+            "preconditioner_setup_elapsed_ns": 0,
+            "preconditioner_stored_bytes": 0,
+            "reset_scope": "device x0 copy included in every invocation",
+            "resident_adapter_setup_elapsed_ns": 88279,
+            "residual_policy": "standard with residual_refresh=50",
+            "setup_in_timed_call": false,
+            "setup_measurement": "single untimed setup probe",
+            "setup_probe_scope": "prepared snapshot/workspace when selected; Jacobi setup separately recorded",
+            "solver_family": "cg",
+            "stream": 0,
+            "timing": "wall completion; device fence before block and after last invocation",
+            "transfer_scope": "input uploads and correctness output downloads excluded",
+            "workspace_policy": "preallocated prepared tensors; API uses PyTorch caching allocator"
+          },
+          "solver_status": "converged",
+          "status": "measured",
+          "true_residual_norm": 9.618917425099096e-08
+        }
+      ],
+      "round_orders": [
+        [
+          "cuda-native",
+          "cuda-cublas",
+          "torch-cuda-eager"
+        ],
+        [
+          "torch-cuda-eager",
+          "cuda-native",
+          "cuda-cublas"
+        ],
+        [
+          "cuda-cublas",
+          "torch-cuda-eager",
+          "cuda-native"
+        ],
+        [
+          "cuda-native",
+          "torch-cuda-eager",
+          "cuda-cublas"
+        ],
+        [
+          "cuda-cublas",
+          "cuda-native",
+          "torch-cuda-eager"
+        ],
+        [
+          "torch-cuda-eager",
+          "cuda-cublas",
+          "cuda-native"
+        ]
+      ],
+      "sampling": {
+        "repetitions": 1,
+        "rounds": 6,
+        "warmups": 0
+      },
+      "schedule": "williams"
+    }
+  ],
+  "environment": {
+    "affinity": [
+      0
+    ],
+    "cmake": {
+      "fields": {
+        "CG_BUILD_PYTHON:BOOL": "ON",
+        "CG_ENABLE_BLAS:BOOL": "OFF",
+        "CG_ENABLE_CLANG_TIDY:BOOL": "OFF",
+        "CG_ENABLE_CUDA:BOOL": "ON",
+        "CG_ENABLE_OPENMP:BOOL": "OFF",
+        "CG_ENABLE_SANITIZERS:BOOL": "OFF",
+        "CMAKE_BUILD_TYPE:STRING": "Release",
+        "CMAKE_CXX_COMPILER:UNINITIALIZED": "/usr/bin/g++-13",
+        "CMAKE_CXX_FLAGS-ADVANCED:INTERNAL": "1",
+        "CMAKE_CXX_FLAGS:STRING": "",
+        "CMAKE_CXX_FLAGS_DEBUG-ADVANCED:INTERNAL": "1",
+        "CMAKE_CXX_FLAGS_DEBUG:STRING": "-g",
+        "CMAKE_CXX_FLAGS_MINSIZEREL-ADVANCED:INTERNAL": "1",
+        "CMAKE_CXX_FLAGS_MINSIZEREL:STRING": "-Os -DNDEBUG",
+        "CMAKE_CXX_FLAGS_RELEASE-ADVANCED:INTERNAL": "1",
+        "CMAKE_CXX_FLAGS_RELEASE:STRING": "-O3 -DNDEBUG",
+        "CMAKE_CXX_FLAGS_RELWITHDEBINFO-ADVANCED:INTERNAL": "1",
+        "CMAKE_CXX_FLAGS_RELWITHDEBINFO:STRING": "-O2 -g -DNDEBUG"
+      },
+      "path": "/home/threemonth03/Downloads/Conjugate-Gradient-Method-library/build/cuda-release/CMakeCache.txt"
+    },
+    "cpu": "13th Gen Intel(R) Core(TM) i7-13700K",
+    "cuda": {
+      "device": 0,
+      "environment": {
+        "CUBLAS_WORKSPACE_CONFIG": ":4096:8",
+        "CUDA_DEVICE_ORDER": null,
+        "CUDA_LAUNCH_BLOCKING": null,
+        "CUDA_VISIBLE_DEVICES": null,
+        "PYTORCH_CUDA_ALLOC_CONF": null
+      },
+      "native": {
+        "build_info": {
+          "architectures": "75",
+          "build_type": "Release",
+          "compiler": "NVIDIA 12.8.93",
+          "enabled": true,
+          "flags": " -O3 -DNDEBUG",
+          "host_compiler": "GNU 13.3.0",
+          "scalar_dtype": "float64",
+          "toolkit_version": "12.8.93"
+        },
+        "module_path": "/home/threemonth03/Downloads/Conjugate-Gradient-Method-library/build/cuda-release/python/_cgcuda.cpython-312-x86_64-linux-gnu.so",
+        "module_sha256": "f4e77c0314be523ae6780a1597ff0de6bc6a0f330b98c657b09c577d0d6bb22f",
+        "runtime_info": {
+          "compute_capability": [
+            7,
+            5
+          ],
+          "device": 0,
+          "driver_api_version": 13010,
+          "name": "NVIDIA GeForce RTX 2060",
+          "runtime_version": 12080,
+          "total_memory": 6442123264,
+          "uuid": "GPU-725be96d-2b67-c8ec-fa10-5d9b23a2c302"
+        }
+      },
+      "nvidia_smi": [
+        {
+          "driver_version": "591.86",
+          "name": "NVIDIA GeForce RTX 2060",
+          "pci_bus_id": "00000000:01:00.0",
+          "physical_index": "0",
+          "uuid": "GPU-725be96d-2b67-c8ec-fa10-5d9b23a2c302"
+        }
+      ],
+      "nvidia_smi_mapping": "physical device inventory; CUDA_VISIBLE_DEVICES may change logical ordinals",
+      "torch": {
+        "compute_capability": [
+          7,
+          5
+        ],
+        "cudnn_allow_tf32": false,
+        "deterministic_algorithms": false,
+        "device": 0,
+        "matmul_allow_tf32": false,
+        "multiprocessor_count": 30,
+        "name": "NVIDIA GeForce RTX 2060",
+        "runtime_version": "12.8",
+        "total_memory_bytes": 6442123264,
+        "uuid": "725be96d-2b67-c8ec-fa10-5d9b23a2c302"
+      }
+    },
+    "dynamic_thread_environment": {
+      "MKL_DYNAMIC": "FALSE",
+      "OMP_DYNAMIC": "FALSE"
+    },
+    "git_status": "?? benchmarks/cg_vs_direct_results.json\n?? benchmarks/compare_direct.py",
+    "logical_cpus": 24,
+    "machine": "x86_64",
+    "native": {
+      "build_info": {
+        "blas": {
+          "configuration": "disabled",
+          "enabled": false,
+          "integer_bits": null,
+          "provider": null,
+          "symbol_prefix": null,
+          "thread_mode": null
+        },
+        "build_type": "Release",
+        "compiler": "GNU 13.3.0",
+        "flags": " -O3 -DNDEBUG",
+        "openmp": false
+      },
+      "module_path": "/home/threemonth03/Downloads/Conjugate-Gradient-Method-library/build/cuda-release/python/_cgcore.cpython-312-x86_64-linux-gnu.so",
+      "module_sha256": "67531bd75aca2de079a67e240d51b18caca500cd05f40f301acbc482a2fe7bf6",
+      "python_package_path": "/home/threemonth03/Downloads/Conjugate-Gradient-Method-library/python/cgpy/__init__.py"
+    },
+    "numpy_config": {
+      "Build Dependencies": {
+        "blas": {
+          "detection method": "pkgconfig",
+          "found": true,
+          "include directory": "/opt/_internal/cpython-3.12.7/lib/python3.12/site-packages/scipy_openblas64/include",
+          "lib directory": "/opt/_internal/cpython-3.12.7/lib/python3.12/site-packages/scipy_openblas64/lib",
+          "name": "scipy-openblas",
+          "openblas configuration": "OpenBLAS 0.3.29  USE64BITINT DYNAMIC_ARCH NO_AFFINITY Haswell MAX_THREADS=64",
+          "pc file directory": "/project/.openblas",
+          "version": "0.3.29"
+        },
+        "lapack": {
+          "detection method": "pkgconfig",
+          "found": true,
+          "include directory": "/opt/_internal/cpython-3.12.7/lib/python3.12/site-packages/scipy_openblas64/include",
+          "lib directory": "/opt/_internal/cpython-3.12.7/lib/python3.12/site-packages/scipy_openblas64/lib",
+          "name": "scipy-openblas",
+          "openblas configuration": "OpenBLAS 0.3.29  USE64BITINT DYNAMIC_ARCH NO_AFFINITY Haswell MAX_THREADS=64",
+          "pc file directory": "/project/.openblas",
+          "version": "0.3.29"
+        }
+      },
+      "Compilers": {
+        "c": {
+          "commands": "cc",
+          "linker": "ld.bfd",
+          "name": "gcc",
+          "version": "10.2.1"
+        },
+        "c++": {
+          "commands": "c++",
+          "linker": "ld.bfd",
+          "name": "gcc",
+          "version": "10.2.1"
+        },
+        "cython": {
+          "commands": "cython",
+          "linker": "cython",
+          "name": "cython",
+          "version": "3.1.0"
+        }
+      },
+      "Machine Information": {
+        "build": {
+          "cpu": "x86_64",
+          "endian": "little",
+          "family": "x86_64",
+          "system": "linux"
+        },
+        "host": {
+          "cpu": "x86_64",
+          "endian": "little",
+          "family": "x86_64",
+          "system": "linux"
+        }
+      },
+      "Python Information": {
+        "path": "/tmp/build-env-sgs8db9u/bin/python",
+        "version": "3.12"
+      },
+      "SIMD Extensions": {
+        "baseline": [
+          "SSE",
+          "SSE2",
+          "SSE3"
+        ],
+        "found": [
+          "SSSE3",
+          "SSE41",
+          "POPCNT",
+          "SSE42",
+          "AVX",
+          "F16C",
+          "FMA3",
+          "AVX2"
+        ],
+        "not found": [
+          "AVX512F",
+          "AVX512CD",
+          "AVX512_KNL",
+          "AVX512_KNM",
+          "AVX512_SKX",
+          "AVX512_CLX",
+          "AVX512_CNL",
+          "AVX512_ICL"
+        ]
+      }
+    },
+    "packages": {
+      "cgpy": null,
+      "numpy": "2.2.6",
+      "scipy": "1.15.3",
+      "threadpoolctl": "3.6.0",
+      "torch": "2.8.0+cu128"
+    },
+    "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+    "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+    "python_compiler": "GCC 13.3.0",
+    "python_executable": "/home/threemonth03/Downloads/Conjugate-Gradient-Method-library/.venv-cuda/bin/python",
+    "revision": "6d3ebb16a4a0f47732326045c1a0a55782f91cb7",
+    "thread_environment": {
+      "BLIS_NUM_THREADS": "1",
+      "MKL_NUM_THREADS": "1",
+      "NUMEXPR_NUM_THREADS": "1",
+      "OMP_NUM_THREADS": "1",
+      "OPENBLAS_NUM_THREADS": "1",
+      "VECLIB_MAXIMUM_THREADS": "1"
+    },
+    "threadpools": [
+      {
+        "architecture": "Haswell",
+        "filepath": "/home/threemonth03/Downloads/Conjugate-Gradient-Method-library/.venv-cuda/lib/python3.12/site-packages/numpy.libs/libscipy_openblas64_-56d6093b.so",
+        "internal_api": "openblas",
+        "num_threads": 1,
+        "prefix": "libscipy_openblas",
+        "threading_layer": "pthreads",
+        "user_api": "blas",
+        "version": "0.3.29"
+      },
+      {
+        "filepath": "/home/threemonth03/Downloads/Conjugate-Gradient-Method-library/.venv-cuda/lib/python3.12/site-packages/torch/lib/libgomp.so.1",
+        "internal_api": "openmp",
+        "num_threads": 1,
+        "prefix": "libgomp",
+        "user_api": "openmp",
+        "version": null
+      }
+    ],
+    "torch": {
+      "config": "PyTorch built with:\n  - GCC 13.3\n  - C++ Version: 201703\n  - Intel(R) oneAPI Math Kernel Library Version 2024.2-Product Build 20240605 for Intel(R) 64 architecture applications\n  - Intel(R) MKL-DNN v3.7.1 (Git Hash 8d263e693366ef8db40acc569cc7d8edf644556d)\n  - OpenMP 201511 (a.k.a. OpenMP 4.5)\n  - LAPACK is enabled (usually provided by MKL)\n  - NNPACK is enabled\n  - CPU capability usage: AVX2\n  - CUDA Runtime 12.8\n  - NVCC architecture flags: -gencode;arch=compute_70,code=sm_70;-gencode;arch=compute_75,code=sm_75;-gencode;arch=compute_80,code=sm_80;-gencode;arch=compute_86,code=sm_86;-gencode;arch=compute_90,code=sm_90;-gencode;arch=compute_100,code=sm_100;-gencode;arch=compute_120,code=sm_120\n  - CuDNN 91.0.2  (built against CUDA 12.9)\n    - Built with CuDNN 90.8\n  - Magma 2.6.1\n  - Build settings: BLAS_INFO=mkl, BUILD_TYPE=Release, COMMIT_SHA=a1cb3cc05d46d198467bebbb6e8fba50a325d4e7, CUDA_VERSION=12.8, CUDNN_VERSION=9.8.0, CXX_COMPILER=/opt/rh/gcc-toolset-13/root/usr/bin/c++, CXX_FLAGS= -fvisibility-inlines-hidden -DUSE_PTHREADPOOL -DNDEBUG -DUSE_KINETO -DLIBKINETO_NOROCTRACER -DLIBKINETO_NOXPUPTI=ON -DUSE_FBGEMM -DUSE_PYTORCH_QNNPACK -DUSE_XNNPACK -DSYMBOLICATE_MOBILE_DEBUG_HANDLE -O2 -fPIC -DC10_NODEPRECATED -Wall -Wextra -Werror=return-type -Werror=non-virtual-dtor -Werror=range-loop-construct -Werror=bool-operation -Wnarrowing -Wno-missing-field-initializers -Wno-unknown-pragmas -Wno-unused-parameter -Wno-strict-overflow -Wno-strict-aliasing -Wno-stringop-overflow -Wsuggest-override -Wno-psabi -Wno-error=old-style-cast -faligned-new -Wno-maybe-uninitialized -fno-math-errno -fno-trapping-math -Werror=format -Wno-dangling-reference -Wno-error=dangling-reference -Wno-stringop-overflow, LAPACK_INFO=mkl, PERF_WITH_AVX=1, PERF_WITH_AVX2=1, TORCH_VERSION=2.8.0, USE_CUDA=ON, USE_CUDNN=ON, USE_CUSPARSELT=1, USE_GFLAGS=OFF, USE_GLOG=OFF, USE_GLOO=ON, USE_MKL=ON, USE_MKLDNN=ON, USE_MPI=OFF, USE_NCCL=1, USE_NNPACK=ON, USE_OPENMP=ON, USE_ROCM=OFF, USE_ROCM_KERNEL_ASSERT=OFF, USE_XCCL=OFF, USE_XPU=OFF, \n",
+      "interop_threads": 1,
+      "intraop_threads": 1
+    }
+  },
+  "metric": "time_to_solution",
+  "schema_version": 1,
+  "spec": {
+    "cases": [
+      {
+        "condition_scale": 100.0,
+        "name": "dense-16",
+        "size": 16
+      }
+    ],
+    "comparison": "implementations",
+    "cuda_device": 0,
+    "device": "cuda",
+    "implementations": [
+      "cuda-native",
+      "cuda-cublas",
+      "torch-cuda-eager"
+    ],
+    "sampling": {
+      "repetitions": 1,
+      "rounds": 6,
+      "warmups": 0
+    },
+    "scope": "prepared",
+    "seed": 20261015,
+    "solver": {
+      "algorithm": "standard",
+      "atol": 1e-12,
+      "fused": true,
+      "maxiter": 2000,
+      "preconditioner": "none",
+      "residual_refresh": 50,
+      "rtol": 1e-08
+    },
+    "suite": "smoke-cuda-dense",
+    "threads": 1
+  }
+}

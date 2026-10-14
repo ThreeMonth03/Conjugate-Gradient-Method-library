@@ -1,0 +1,1786 @@
+{
+  "cases": [
+    {
+      "case": {
+        "condition_scale": 100.0,
+        "name": "dense-64",
+        "size": 64
+      },
+      "cycle_rows": 6,
+      "dtype": "float64",
+      "input_sha256": "e8985fd6c5ed371b92931d8ff1bbddf1a718eeeebd399f5ca2a62a45255e4cb6",
+      "input_storage_basis": "shared input NumPy/SciPy arrays, including original index dtype; excludes native owning copies and workspace",
+      "input_stored_bytes": 33792,
+      "layout": "C",
+      "nnz": null,
+      "results": [
+        {
+          "iterations": 5,
+          "matvecs": 7,
+          "name": "cuda-native",
+          "reason": null,
+          "reported_residual_norm": 1.14101869729518e-07,
+          "residual_threshold": 2.7375571192211847e-06,
+          "round_elapsed_ns": [
+            2892866,
+            3233863,
+            4397565,
+            3433449,
+            4987394,
+            3701722,
+            3948076,
+            4382312,
+            3452351,
+            3074848,
+            3063399,
+            3232545,
+            3120226,
+            4314361,
+            3212814,
+            3508301,
+            3091063,
+            3464596,
+            3996798,
+            2933899,
+            2999241,
+            2933902,
+            3134241,
+            3252503,
+            3148027,
+            2954378,
+            2971880,
+            3640230,
+            2952500,
+            5724061
+          ],
+          "setup": {
+            "api_setup_scope": "output/workspace allocations and per-call Jacobi; matrix upload/snapshot excluded",
+            "control_scope": "synchronous native solve; host dispatch and scalar checks included",
+            "cuda_device": 0,
+            "dense_kernel": "native",
+            "device": "cuda",
+            "fused": true,
+            "host_upload_setup_elapsed_ns": 2631687,
+            "implementation_role": "native",
+            "preconditioner": "jacobi",
+            "preconditioner_setup_elapsed_ns": 347826,
+            "preconditioner_stored_bytes": 512,
+            "reset_scope": "device x0 copy included in every invocation",
+            "resident_adapter_setup_elapsed_ns": 12480551,
+            "residual_policy": "standard with residual_refresh=50",
+            "setup_in_timed_call": false,
+            "setup_measurement": "single untimed completed GPU setup probe",
+            "setup_probe_scope": "operator snapshot and Jacobi probe; reusable output/workspace only for prepared scope",
+            "stream": 0,
+            "timing": "wall completion; stream fence before block and after last invocation",
+            "transfer_scope": "input uploads and correctness output downloads excluded"
+          },
+          "solver_status": "converged",
+          "status": "measured",
+          "true_residual_norm": 1.1410185871025843e-07
+        },
+        {
+          "iterations": 5,
+          "matvecs": 7,
+          "name": "cuda-cublas",
+          "reason": null,
+          "reported_residual_norm": 1.1410184938978006e-07,
+          "residual_threshold": 2.7375571192211847e-06,
+          "round_elapsed_ns": [
+            3991451,
+            4812688,
+            3295764,
+            3164978,
+            3149623,
+            3243102,
+            3351065,
+            4232616,
+            5972506,
+            3177698,
+            3556993,
+            3942521,
+            3155796,
+            4522822,
+            4568132,
+            3170807,
+            4649141,
+            3092364,
+            2983781,
+            2966380,
+            3345054,
+            3379101,
+            3115970,
+            3086491,
+            3074715,
+            3493127,
+            3085530,
+            4361663,
+            3013445,
+            4331822
+          ],
+          "setup": {
+            "api_setup_scope": "output/workspace allocations and per-call Jacobi; matrix upload/snapshot excluded",
+            "control_scope": "synchronous native solve; host dispatch and scalar checks included",
+            "cuda_device": 0,
+            "dense_kernel": "cublas",
+            "device": "cuda",
+            "fused": true,
+            "host_upload_setup_elapsed_ns": 506185,
+            "implementation_role": "native",
+            "preconditioner": "jacobi",
+            "preconditioner_setup_elapsed_ns": 753213,
+            "preconditioner_stored_bytes": 512,
+            "reset_scope": "device x0 copy included in every invocation",
+            "resident_adapter_setup_elapsed_ns": 2634928,
+            "residual_policy": "standard with residual_refresh=50",
+            "setup_in_timed_call": false,
+            "setup_measurement": "single untimed completed GPU setup probe",
+            "setup_probe_scope": "operator snapshot and Jacobi probe; reusable output/workspace only for prepared scope",
+            "stream": 0,
+            "timing": "wall completion; stream fence before block and after last invocation",
+            "transfer_scope": "input uploads and correctness output downloads excluded"
+          },
+          "solver_status": "converged",
+          "status": "measured",
+          "true_residual_norm": 1.141018508264821e-07
+        },
+        {
+          "iterations": 5,
+          "matvecs": 7,
+          "name": "torch-cuda-eager",
+          "reason": null,
+          "reported_residual_norm": 1.1410184938978006e-07,
+          "residual_threshold": 2.7375571192211847e-06,
+          "round_elapsed_ns": [
+            6508542,
+            5354896,
+            5851866,
+            6026080,
+            7986143,
+            5797945,
+            6981811,
+            7514145,
+            9557710,
+            6051840,
+            5788294,
+            8828652,
+            5743317,
+            9164631,
+            6968701,
+            6924279,
+            6860709,
+            5552007,
+            6836939,
+            5866948,
+            6835632,
+            7460800,
+            7410307,
+            5697727,
+            6803045,
+            7599425,
+            6768744,
+            5758973,
+            5863475,
+            6784360
+          ],
+          "setup": {
+            "api_setup_scope": "output/workspace tensor allocations and per-call Jacobi; matrix upload excluded",
+            "control_scope": "CPU eager CG control and GPU scalar synchronizations included; numerical-range fallback may download residual",
+            "cuda_device": 0,
+            "device": "cuda",
+            "host_upload_setup_elapsed_ns": 783843,
+            "implementation_role": "same_policy_reference",
+            "precision": "float64; TF32 disabled; no mixed precision",
+            "preconditioner": "jacobi",
+            "preconditioner_setup_elapsed_ns": 53557690,
+            "preconditioner_stored_bytes": 512,
+            "reset_scope": "device x0 copy included in every invocation",
+            "resident_adapter_setup_elapsed_ns": 53765157,
+            "residual_policy": "standard with residual_refresh=50",
+            "setup_in_timed_call": false,
+            "setup_measurement": "single untimed setup probe",
+            "setup_probe_scope": "prepared snapshot/workspace when selected; Jacobi setup separately recorded",
+            "solver_family": "pcg",
+            "stream": 0,
+            "timing": "wall completion; device fence before block and after last invocation",
+            "transfer_scope": "input uploads and correctness output downloads excluded",
+            "workspace_policy": "preallocated prepared tensors; API uses PyTorch caching allocator"
+          },
+          "solver_status": "converged",
+          "status": "measured",
+          "true_residual_norm": 1.141018508264821e-07
+        }
+      ],
+      "round_orders": [
+        [
+          "cuda-native",
+          "cuda-cublas",
+          "torch-cuda-eager"
+        ],
+        [
+          "torch-cuda-eager",
+          "cuda-native",
+          "cuda-cublas"
+        ],
+        [
+          "cuda-cublas",
+          "torch-cuda-eager",
+          "cuda-native"
+        ],
+        [
+          "cuda-native",
+          "torch-cuda-eager",
+          "cuda-cublas"
+        ],
+        [
+          "cuda-cublas",
+          "cuda-native",
+          "torch-cuda-eager"
+        ],
+        [
+          "torch-cuda-eager",
+          "cuda-cublas",
+          "cuda-native"
+        ],
+        [
+          "cuda-native",
+          "cuda-cublas",
+          "torch-cuda-eager"
+        ],
+        [
+          "torch-cuda-eager",
+          "cuda-native",
+          "cuda-cublas"
+        ],
+        [
+          "cuda-cublas",
+          "torch-cuda-eager",
+          "cuda-native"
+        ],
+        [
+          "cuda-native",
+          "torch-cuda-eager",
+          "cuda-cublas"
+        ],
+        [
+          "cuda-cublas",
+          "cuda-native",
+          "torch-cuda-eager"
+        ],
+        [
+          "torch-cuda-eager",
+          "cuda-cublas",
+          "cuda-native"
+        ],
+        [
+          "cuda-native",
+          "cuda-cublas",
+          "torch-cuda-eager"
+        ],
+        [
+          "torch-cuda-eager",
+          "cuda-native",
+          "cuda-cublas"
+        ],
+        [
+          "cuda-cublas",
+          "torch-cuda-eager",
+          "cuda-native"
+        ],
+        [
+          "cuda-native",
+          "torch-cuda-eager",
+          "cuda-cublas"
+        ],
+        [
+          "cuda-cublas",
+          "cuda-native",
+          "torch-cuda-eager"
+        ],
+        [
+          "torch-cuda-eager",
+          "cuda-cublas",
+          "cuda-native"
+        ],
+        [
+          "cuda-native",
+          "cuda-cublas",
+          "torch-cuda-eager"
+        ],
+        [
+          "torch-cuda-eager",
+          "cuda-native",
+          "cuda-cublas"
+        ],
+        [
+          "cuda-cublas",
+          "torch-cuda-eager",
+          "cuda-native"
+        ],
+        [
+          "cuda-native",
+          "torch-cuda-eager",
+          "cuda-cublas"
+        ],
+        [
+          "cuda-cublas",
+          "cuda-native",
+          "torch-cuda-eager"
+        ],
+        [
+          "torch-cuda-eager",
+          "cuda-cublas",
+          "cuda-native"
+        ],
+        [
+          "cuda-native",
+          "cuda-cublas",
+          "torch-cuda-eager"
+        ],
+        [
+          "torch-cuda-eager",
+          "cuda-native",
+          "cuda-cublas"
+        ],
+        [
+          "cuda-cublas",
+          "torch-cuda-eager",
+          "cuda-native"
+        ],
+        [
+          "cuda-native",
+          "torch-cuda-eager",
+          "cuda-cublas"
+        ],
+        [
+          "cuda-cublas",
+          "cuda-native",
+          "torch-cuda-eager"
+        ],
+        [
+          "torch-cuda-eager",
+          "cuda-cublas",
+          "cuda-native"
+        ]
+      ],
+      "sampling": {
+        "repetitions": 3,
+        "rounds": 30,
+        "warmups": 3
+      },
+      "schedule": "williams"
+    },
+    {
+      "case": {
+        "condition_scale": 100.0,
+        "name": "dense-256",
+        "size": 256
+      },
+      "cycle_rows": 6,
+      "dtype": "float64",
+      "input_sha256": "96f633f1697698d7e55c0e06b38ab801460f1ba1aa3909deaae939aa1d2e6274",
+      "input_storage_basis": "shared input NumPy/SciPy arrays, including original index dtype; excludes native owning copies and workspace",
+      "input_stored_bytes": 528384,
+      "layout": "C",
+      "nnz": null,
+      "results": [
+        {
+          "iterations": 4,
+          "matvecs": 6,
+          "name": "cuda-native",
+          "reason": null,
+          "reported_residual_norm": 1.0989680077221732e-06,
+          "residual_threshold": 6.342305622058719e-06,
+          "round_elapsed_ns": [
+            2887173,
+            2694749,
+            3960951,
+            2675995,
+            2578087,
+            2582931,
+            2651199,
+            2703811,
+            2586170,
+            2683084,
+            2657102,
+            3154077,
+            4130366,
+            3003803,
+            2696321,
+            3657979,
+            2627594,
+            2660484,
+            3726348,
+            2688835,
+            2816273,
+            3939235,
+            2880534,
+            2653274,
+            2667328,
+            2765064,
+            2546194,
+            2733328,
+            2775628,
+            2760842
+          ],
+          "setup": {
+            "api_setup_scope": "output/workspace allocations and per-call Jacobi; matrix upload/snapshot excluded",
+            "control_scope": "synchronous native solve; host dispatch and scalar checks included",
+            "cuda_device": 0,
+            "dense_kernel": "native",
+            "device": "cuda",
+            "fused": true,
+            "host_upload_setup_elapsed_ns": 250221,
+            "implementation_role": "native",
+            "preconditioner": "jacobi",
+            "preconditioner_setup_elapsed_ns": 58162,
+            "preconditioner_stored_bytes": 2048,
+            "reset_scope": "device x0 copy included in every invocation",
+            "resident_adapter_setup_elapsed_ns": 1715593,
+            "residual_policy": "standard with residual_refresh=50",
+            "setup_in_timed_call": false,
+            "setup_measurement": "single untimed completed GPU setup probe",
+            "setup_probe_scope": "operator snapshot and Jacobi probe; reusable output/workspace only for prepared scope",
+            "stream": 0,
+            "timing": "wall completion; stream fence before block and after last invocation",
+            "transfer_scope": "input uploads and correctness output downloads excluded"
+          },
+          "solver_status": "converged",
+          "status": "measured",
+          "true_residual_norm": 1.0989680087372873e-06
+        },
+        {
+          "iterations": 4,
+          "matvecs": 6,
+          "name": "cuda-cublas",
+          "reason": null,
+          "reported_residual_norm": 1.098968019574512e-06,
+          "residual_threshold": 6.342305622058719e-06,
+          "round_elapsed_ns": [
+            2981189,
+            2728361,
+            2491548,
+            2528209,
+            2924109,
+            2586953,
+            3819982,
+            2592244,
+            2435516,
+            4570045,
+            2627507,
+            2828897,
+            2822100,
+            2868548,
+            2755722,
+            2585361,
+            2509663,
+            2575146,
+            3059072,
+            3503878,
+            4865606,
+            2617963,
+            2861381,
+            2592535,
+            2541384,
+            2502938,
+            2505502,
+            2557792,
+            2580887,
+            2721898
+          ],
+          "setup": {
+            "api_setup_scope": "output/workspace allocations and per-call Jacobi; matrix upload/snapshot excluded",
+            "control_scope": "synchronous native solve; host dispatch and scalar checks included",
+            "cuda_device": 0,
+            "dense_kernel": "cublas",
+            "device": "cuda",
+            "fused": true,
+            "host_upload_setup_elapsed_ns": 199508,
+            "implementation_role": "native",
+            "preconditioner": "jacobi",
+            "preconditioner_setup_elapsed_ns": 59914,
+            "preconditioner_stored_bytes": 2048,
+            "reset_scope": "device x0 copy included in every invocation",
+            "resident_adapter_setup_elapsed_ns": 2048606,
+            "residual_policy": "standard with residual_refresh=50",
+            "setup_in_timed_call": false,
+            "setup_measurement": "single untimed completed GPU setup probe",
+            "setup_probe_scope": "operator snapshot and Jacobi probe; reusable output/workspace only for prepared scope",
+            "stream": 0,
+            "timing": "wall completion; stream fence before block and after last invocation",
+            "transfer_scope": "input uploads and correctness output downloads excluded"
+          },
+          "solver_status": "converged",
+          "status": "measured",
+          "true_residual_norm": 1.0989680183296648e-06
+        },
+        {
+          "iterations": 4,
+          "matvecs": 6,
+          "name": "torch-cuda-eager",
+          "reason": null,
+          "reported_residual_norm": 1.0989680221403513e-06,
+          "residual_threshold": 6.342305622058719e-06,
+          "round_elapsed_ns": [
+            5210340,
+            5957091,
+            4530554,
+            4334932,
+            6659118,
+            5348256,
+            4447034,
+            4159993,
+            4358421,
+            4700724,
+            4754988,
+            4995083,
+            6830751,
+            6805828,
+            6821229,
+            4971020,
+            5130728,
+            5754773,
+            4752058,
+            4786966,
+            4668943,
+            4882243,
+            4612998,
+            4598561,
+            6091921,
+            4578803,
+            4492382,
+            5604308,
+            6851395,
+            4247437
+          ],
+          "setup": {
+            "api_setup_scope": "output/workspace tensor allocations and per-call Jacobi; matrix upload excluded",
+            "control_scope": "CPU eager CG control and GPU scalar synchronizations included; numerical-range fallback may download residual",
+            "cuda_device": 0,
+            "device": "cuda",
+            "host_upload_setup_elapsed_ns": 265005,
+            "implementation_role": "same_policy_reference",
+            "precision": "float64; TF32 disabled; no mixed precision",
+            "preconditioner": "jacobi",
+            "preconditioner_setup_elapsed_ns": 352815,
+            "preconditioner_stored_bytes": 2048,
+            "reset_scope": "device x0 copy included in every invocation",
+            "resident_adapter_setup_elapsed_ns": 405947,
+            "residual_policy": "standard with residual_refresh=50",
+            "setup_in_timed_call": false,
+            "setup_measurement": "single untimed setup probe",
+            "setup_probe_scope": "prepared snapshot/workspace when selected; Jacobi setup separately recorded",
+            "solver_family": "pcg",
+            "stream": 0,
+            "timing": "wall completion; device fence before block and after last invocation",
+            "transfer_scope": "input uploads and correctness output downloads excluded",
+            "workspace_policy": "preallocated prepared tensors; API uses PyTorch caching allocator"
+          },
+          "solver_status": "converged",
+          "status": "measured",
+          "true_residual_norm": 1.098968015452014e-06
+        }
+      ],
+      "round_orders": [
+        [
+          "cuda-native",
+          "cuda-cublas",
+          "torch-cuda-eager"
+        ],
+        [
+          "torch-cuda-eager",
+          "cuda-native",
+          "cuda-cublas"
+        ],
+        [
+          "cuda-cublas",
+          "torch-cuda-eager",
+          "cuda-native"
+        ],
+        [
+          "cuda-native",
+          "torch-cuda-eager",
+          "cuda-cublas"
+        ],
+        [
+          "cuda-cublas",
+          "cuda-native",
+          "torch-cuda-eager"
+        ],
+        [
+          "torch-cuda-eager",
+          "cuda-cublas",
+          "cuda-native"
+        ],
+        [
+          "cuda-native",
+          "cuda-cublas",
+          "torch-cuda-eager"
+        ],
+        [
+          "torch-cuda-eager",
+          "cuda-native",
+          "cuda-cublas"
+        ],
+        [
+          "cuda-cublas",
+          "torch-cuda-eager",
+          "cuda-native"
+        ],
+        [
+          "cuda-native",
+          "torch-cuda-eager",
+          "cuda-cublas"
+        ],
+        [
+          "cuda-cublas",
+          "cuda-native",
+          "torch-cuda-eager"
+        ],
+        [
+          "torch-cuda-eager",
+          "cuda-cublas",
+          "cuda-native"
+        ],
+        [
+          "cuda-native",
+          "cuda-cublas",
+          "torch-cuda-eager"
+        ],
+        [
+          "torch-cuda-eager",
+          "cuda-native",
+          "cuda-cublas"
+        ],
+        [
+          "cuda-cublas",
+          "torch-cuda-eager",
+          "cuda-native"
+        ],
+        [
+          "cuda-native",
+          "torch-cuda-eager",
+          "cuda-cublas"
+        ],
+        [
+          "cuda-cublas",
+          "cuda-native",
+          "torch-cuda-eager"
+        ],
+        [
+          "torch-cuda-eager",
+          "cuda-cublas",
+          "cuda-native"
+        ],
+        [
+          "cuda-native",
+          "cuda-cublas",
+          "torch-cuda-eager"
+        ],
+        [
+          "torch-cuda-eager",
+          "cuda-native",
+          "cuda-cublas"
+        ],
+        [
+          "cuda-cublas",
+          "torch-cuda-eager",
+          "cuda-native"
+        ],
+        [
+          "cuda-native",
+          "torch-cuda-eager",
+          "cuda-cublas"
+        ],
+        [
+          "cuda-cublas",
+          "cuda-native",
+          "torch-cuda-eager"
+        ],
+        [
+          "torch-cuda-eager",
+          "cuda-cublas",
+          "cuda-native"
+        ],
+        [
+          "cuda-native",
+          "cuda-cublas",
+          "torch-cuda-eager"
+        ],
+        [
+          "torch-cuda-eager",
+          "cuda-native",
+          "cuda-cublas"
+        ],
+        [
+          "cuda-cublas",
+          "torch-cuda-eager",
+          "cuda-native"
+        ],
+        [
+          "cuda-native",
+          "torch-cuda-eager",
+          "cuda-cublas"
+        ],
+        [
+          "cuda-cublas",
+          "cuda-native",
+          "torch-cuda-eager"
+        ],
+        [
+          "torch-cuda-eager",
+          "cuda-cublas",
+          "cuda-native"
+        ]
+      ],
+      "sampling": {
+        "repetitions": 3,
+        "rounds": 30,
+        "warmups": 3
+      },
+      "schedule": "williams"
+    },
+    {
+      "case": {
+        "condition_scale": 100.0,
+        "name": "dense-1024",
+        "size": 1024
+      },
+      "cycle_rows": 6,
+      "dtype": "float64",
+      "input_sha256": "58a504a95c04274e80597b08bb8363241cf0c16ddbb5060b0ec3758065181329",
+      "input_storage_basis": "shared input NumPy/SciPy arrays, including original index dtype; excludes native owning copies and workspace",
+      "input_stored_bytes": 8404992,
+      "layout": "C",
+      "nnz": null,
+      "results": [
+        {
+          "iterations": 4,
+          "matvecs": 6,
+          "name": "cuda-native",
+          "reason": null,
+          "reported_residual_norm": 1.7222848656078757e-07,
+          "residual_threshold": 1.0790676564437561e-05,
+          "round_elapsed_ns": [
+            3501929,
+            3546142,
+            3688735,
+            4926315,
+            4879494,
+            4250350,
+            3683182,
+            3561478,
+            3759578,
+            5141190,
+            5061649,
+            4887111,
+            3807667,
+            3513944,
+            3571241,
+            3493750,
+            5102942,
+            5457020,
+            3697105,
+            4081500,
+            3563413,
+            3936974,
+            3847393,
+            3689857,
+            4183447,
+            3572564,
+            3702414,
+            3601946,
+            3621527,
+            3883820
+          ],
+          "setup": {
+            "api_setup_scope": "output/workspace allocations and per-call Jacobi; matrix upload/snapshot excluded",
+            "control_scope": "synchronous native solve; host dispatch and scalar checks included",
+            "cuda_device": 0,
+            "dense_kernel": "native",
+            "device": "cuda",
+            "fused": true,
+            "host_upload_setup_elapsed_ns": 2001205,
+            "implementation_role": "native",
+            "preconditioner": "jacobi",
+            "preconditioner_setup_elapsed_ns": 56283,
+            "preconditioner_stored_bytes": 8192,
+            "reset_scope": "device x0 copy included in every invocation",
+            "resident_adapter_setup_elapsed_ns": 2302308,
+            "residual_policy": "standard with residual_refresh=50",
+            "setup_in_timed_call": false,
+            "setup_measurement": "single untimed completed GPU setup probe",
+            "setup_probe_scope": "operator snapshot and Jacobi probe; reusable output/workspace only for prepared scope",
+            "stream": 0,
+            "timing": "wall completion; stream fence before block and after last invocation",
+            "transfer_scope": "input uploads and correctness output downloads excluded"
+          },
+          "solver_status": "converged",
+          "status": "measured",
+          "true_residual_norm": 1.722284860870345e-07
+        },
+        {
+          "iterations": 4,
+          "matvecs": 6,
+          "name": "cuda-cublas",
+          "reason": null,
+          "reported_residual_norm": 1.7222846667473426e-07,
+          "residual_threshold": 1.0790676564437561e-05,
+          "round_elapsed_ns": [
+            3800298,
+            4853582,
+            3303653,
+            3258731,
+            3228114,
+            3530669,
+            4578352,
+            3224272,
+            4457893,
+            3073313,
+            3242489,
+            3224784,
+            3070159,
+            3199407,
+            3282735,
+            3619880,
+            3666827,
+            3594775,
+            3577342,
+            5347513,
+            3243788,
+            3166214,
+            3126639,
+            3306217,
+            3399362,
+            4772501,
+            3293905,
+            3275441,
+            4574433,
+            3358646
+          ],
+          "setup": {
+            "api_setup_scope": "output/workspace allocations and per-call Jacobi; matrix upload/snapshot excluded",
+            "control_scope": "synchronous native solve; host dispatch and scalar checks included",
+            "cuda_device": 0,
+            "dense_kernel": "cublas",
+            "device": "cuda",
+            "fused": true,
+            "host_upload_setup_elapsed_ns": 1448370,
+            "implementation_role": "native",
+            "preconditioner": "jacobi",
+            "preconditioner_setup_elapsed_ns": 63592,
+            "preconditioner_stored_bytes": 8192,
+            "reset_scope": "device x0 copy included in every invocation",
+            "resident_adapter_setup_elapsed_ns": 2063364,
+            "residual_policy": "standard with residual_refresh=50",
+            "setup_in_timed_call": false,
+            "setup_measurement": "single untimed completed GPU setup probe",
+            "setup_probe_scope": "operator snapshot and Jacobi probe; reusable output/workspace only for prepared scope",
+            "stream": 0,
+            "timing": "wall completion; stream fence before block and after last invocation",
+            "transfer_scope": "input uploads and correctness output downloads excluded"
+          },
+          "solver_status": "converged",
+          "status": "measured",
+          "true_residual_norm": 1.7222847603088595e-07
+        },
+        {
+          "iterations": 4,
+          "matvecs": 6,
+          "name": "torch-cuda-eager",
+          "reason": null,
+          "reported_residual_norm": 1.722284666542286e-07,
+          "residual_threshold": 1.0790676564437561e-05,
+          "round_elapsed_ns": [
+            6622197,
+            4471164,
+            4690843,
+            4690161,
+            4814499,
+            4491919,
+            9505329,
+            5936117,
+            4640543,
+            4691404,
+            4915060,
+            5500367,
+            6122275,
+            4525952,
+            5337546,
+            4624262,
+            4838130,
+            5533750,
+            6785881,
+            4758611,
+            6351459,
+            6065645,
+            5892482,
+            6596284,
+            7010698,
+            4851157,
+            7636752,
+            7732627,
+            6330368,
+            4659810
+          ],
+          "setup": {
+            "api_setup_scope": "output/workspace tensor allocations and per-call Jacobi; matrix upload excluded",
+            "control_scope": "CPU eager CG control and GPU scalar synchronizations included; numerical-range fallback may download residual",
+            "cuda_device": 0,
+            "device": "cuda",
+            "host_upload_setup_elapsed_ns": 2245832,
+            "implementation_role": "same_policy_reference",
+            "precision": "float64; TF32 disabled; no mixed precision",
+            "preconditioner": "jacobi",
+            "preconditioner_setup_elapsed_ns": 367077,
+            "preconditioner_stored_bytes": 8192,
+            "reset_scope": "device x0 copy included in every invocation",
+            "resident_adapter_setup_elapsed_ns": 430422,
+            "residual_policy": "standard with residual_refresh=50",
+            "setup_in_timed_call": false,
+            "setup_measurement": "single untimed setup probe",
+            "setup_probe_scope": "prepared snapshot/workspace when selected; Jacobi setup separately recorded",
+            "solver_family": "pcg",
+            "stream": 0,
+            "timing": "wall completion; device fence before block and after last invocation",
+            "transfer_scope": "input uploads and correctness output downloads excluded",
+            "workspace_policy": "preallocated prepared tensors; API uses PyTorch caching allocator"
+          },
+          "solver_status": "converged",
+          "status": "measured",
+          "true_residual_norm": 1.7222847601613132e-07
+        }
+      ],
+      "round_orders": [
+        [
+          "cuda-native",
+          "cuda-cublas",
+          "torch-cuda-eager"
+        ],
+        [
+          "torch-cuda-eager",
+          "cuda-native",
+          "cuda-cublas"
+        ],
+        [
+          "cuda-cublas",
+          "torch-cuda-eager",
+          "cuda-native"
+        ],
+        [
+          "cuda-native",
+          "torch-cuda-eager",
+          "cuda-cublas"
+        ],
+        [
+          "cuda-cublas",
+          "cuda-native",
+          "torch-cuda-eager"
+        ],
+        [
+          "torch-cuda-eager",
+          "cuda-cublas",
+          "cuda-native"
+        ],
+        [
+          "cuda-native",
+          "cuda-cublas",
+          "torch-cuda-eager"
+        ],
+        [
+          "torch-cuda-eager",
+          "cuda-native",
+          "cuda-cublas"
+        ],
+        [
+          "cuda-cublas",
+          "torch-cuda-eager",
+          "cuda-native"
+        ],
+        [
+          "cuda-native",
+          "torch-cuda-eager",
+          "cuda-cublas"
+        ],
+        [
+          "cuda-cublas",
+          "cuda-native",
+          "torch-cuda-eager"
+        ],
+        [
+          "torch-cuda-eager",
+          "cuda-cublas",
+          "cuda-native"
+        ],
+        [
+          "cuda-native",
+          "cuda-cublas",
+          "torch-cuda-eager"
+        ],
+        [
+          "torch-cuda-eager",
+          "cuda-native",
+          "cuda-cublas"
+        ],
+        [
+          "cuda-cublas",
+          "torch-cuda-eager",
+          "cuda-native"
+        ],
+        [
+          "cuda-native",
+          "torch-cuda-eager",
+          "cuda-cublas"
+        ],
+        [
+          "cuda-cublas",
+          "cuda-native",
+          "torch-cuda-eager"
+        ],
+        [
+          "torch-cuda-eager",
+          "cuda-cublas",
+          "cuda-native"
+        ],
+        [
+          "cuda-native",
+          "cuda-cublas",
+          "torch-cuda-eager"
+        ],
+        [
+          "torch-cuda-eager",
+          "cuda-native",
+          "cuda-cublas"
+        ],
+        [
+          "cuda-cublas",
+          "torch-cuda-eager",
+          "cuda-native"
+        ],
+        [
+          "cuda-native",
+          "torch-cuda-eager",
+          "cuda-cublas"
+        ],
+        [
+          "cuda-cublas",
+          "cuda-native",
+          "torch-cuda-eager"
+        ],
+        [
+          "torch-cuda-eager",
+          "cuda-cublas",
+          "cuda-native"
+        ],
+        [
+          "cuda-native",
+          "cuda-cublas",
+          "torch-cuda-eager"
+        ],
+        [
+          "torch-cuda-eager",
+          "cuda-native",
+          "cuda-cublas"
+        ],
+        [
+          "cuda-cublas",
+          "torch-cuda-eager",
+          "cuda-native"
+        ],
+        [
+          "cuda-native",
+          "torch-cuda-eager",
+          "cuda-cublas"
+        ],
+        [
+          "cuda-cublas",
+          "cuda-native",
+          "torch-cuda-eager"
+        ],
+        [
+          "torch-cuda-eager",
+          "cuda-cublas",
+          "cuda-native"
+        ]
+      ],
+      "sampling": {
+        "repetitions": 3,
+        "rounds": 30,
+        "warmups": 3
+      },
+      "schedule": "williams"
+    },
+    {
+      "case": {
+        "condition_scale": 100.0,
+        "name": "dense-2048",
+        "size": 2048
+      },
+      "cycle_rows": 6,
+      "dtype": "float64",
+      "input_sha256": "074f888f022f56e8ef847862a4554a716ce5571c6da3859a06568e2657f22bc9",
+      "input_storage_basis": "shared input NumPy/SciPy arrays, including original index dtype; excludes native owning copies and workspace",
+      "input_stored_bytes": 33587200,
+      "layout": "C",
+      "nnz": null,
+      "results": [
+        {
+          "iterations": 3,
+          "matvecs": 5,
+          "name": "cuda-native",
+          "reason": null,
+          "reported_residual_norm": 1.2450090463991078e-05,
+          "residual_threshold": 1.4741032408216817e-05,
+          "round_elapsed_ns": [
+            4536735,
+            5985777,
+            6226270,
+            4655431,
+            4787633,
+            5716398,
+            4603323,
+            4933407,
+            4669229,
+            4956702,
+            4309018,
+            5366531,
+            4001679,
+            5314262,
+            4209918,
+            5004755,
+            3994469,
+            4017977,
+            5074733,
+            4379373,
+            4123017,
+            4051901,
+            4964533,
+            3973610,
+            3981823,
+            4054766,
+            4008720,
+            4981588,
+            4006333,
+            5030915
+          ],
+          "setup": {
+            "api_setup_scope": "output/workspace allocations and per-call Jacobi; matrix upload/snapshot excluded",
+            "control_scope": "synchronous native solve; host dispatch and scalar checks included",
+            "cuda_device": 0,
+            "dense_kernel": "native",
+            "device": "cuda",
+            "fused": true,
+            "host_upload_setup_elapsed_ns": 5124545,
+            "implementation_role": "native",
+            "preconditioner": "jacobi",
+            "preconditioner_setup_elapsed_ns": 73063,
+            "preconditioner_stored_bytes": 16384,
+            "reset_scope": "device x0 copy included in every invocation",
+            "resident_adapter_setup_elapsed_ns": 3390604,
+            "residual_policy": "standard with residual_refresh=50",
+            "setup_in_timed_call": false,
+            "setup_measurement": "single untimed completed GPU setup probe",
+            "setup_probe_scope": "operator snapshot and Jacobi probe; reusable output/workspace only for prepared scope",
+            "stream": 0,
+            "timing": "wall completion; stream fence before block and after last invocation",
+            "transfer_scope": "input uploads and correctness output downloads excluded"
+          },
+          "solver_status": "converged",
+          "status": "measured",
+          "true_residual_norm": 1.2450090457520805e-05
+        },
+        {
+          "iterations": 3,
+          "matvecs": 5,
+          "name": "cuda-cublas",
+          "reason": null,
+          "reported_residual_norm": 1.2450090474530855e-05,
+          "residual_threshold": 1.4741032408216817e-05,
+          "round_elapsed_ns": [
+            8641335,
+            3951855,
+            4048119,
+            3989825,
+            5430936,
+            4158835,
+            3928613,
+            5547599,
+            4006868,
+            3649376,
+            4850350,
+            4239249,
+            3939611,
+            3690699,
+            3667710,
+            3841164,
+            3713007,
+            4869359,
+            6690728,
+            3906579,
+            3899470,
+            3807492,
+            3641434,
+            3586069,
+            3818782,
+            3642284,
+            3655243,
+            3655388,
+            3635989,
+            4181062
+          ],
+          "setup": {
+            "api_setup_scope": "output/workspace allocations and per-call Jacobi; matrix upload/snapshot excluded",
+            "control_scope": "synchronous native solve; host dispatch and scalar checks included",
+            "cuda_device": 0,
+            "dense_kernel": "cublas",
+            "device": "cuda",
+            "fused": true,
+            "host_upload_setup_elapsed_ns": 5347755,
+            "implementation_role": "native",
+            "preconditioner": "jacobi",
+            "preconditioner_setup_elapsed_ns": 102278,
+            "preconditioner_stored_bytes": 16384,
+            "reset_scope": "device x0 copy included in every invocation",
+            "resident_adapter_setup_elapsed_ns": 3336524,
+            "residual_policy": "standard with residual_refresh=50",
+            "setup_in_timed_call": false,
+            "setup_measurement": "single untimed completed GPU setup probe",
+            "setup_probe_scope": "operator snapshot and Jacobi probe; reusable output/workspace only for prepared scope",
+            "stream": 0,
+            "timing": "wall completion; stream fence before block and after last invocation",
+            "transfer_scope": "input uploads and correctness output downloads excluded"
+          },
+          "solver_status": "converged",
+          "status": "measured",
+          "true_residual_norm": 1.245009046171724e-05
+        },
+        {
+          "iterations": 3,
+          "matvecs": 5,
+          "name": "torch-cuda-eager",
+          "reason": null,
+          "reported_residual_norm": 1.2450090474615017e-05,
+          "residual_threshold": 1.4741032408216817e-05,
+          "round_elapsed_ns": [
+            5327872,
+            5386315,
+            6127102,
+            5451580,
+            5376854,
+            6972779,
+            5277093,
+            5313548,
+            5323842,
+            4867767,
+            5125107,
+            5405368,
+            5174756,
+            5020821,
+            5064859,
+            5095061,
+            4782059,
+            5269063,
+            5173454,
+            5266512,
+            6136909,
+            5046525,
+            4965935,
+            4724240,
+            5722890,
+            4759640,
+            5018005,
+            5158567,
+            4935600,
+            4990584
+          ],
+          "setup": {
+            "api_setup_scope": "output/workspace tensor allocations and per-call Jacobi; matrix upload excluded",
+            "control_scope": "CPU eager CG control and GPU scalar synchronizations included; numerical-range fallback may download residual",
+            "cuda_device": 0,
+            "device": "cuda",
+            "host_upload_setup_elapsed_ns": 6016844,
+            "implementation_role": "same_policy_reference",
+            "precision": "float64; TF32 disabled; no mixed precision",
+            "preconditioner": "jacobi",
+            "preconditioner_setup_elapsed_ns": 1860145,
+            "preconditioner_stored_bytes": 16384,
+            "reset_scope": "device x0 copy included in every invocation",
+            "resident_adapter_setup_elapsed_ns": 2255301,
+            "residual_policy": "standard with residual_refresh=50",
+            "setup_in_timed_call": false,
+            "setup_measurement": "single untimed setup probe",
+            "setup_probe_scope": "prepared snapshot/workspace when selected; Jacobi setup separately recorded",
+            "solver_family": "pcg",
+            "stream": 0,
+            "timing": "wall completion; device fence before block and after last invocation",
+            "transfer_scope": "input uploads and correctness output downloads excluded",
+            "workspace_policy": "preallocated prepared tensors; API uses PyTorch caching allocator"
+          },
+          "solver_status": "converged",
+          "status": "measured",
+          "true_residual_norm": 1.2450090461766376e-05
+        }
+      ],
+      "round_orders": [
+        [
+          "cuda-native",
+          "cuda-cublas",
+          "torch-cuda-eager"
+        ],
+        [
+          "torch-cuda-eager",
+          "cuda-native",
+          "cuda-cublas"
+        ],
+        [
+          "cuda-cublas",
+          "torch-cuda-eager",
+          "cuda-native"
+        ],
+        [
+          "cuda-native",
+          "torch-cuda-eager",
+          "cuda-cublas"
+        ],
+        [
+          "cuda-cublas",
+          "cuda-native",
+          "torch-cuda-eager"
+        ],
+        [
+          "torch-cuda-eager",
+          "cuda-cublas",
+          "cuda-native"
+        ],
+        [
+          "cuda-native",
+          "cuda-cublas",
+          "torch-cuda-eager"
+        ],
+        [
+          "torch-cuda-eager",
+          "cuda-native",
+          "cuda-cublas"
+        ],
+        [
+          "cuda-cublas",
+          "torch-cuda-eager",
+          "cuda-native"
+        ],
+        [
+          "cuda-native",
+          "torch-cuda-eager",
+          "cuda-cublas"
+        ],
+        [
+          "cuda-cublas",
+          "cuda-native",
+          "torch-cuda-eager"
+        ],
+        [
+          "torch-cuda-eager",
+          "cuda-cublas",
+          "cuda-native"
+        ],
+        [
+          "cuda-native",
+          "cuda-cublas",
+          "torch-cuda-eager"
+        ],
+        [
+          "torch-cuda-eager",
+          "cuda-native",
+          "cuda-cublas"
+        ],
+        [
+          "cuda-cublas",
+          "torch-cuda-eager",
+          "cuda-native"
+        ],
+        [
+          "cuda-native",
+          "torch-cuda-eager",
+          "cuda-cublas"
+        ],
+        [
+          "cuda-cublas",
+          "cuda-native",
+          "torch-cuda-eager"
+        ],
+        [
+          "torch-cuda-eager",
+          "cuda-cublas",
+          "cuda-native"
+        ],
+        [
+          "cuda-native",
+          "cuda-cublas",
+          "torch-cuda-eager"
+        ],
+        [
+          "torch-cuda-eager",
+          "cuda-native",
+          "cuda-cublas"
+        ],
+        [
+          "cuda-cublas",
+          "torch-cuda-eager",
+          "cuda-native"
+        ],
+        [
+          "cuda-native",
+          "torch-cuda-eager",
+          "cuda-cublas"
+        ],
+        [
+          "cuda-cublas",
+          "cuda-native",
+          "torch-cuda-eager"
+        ],
+        [
+          "torch-cuda-eager",
+          "cuda-cublas",
+          "cuda-native"
+        ],
+        [
+          "cuda-native",
+          "cuda-cublas",
+          "torch-cuda-eager"
+        ],
+        [
+          "torch-cuda-eager",
+          "cuda-native",
+          "cuda-cublas"
+        ],
+        [
+          "cuda-cublas",
+          "torch-cuda-eager",
+          "cuda-native"
+        ],
+        [
+          "cuda-native",
+          "torch-cuda-eager",
+          "cuda-cublas"
+        ],
+        [
+          "cuda-cublas",
+          "cuda-native",
+          "torch-cuda-eager"
+        ],
+        [
+          "torch-cuda-eager",
+          "cuda-cublas",
+          "cuda-native"
+        ]
+      ],
+      "sampling": {
+        "repetitions": 3,
+        "rounds": 30,
+        "warmups": 3
+      },
+      "schedule": "williams"
+    }
+  ],
+  "environment": {
+    "affinity": [
+      0
+    ],
+    "cmake": {
+      "fields": {
+        "CG_BUILD_PYTHON:BOOL": "ON",
+        "CG_ENABLE_BLAS:BOOL": "OFF",
+        "CG_ENABLE_CLANG_TIDY:BOOL": "OFF",
+        "CG_ENABLE_CUDA:BOOL": "ON",
+        "CG_ENABLE_OPENMP:BOOL": "OFF",
+        "CG_ENABLE_SANITIZERS:BOOL": "OFF",
+        "CMAKE_BUILD_TYPE:STRING": "Release",
+        "CMAKE_CXX_COMPILER:UNINITIALIZED": "/usr/bin/g++-13",
+        "CMAKE_CXX_FLAGS-ADVANCED:INTERNAL": "1",
+        "CMAKE_CXX_FLAGS:STRING": "",
+        "CMAKE_CXX_FLAGS_DEBUG-ADVANCED:INTERNAL": "1",
+        "CMAKE_CXX_FLAGS_DEBUG:STRING": "-g",
+        "CMAKE_CXX_FLAGS_MINSIZEREL-ADVANCED:INTERNAL": "1",
+        "CMAKE_CXX_FLAGS_MINSIZEREL:STRING": "-Os -DNDEBUG",
+        "CMAKE_CXX_FLAGS_RELEASE-ADVANCED:INTERNAL": "1",
+        "CMAKE_CXX_FLAGS_RELEASE:STRING": "-O3 -DNDEBUG",
+        "CMAKE_CXX_FLAGS_RELWITHDEBINFO-ADVANCED:INTERNAL": "1",
+        "CMAKE_CXX_FLAGS_RELWITHDEBINFO:STRING": "-O2 -g -DNDEBUG"
+      },
+      "path": "/home/threemonth03/Downloads/Conjugate-Gradient-Method-library/build/cuda-release/CMakeCache.txt"
+    },
+    "cpu": "13th Gen Intel(R) Core(TM) i7-13700K",
+    "cuda": {
+      "device": 0,
+      "environment": {
+        "CUBLAS_WORKSPACE_CONFIG": ":4096:8",
+        "CUDA_DEVICE_ORDER": null,
+        "CUDA_LAUNCH_BLOCKING": null,
+        "CUDA_VISIBLE_DEVICES": null,
+        "PYTORCH_CUDA_ALLOC_CONF": null
+      },
+      "native": {
+        "build_info": {
+          "architectures": "75",
+          "build_type": "Release",
+          "compiler": "NVIDIA 12.8.93",
+          "enabled": true,
+          "flags": " -O3 -DNDEBUG",
+          "host_compiler": "GNU 13.3.0",
+          "scalar_dtype": "float64",
+          "toolkit_version": "12.8.93"
+        },
+        "module_path": "/home/threemonth03/Downloads/Conjugate-Gradient-Method-library/build/cuda-release/python/_cgcuda.cpython-312-x86_64-linux-gnu.so",
+        "module_sha256": "f4e77c0314be523ae6780a1597ff0de6bc6a0f330b98c657b09c577d0d6bb22f",
+        "runtime_info": {
+          "compute_capability": [
+            7,
+            5
+          ],
+          "device": 0,
+          "driver_api_version": 13010,
+          "name": "NVIDIA GeForce RTX 2060",
+          "runtime_version": 12080,
+          "total_memory": 6442123264,
+          "uuid": "GPU-725be96d-2b67-c8ec-fa10-5d9b23a2c302"
+        }
+      },
+      "nvidia_smi": [
+        {
+          "driver_version": "591.86",
+          "name": "NVIDIA GeForce RTX 2060",
+          "pci_bus_id": "00000000:01:00.0",
+          "physical_index": "0",
+          "uuid": "GPU-725be96d-2b67-c8ec-fa10-5d9b23a2c302"
+        }
+      ],
+      "nvidia_smi_mapping": "physical device inventory; CUDA_VISIBLE_DEVICES may change logical ordinals",
+      "torch": {
+        "compute_capability": [
+          7,
+          5
+        ],
+        "cudnn_allow_tf32": false,
+        "deterministic_algorithms": false,
+        "device": 0,
+        "matmul_allow_tf32": false,
+        "multiprocessor_count": 30,
+        "name": "NVIDIA GeForce RTX 2060",
+        "runtime_version": "12.8",
+        "total_memory_bytes": 6442123264,
+        "uuid": "725be96d-2b67-c8ec-fa10-5d9b23a2c302"
+      }
+    },
+    "dynamic_thread_environment": {
+      "MKL_DYNAMIC": "FALSE",
+      "OMP_DYNAMIC": "FALSE"
+    },
+    "git_status": "?? benchmarks/cg_vs_direct_results.json\n?? benchmarks/compare_direct.py",
+    "logical_cpus": 24,
+    "machine": "x86_64",
+    "native": {
+      "build_info": {
+        "blas": {
+          "configuration": "disabled",
+          "enabled": false,
+          "integer_bits": null,
+          "provider": null,
+          "symbol_prefix": null,
+          "thread_mode": null
+        },
+        "build_type": "Release",
+        "compiler": "GNU 13.3.0",
+        "flags": " -O3 -DNDEBUG",
+        "openmp": false
+      },
+      "module_path": "/home/threemonth03/Downloads/Conjugate-Gradient-Method-library/build/cuda-release/python/_cgcore.cpython-312-x86_64-linux-gnu.so",
+      "module_sha256": "67531bd75aca2de079a67e240d51b18caca500cd05f40f301acbc482a2fe7bf6",
+      "python_package_path": "/home/threemonth03/Downloads/Conjugate-Gradient-Method-library/python/cgpy/__init__.py"
+    },
+    "numpy_config": {
+      "Build Dependencies": {
+        "blas": {
+          "detection method": "pkgconfig",
+          "found": true,
+          "include directory": "/opt/_internal/cpython-3.12.7/lib/python3.12/site-packages/scipy_openblas64/include",
+          "lib directory": "/opt/_internal/cpython-3.12.7/lib/python3.12/site-packages/scipy_openblas64/lib",
+          "name": "scipy-openblas",
+          "openblas configuration": "OpenBLAS 0.3.29  USE64BITINT DYNAMIC_ARCH NO_AFFINITY Haswell MAX_THREADS=64",
+          "pc file directory": "/project/.openblas",
+          "version": "0.3.29"
+        },
+        "lapack": {
+          "detection method": "pkgconfig",
+          "found": true,
+          "include directory": "/opt/_internal/cpython-3.12.7/lib/python3.12/site-packages/scipy_openblas64/include",
+          "lib directory": "/opt/_internal/cpython-3.12.7/lib/python3.12/site-packages/scipy_openblas64/lib",
+          "name": "scipy-openblas",
+          "openblas configuration": "OpenBLAS 0.3.29  USE64BITINT DYNAMIC_ARCH NO_AFFINITY Haswell MAX_THREADS=64",
+          "pc file directory": "/project/.openblas",
+          "version": "0.3.29"
+        }
+      },
+      "Compilers": {
+        "c": {
+          "commands": "cc",
+          "linker": "ld.bfd",
+          "name": "gcc",
+          "version": "10.2.1"
+        },
+        "c++": {
+          "commands": "c++",
+          "linker": "ld.bfd",
+          "name": "gcc",
+          "version": "10.2.1"
+        },
+        "cython": {
+          "commands": "cython",
+          "linker": "cython",
+          "name": "cython",
+          "version": "3.1.0"
+        }
+      },
+      "Machine Information": {
+        "build": {
+          "cpu": "x86_64",
+          "endian": "little",
+          "family": "x86_64",
+          "system": "linux"
+        },
+        "host": {
+          "cpu": "x86_64",
+          "endian": "little",
+          "family": "x86_64",
+          "system": "linux"
+        }
+      },
+      "Python Information": {
+        "path": "/tmp/build-env-sgs8db9u/bin/python",
+        "version": "3.12"
+      },
+      "SIMD Extensions": {
+        "baseline": [
+          "SSE",
+          "SSE2",
+          "SSE3"
+        ],
+        "found": [
+          "SSSE3",
+          "SSE41",
+          "POPCNT",
+          "SSE42",
+          "AVX",
+          "F16C",
+          "FMA3",
+          "AVX2"
+        ],
+        "not found": [
+          "AVX512F",
+          "AVX512CD",
+          "AVX512_KNL",
+          "AVX512_KNM",
+          "AVX512_SKX",
+          "AVX512_CLX",
+          "AVX512_CNL",
+          "AVX512_ICL"
+        ]
+      }
+    },
+    "packages": {
+      "cgpy": null,
+      "numpy": "2.2.6",
+      "scipy": "1.15.3",
+      "threadpoolctl": "3.6.0",
+      "torch": "2.8.0+cu128"
+    },
+    "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+    "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+    "python_compiler": "GCC 13.3.0",
+    "python_executable": "/home/threemonth03/Downloads/Conjugate-Gradient-Method-library/.venv-cuda/bin/python",
+    "revision": "6d3ebb16a4a0f47732326045c1a0a55782f91cb7",
+    "thread_environment": {
+      "BLIS_NUM_THREADS": "1",
+      "MKL_NUM_THREADS": "1",
+      "NUMEXPR_NUM_THREADS": "1",
+      "OMP_NUM_THREADS": "1",
+      "OPENBLAS_NUM_THREADS": "1",
+      "VECLIB_MAXIMUM_THREADS": "1"
+    },
+    "threadpools": [
+      {
+        "architecture": "Haswell",
+        "filepath": "/home/threemonth03/Downloads/Conjugate-Gradient-Method-library/.venv-cuda/lib/python3.12/site-packages/numpy.libs/libscipy_openblas64_-56d6093b.so",
+        "internal_api": "openblas",
+        "num_threads": 1,
+        "prefix": "libscipy_openblas",
+        "threading_layer": "pthreads",
+        "user_api": "blas",
+        "version": "0.3.29"
+      },
+      {
+        "filepath": "/home/threemonth03/Downloads/Conjugate-Gradient-Method-library/.venv-cuda/lib/python3.12/site-packages/torch/lib/libgomp.so.1",
+        "internal_api": "openmp",
+        "num_threads": 1,
+        "prefix": "libgomp",
+        "user_api": "openmp",
+        "version": null
+      }
+    ],
+    "torch": {
+      "config": "PyTorch built with:\n  - GCC 13.3\n  - C++ Version: 201703\n  - Intel(R) oneAPI Math Kernel Library Version 2024.2-Product Build 20240605 for Intel(R) 64 architecture applications\n  - Intel(R) MKL-DNN v3.7.1 (Git Hash 8d263e693366ef8db40acc569cc7d8edf644556d)\n  - OpenMP 201511 (a.k.a. OpenMP 4.5)\n  - LAPACK is enabled (usually provided by MKL)\n  - NNPACK is enabled\n  - CPU capability usage: AVX2\n  - CUDA Runtime 12.8\n  - NVCC architecture flags: -gencode;arch=compute_70,code=sm_70;-gencode;arch=compute_75,code=sm_75;-gencode;arch=compute_80,code=sm_80;-gencode;arch=compute_86,code=sm_86;-gencode;arch=compute_90,code=sm_90;-gencode;arch=compute_100,code=sm_100;-gencode;arch=compute_120,code=sm_120\n  - CuDNN 91.0.2  (built against CUDA 12.9)\n    - Built with CuDNN 90.8\n  - Magma 2.6.1\n  - Build settings: BLAS_INFO=mkl, BUILD_TYPE=Release, COMMIT_SHA=a1cb3cc05d46d198467bebbb6e8fba50a325d4e7, CUDA_VERSION=12.8, CUDNN_VERSION=9.8.0, CXX_COMPILER=/opt/rh/gcc-toolset-13/root/usr/bin/c++, CXX_FLAGS= -fvisibility-inlines-hidden -DUSE_PTHREADPOOL -DNDEBUG -DUSE_KINETO -DLIBKINETO_NOROCTRACER -DLIBKINETO_NOXPUPTI=ON -DUSE_FBGEMM -DUSE_PYTORCH_QNNPACK -DUSE_XNNPACK -DSYMBOLICATE_MOBILE_DEBUG_HANDLE -O2 -fPIC -DC10_NODEPRECATED -Wall -Wextra -Werror=return-type -Werror=non-virtual-dtor -Werror=range-loop-construct -Werror=bool-operation -Wnarrowing -Wno-missing-field-initializers -Wno-unknown-pragmas -Wno-unused-parameter -Wno-strict-overflow -Wno-strict-aliasing -Wno-stringop-overflow -Wsuggest-override -Wno-psabi -Wno-error=old-style-cast -faligned-new -Wno-maybe-uninitialized -fno-math-errno -fno-trapping-math -Werror=format -Wno-dangling-reference -Wno-error=dangling-reference -Wno-stringop-overflow, LAPACK_INFO=mkl, PERF_WITH_AVX=1, PERF_WITH_AVX2=1, TORCH_VERSION=2.8.0, USE_CUDA=ON, USE_CUDNN=ON, USE_CUSPARSELT=1, USE_GFLAGS=OFF, USE_GLOG=OFF, USE_GLOO=ON, USE_MKL=ON, USE_MKLDNN=ON, USE_MPI=OFF, USE_NCCL=1, USE_NNPACK=ON, USE_OPENMP=ON, USE_ROCM=OFF, USE_ROCM_KERNEL_ASSERT=OFF, USE_XCCL=OFF, USE_XPU=OFF, \n",
+      "interop_threads": 1,
+      "intraop_threads": 1
+    }
+  },
+  "metric": "time_to_solution",
+  "schema_version": 1,
+  "spec": {
+    "cases": [
+      {
+        "condition_scale": 100.0,
+        "name": "dense-64",
+        "size": 64
+      },
+      {
+        "condition_scale": 100.0,
+        "name": "dense-256",
+        "size": 256
+      },
+      {
+        "condition_scale": 100.0,
+        "name": "dense-1024",
+        "size": 1024
+      },
+      {
+        "condition_scale": 100.0,
+        "name": "dense-2048",
+        "size": 2048
+      }
+    ],
+    "comparison": "implementations",
+    "cuda_device": 0,
+    "device": "cuda",
+    "implementations": [
+      "cuda-native",
+      "cuda-cublas",
+      "torch-cuda-eager"
+    ],
+    "sampling": {
+      "repetitions": 3,
+      "rounds": 30,
+      "warmups": 3
+    },
+    "scope": "prepared",
+    "seed": 20261015,
+    "solver": {
+      "algorithm": "standard",
+      "atol": 1e-12,
+      "fused": true,
+      "maxiter": 2000,
+      "preconditioner": "jacobi",
+      "residual_refresh": 50,
+      "rtol": 1e-08
+    },
+    "suite": "cuda-dense-f64-v1",
+    "threads": 1
+  }
+}

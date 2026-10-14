@@ -127,4 +127,6 @@ make pyprof PRESET=cuda-release PYTHON="$PWD/.venv-cuda/bin/python" \
 
 CUDA prepared/API scopes use resident inputs and include completed solve wall time. Host upload and correctness download remain outside timing; these are not end-to-end host-to-host measurements. CPU benchmark defaults are unchanged.
 
+The [recorded CUDA results](benchmarks/cuda-results.md) include dense/CSR CG and Jacobi PCG in both scopes against eager PyTorch CUDA, with complete raw samples, replay commands and cases where native CUDA is slower.
+
 An optional [CPU Docker environment](contrib/docker/README.md) keeps the compiler and dependencies inside a container.

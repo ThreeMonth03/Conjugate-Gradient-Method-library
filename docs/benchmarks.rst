@@ -98,3 +98,8 @@ end-to-end host-to-host comparison. Retain GPU/driver/runtime/compiler metadata,
 the actual loaded CUDA binary hash and device mapping with results. Logical
 CUDA device ordinals need not match physical ``nvidia-smi`` indices. Shared CI
 compiles CUDA without a GPU; execution proof requires an available device.
+
+The `recorded CUDA results <https://github.com/ThreeMonth03/Conjugate-Gradient-Method-library/blob/main/benchmarks/cuda-results.md>`_
+include all dense/CSR CG and Jacobi PCG measurements in both scopes, original
+samples, device/build identity and replay commands. They retain cases where
+native CUDA has a higher median than eager PyTorch CUDA.

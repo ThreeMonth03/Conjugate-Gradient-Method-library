@@ -21,6 +21,8 @@ Both scopes measure resident GPU inputs with completion fences; `prepared`
 reuses workspace and preconditioner, while `api` charges their construction.
 Uploads and correctness downloads are outside timed calls. See the
 [CUDA guide](../docs/cuda.rst) for setup, stream ownership and timing details.
+The [recorded CUDA results](cuda-results.md) retain all eight comparisons,
+including setup-sensitive losses, raw timing distributions and replay commands.
 
 See [recorded CPU results](results.md) for complete measurements, raw artifacts,
 hardware provenance, and reproduction commands.
