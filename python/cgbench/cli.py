@@ -7,7 +7,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-IMPLEMENTATIONS = ("native", "numpy-out", "torch-eager-out")
+IMPLEMENTATIONS = ("native", "numpy-out", "scipy-out", "torch-eager-out")
 
 
 def _positive(value):
@@ -25,13 +25,17 @@ def _nonnegative(value):
 
 
 def parser():
+    from .cases import SUITES
+
     result = argparse.ArgumentParser(
         description="Reproducible CPU CG comparisons (also run by make pyprof)"
     )
     commands = result.add_subparsers(dest="command", required=True)
     run = commands.add_parser("run")
-    run.add_argument("--suite", choices=("smoke", "cpu"), default="cpu")
-    run.add_argument("--implementations", default=",".join(IMPLEMENTATIONS))
+    run.add_argument("--suite", choices=tuple(SUITES), default="cpu")
+    run.add_argument(
+        "--implementations", help="comma-separated candidates; default follows suite storage"
+    )
     run.add_argument("--scope", choices=("api", "prepared"), default="prepared")
     run.add_argument("--threads", type=_positive, default=1)
     run.add_argument("--seed", type=_nonnegative, default=20261015)
@@ -117,7 +121,14 @@ def main(argv=None):
 
         from .cases import SUITES
 
-        names = arguments.implementations.split(",")
+        default_reference = (
+            "scipy-out" if SUITES[arguments.suite][0].storage == "csr" else "numpy-out"
+        )
+        names = (
+            arguments.implementations.split(",")
+            if arguments.implementations
+            else ["native", default_reference, "torch-eager-out"]
+        )
         if (
             not names
             or len(names) != len(set(names))

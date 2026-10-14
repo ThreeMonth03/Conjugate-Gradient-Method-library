@@ -25,6 +25,10 @@ class NativeExecutor:
         self.np = np
         self.cgpy = cgpy
         self.matrix, self.rhs, self.initial = arrays
+        if hasattr(self.matrix, "indptr"):
+            self.matrix = cgpy.CSRMatrix(
+                self.matrix.indptr, self.matrix.indices, self.matrix.data, self.matrix.shape
+            )
         self.options = options
         self.scope = scope
         self.threads = threads
@@ -65,6 +69,7 @@ class NumpyOps:
 
         self.np = np
         self.matrix, self.rhs, self.initial = arrays
+        self.validate(True)
 
     def workspace(self):
         return [self.np.empty_like(self.initial) for _ in range(5)]
@@ -119,13 +124,31 @@ class TorchOps:
         if torch.get_num_interop_threads() != 1:
             torch.set_num_interop_threads(1)
         self.torch = torch
-        self.matrix, self.rhs, self.initial = [torch.from_numpy(array) for array in arrays]
+        matrix, rhs, initial = arrays
+        self.sparse = hasattr(matrix, "indptr")
+        if self.sparse:
+            self.matrix = torch.sparse_csr_tensor(
+                torch.from_numpy(matrix.indptr),
+                torch.from_numpy(matrix.indices),
+                torch.from_numpy(matrix.data),
+                size=matrix.shape,
+            )
+        else:
+            self.matrix = torch.from_numpy(matrix)
+        self.rhs, self.initial = torch.from_numpy(rhs), torch.from_numpy(initial)
+        self.validate(True)
+        if self.sparse and not bool(torch.isfinite(self.matrix.values()).all()):
+            raise ValueError("CSR inputs must be finite")
 
     def workspace(self):
         return [self.torch.empty_like(self.initial) for _ in range(5)]
 
     def validate(self, api):
-        arrays = (self.matrix, self.rhs, self.initial) if api else (self.rhs, self.initial)
+        arrays = (
+            (self.matrix, self.rhs, self.initial)
+            if api and not self.sparse
+            else (self.rhs, self.initial)
+        )
         if not all(bool(self.torch.isfinite(array).all()) for array in arrays):
             raise ValueError("inputs must be finite")
 
@@ -166,6 +189,31 @@ class TorchOps:
         return x.numpy()
 
 
+class ScipyOps(NumpyOps):
+    """Public CSR matvec with preallocated NumPy vector updates.
+
+    SciPy's public ``A @ x`` allocates a product. Keep that cost visible rather
+    than depending on private sparsetools or claiming an allocation-free solve.
+    """
+
+    def __init__(self, arrays):
+        super().__init__(arrays)
+        if not hasattr(self.matrix, "indptr") or self.matrix.format != "csr":
+            raise ValueError("scipy-out requires canonical CSR inputs")
+        if not self.matrix.has_canonical_format or not self.np.all(
+            self.np.isfinite(self.matrix.data)
+        ):
+            raise ValueError("CSR inputs must be canonical and finite")
+
+    def validate(self, api):
+        # All implementations receive a prepared, validated CSR object. Input
+        # conversion and canonical validation belong outside both solve scopes.
+        super().validate(False)
+
+    def matvec(self, vector, out):
+        self.np.copyto(out, self.matrix @ vector)
+
+
 class ReferenceExecutor:
     """Use the native solver's recurrence, restart, and true-residual policy."""
 
@@ -189,7 +237,6 @@ class ReferenceExecutor:
 
     def _solve(self):
         ops = self.ops
-        ops.validate(self.scope == "api")
         x, residual, direction, product, scratch = (
             self.storage if self.storage is not None else ops.workspace()
         )
@@ -287,7 +334,11 @@ def make_executor(name, arrays, options, scope, threads):
     if name == "native":
         return NativeExecutor(arrays, options, scope, threads)
     if name == "numpy-out":
+        if hasattr(arrays[0], "indptr"):
+            raise ValueError("numpy-out requires dense inputs; use scipy-out for CSR")
         return ReferenceExecutor(NumpyOps(arrays), options, scope)
+    if name == "scipy-out":
+        return ReferenceExecutor(ScipyOps(arrays), options, scope)
     if name == "torch-eager-out":
         return ReferenceExecutor(TorchOps(arrays, threads), options, scope)
     raise ValueError(f"unknown implementation: {name}")

@@ -1,5 +1,6 @@
 """Store exact sampling data and report per-round average timings."""
 
+import hashlib
 import json
 import os
 import platform
@@ -34,7 +35,7 @@ def environment_metadata():
 
     root = Path(__file__).resolve().parents[2]
     packages = {}
-    for name in ("numpy", "torch", "threadpoolctl", "cgpy"):
+    for name in ("numpy", "scipy", "torch", "threadpoolctl", "cgpy"):
         try:
             packages[name] = version(name)
         except PackageNotFoundError:
@@ -50,9 +51,24 @@ def environment_metadata():
         numpy_config = np.__config__.show(mode="dicts")
     except TypeError:
         numpy_config = {"information": "configuration unavailable with this NumPy"}
-    cmake = {}
-    if (root / "build").is_dir():
-        for cache in sorted((root / "build").glob("**/CMakeCache.txt"))[:8]:
+    cmake = None
+    native = None
+    native_module = sys.modules.get("_cgcore")
+    if native_module is not None and getattr(native_module, "__file__", None):
+        binary = Path(native_module.__file__).resolve()
+        package = sys.modules.get("cgpy")
+        build_info = getattr(package, "build_info", None)
+        native = {
+            "module_path": str(binary),
+            "module_sha256": hashlib.sha256(binary.read_bytes()).hexdigest(),
+            "build_info": build_info() if callable(build_info) else None,
+        }
+        # Use only an ancestor cache of the binary actually imported. Installed
+        # wheels may have no adjacent cache; never substitute another build.
+        for directory in binary.parents:
+            cache = directory / "CMakeCache.txt"
+            if not cache.is_file():
+                continue
             fields = {}
             for line in cache.read_text(errors="replace").splitlines():
                 if line.startswith(
@@ -65,7 +81,8 @@ def environment_metadata():
                 ):
                     key, _, value = line.partition("=")
                     fields[key] = value
-            cmake[str(cache.relative_to(root))] = fields
+            cmake = {"path": str(cache), "fields": fields}
+            break
     cpu = platform.processor()
     cpuinfo = Path("/proc/cpuinfo")
     if not cpu and cpuinfo.exists():
@@ -86,6 +103,7 @@ def environment_metadata():
         "revision": _command(["git", "rev-parse", "HEAD"], root),
         "git_status": _command(["git", "status", "--short"], root),
         "cmake": cmake,
+        "native": native,
         "thread_environment": {name: os.environ.get(name) for name in THREAD_VARIABLES},
         "dynamic_thread_environment": {
             name: os.environ.get(name) for name in ("OMP_DYNAMIC", "MKL_DYNAMIC")

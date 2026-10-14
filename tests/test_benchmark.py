@@ -258,3 +258,71 @@ def test_torch_reference_is_optional_and_correct(solver_options, scope, algorith
     second = executor()
     assert check_outcome(second, arrays, solver_options)["eligible"]
     assert second.iterations == iterations
+
+
+def test_csr_fixture_is_canonical_reproducible_and_spd():
+    pytest.importorskip("scipy")
+    spec = SUITES["smoke-csr"][0]
+    first = make_case(spec, 17)
+    assert input_hash(spec, first) == input_hash(spec, make_case(spec, 17))
+    assert input_hash(spec, first) != input_hash(spec, make_case(spec, 18))
+    matrix, rhs, initial, expected = first
+    assert matrix.format == "csr" and matrix.has_canonical_format
+    assert matrix.nnz == 5 * spec.size - 4 * spec.grid
+    assert (matrix != matrix.T).nnz == 0
+    # Densification is restricted to this tiny independent SPD check.
+    np.linalg.cholesky(matrix.toarray())
+    np.testing.assert_allclose(matrix @ expected, rhs)
+    assert not initial.any()
+    original_hash = input_hash(spec, first)
+    matrix.data[0] += 0.1
+    assert input_hash(spec, first) != original_hash
+
+
+@pytest.mark.parametrize("implementation", ("scipy-out", "torch-eager-out"))
+@pytest.mark.parametrize("algorithm", ("standard", "explicit"))
+@pytest.mark.parametrize("scope", ("prepared", "api"))
+def test_csr_adapters_share_fixture_and_reset(solver_options, implementation, algorithm, scope):
+    pytest.importorskip("scipy")
+    if implementation == "torch-eager-out":
+        pytest.importorskip("torch")
+    arrays = make_case(SUITES["smoke-csr"][0])[:3]
+    options = {**solver_options, "algorithm": algorithm, "residual_refresh": 5}
+    executor = make_executor(implementation, arrays, options, scope, 1)
+    first = executor()
+    assert check_outcome(first, arrays, options)["eligible"]
+    expected = first.x.copy()
+    iterations, matvecs = first.iterations, first.matvecs
+    first.x.fill(1e6)
+    second = executor()
+    assert check_outcome(second, arrays, options)["eligible"]
+    assert second.iterations == iterations and second.matvecs == matvecs
+    np.testing.assert_array_equal(second.x, expected)
+
+
+def test_csr_collection_does_not_densify(solver_options, smoke_spec, monkeypatch):
+    sparse = pytest.importorskip("scipy.sparse")
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("benchmark attempted to densify CSR")
+
+    monkeypatch.setattr(sparse.csr_matrix, "toarray", forbidden)
+    spec = {**smoke_spec, "implementations": ["scipy-out"]}
+    case = collect_case(SUITES["smoke-csr"][0], spec)
+    assert case["layout"] == "CSR" and case["nnz"] == 64
+    assert case["results"][0]["status"] == "measured"
+
+
+@pytest.mark.parametrize("algorithm", ("standard", "explicit"))
+def test_native_csr_uses_shared_fixture(solver_options, algorithm):
+    pytest.importorskip("scipy")
+    cgpy = pytest.importorskip("cgpy")
+    if not hasattr(cgpy, "CSRMatrix"):
+        pytest.skip("native CSR binding is not available")
+    arrays = make_case(SUITES["smoke-csr"][0])[:3]
+    options = {**solver_options, "algorithm": algorithm}
+    native = make_executor("native", arrays, options, "prepared", 1)()
+    reference = make_executor("scipy-out", arrays, options, "prepared", 1)()
+    assert check_outcome(native, arrays, options)["eligible"]
+    assert check_outcome(reference, arrays, options)["eligible"]
+    np.testing.assert_allclose(native.x, reference.x, rtol=1e-6, atol=1e-8)
