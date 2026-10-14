@@ -1,0 +1,3 @@
+Checks: '-*,clang-analyzer-*,bugprone-use-after-move,bugprone-sizeof-expression,performance-unnecessary-copy-initialization,performance-for-range-copy'
+WarningsAsErrors: ''
+HeaderFilterRegex: '/cpp/|/include/'

@@ -1,0 +1,48 @@
+{
+  "version": 5,
+  "cmakeMinimumRequired": {"major": 3, "minor": 24, "patch": 0},
+  "configurePresets": [
+    {
+      "name": "cpu-release",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_MAKE_PROGRAM": "${sourceDir}/.venv/bin/ninja",
+        "Python_EXECUTABLE": "${sourceDir}/.venv/bin/python",
+        "CG_ENABLE_OPENMP": "OFF",
+        "BUILD_TESTING": "ON"
+      }
+    },
+    {
+      "name": "cpu-debug",
+      "inherits": "cpu-release",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {"CMAKE_BUILD_TYPE": "Debug"}
+    },
+    {
+      "name": "cpu-openmp",
+      "inherits": "cpu-release",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {"CG_ENABLE_OPENMP": "ON"}
+    },
+    {
+      "name": "cpu-asan",
+      "inherits": "cpu-debug",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {"CG_BUILD_PYTHON": "OFF", "CG_ENABLE_SANITIZERS": "ON"}
+    }
+  ],
+  "buildPresets": [
+    {"name": "cpu-release", "configurePreset": "cpu-release"},
+    {"name": "cpu-debug", "configurePreset": "cpu-debug"},
+    {"name": "cpu-openmp", "configurePreset": "cpu-openmp"},
+    {"name": "cpu-asan", "configurePreset": "cpu-asan"}
+  ],
+  "testPresets": [
+    {"name": "cpu-release", "configurePreset": "cpu-release", "output": {"outputOnFailure": true}},
+    {"name": "cpu-debug", "configurePreset": "cpu-debug", "output": {"outputOnFailure": true}},
+    {"name": "cpu-openmp", "configurePreset": "cpu-openmp", "output": {"outputOnFailure": true}},
+    {"name": "cpu-asan", "configurePreset": "cpu-asan", "output": {"outputOnFailure": true}}
+  ]
+}
