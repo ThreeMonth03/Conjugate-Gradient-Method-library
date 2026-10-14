@@ -30,9 +30,12 @@ COPY bindings/*.cpp bindings/
 COPY python/*.py python/
 COPY python/cgpy/*.py python/cgpy/
 COPY python/cgbench/*.py python/cgbench/
+COPY python/README.md python/
+COPY docs/*.md docs/
 COPY tests/*.py tests/
 COPY tests/cpp/*.cpp tests/cpp/
 COPY demo/*.py demo/
-COPY benchmarks/README.md benchmarks/
+COPY benchmarks/README.md benchmarks/results.md benchmarks/
+COPY benchmarks/results/ benchmarks/results/
 
 CMD ["make", "test"]

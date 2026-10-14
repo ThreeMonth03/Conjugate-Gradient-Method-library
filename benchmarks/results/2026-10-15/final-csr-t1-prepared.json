@@ -1,0 +1,1595 @@
+{
+  "cases": [
+    {
+      "case": {
+        "condition_scale": 100.0,
+        "grid": 8,
+        "name": "poisson-8",
+        "size": 64,
+        "storage": "csr"
+      },
+      "cycle_rows": 6,
+      "dtype": "float64",
+      "input_sha256": "c42223d3f75a5c3b4637a56319aec5e0c74ac30f9e81647f0008ae311c362c71",
+      "input_storage_basis": "shared input NumPy/SciPy arrays, including original index dtype; excludes native owning copies and workspace",
+      "input_stored_bytes": 4740,
+      "layout": "CSR",
+      "nnz": 288,
+      "results": [
+        {
+          "iterations": 26,
+          "matvecs": 28,
+          "name": "native",
+          "reason": null,
+          "reported_residual_norm": 2.0122730639305458e-07,
+          "residual_threshold": 3.0549240920310984e-07,
+          "round_elapsed_ns": [
+            46109,
+            86720,
+            46205,
+            41984,
+            47881,
+            46417,
+            41075,
+            65317,
+            50747,
+            42491,
+            77315,
+            55985,
+            41087,
+            49288,
+            91632,
+            41180,
+            57662,
+            89809,
+            43273,
+            58906,
+            48589,
+            41426,
+            48786,
+            51772,
+            41299,
+            48833,
+            68607,
+            40976,
+            48615,
+            49270
+          ],
+          "setup": {
+            "implementation_role": "native",
+            "operator_setup_elapsed_ns": 4141,
+            "preconditioner": "none",
+            "preconditioner_setup_elapsed_ns": 0,
+            "preconditioner_stored_bytes": 0,
+            "residual_policy": "standard with residual_refresh=50",
+            "setup_in_timed_call": false,
+            "setup_measurement": "native plan setup outside timing; API setup repeats inside every timed solve",
+            "solver_family": "cg"
+          },
+          "solver_status": "converged",
+          "status": "measured",
+          "true_residual_norm": 2.012273063930546e-07
+        },
+        {
+          "iterations": 26,
+          "matvecs": 28,
+          "name": "scipy-out",
+          "reason": null,
+          "reported_residual_norm": 2.0122730590581444e-07,
+          "residual_threshold": 3.0549240920310984e-07,
+          "round_elapsed_ns": [
+            789888,
+            783976,
+            748272,
+            740680,
+            704746,
+            752685,
+            985182,
+            776836,
+            745914,
+            765803,
+            782412,
+            744773,
+            762165,
+            880680,
+            789398,
+            995449,
+            726416,
+            821392,
+            898911,
+            782245,
+            734596,
+            780280,
+            733592,
+            793806,
+            737230,
+            1169435,
+            729074,
+            764884,
+            730136,
+            779515
+          ],
+          "setup": {
+            "implementation_role": "same_policy_reference",
+            "preconditioner": "none",
+            "preconditioner_setup_elapsed_ns": 0,
+            "preconditioner_stored_bytes": 0,
+            "residual_policy": "standard with residual_refresh=50",
+            "setup_in_timed_call": false,
+            "setup_measurement": "single untimed setup probe",
+            "solver_family": "cg"
+          },
+          "solver_status": "converged",
+          "status": "measured",
+          "true_residual_norm": 2.0122730590581444e-07
+        },
+        {
+          "iterations": 26,
+          "matvecs": 28,
+          "name": "torch-eager-out",
+          "reason": null,
+          "reported_residual_norm": 2.0122730721861723e-07,
+          "residual_threshold": 3.0549240920310984e-07,
+          "round_elapsed_ns": [
+            1090951,
+            1036178,
+            966568,
+            954370,
+            978371,
+            949824,
+            1069155,
+            1105989,
+            987513,
+            1420541,
+            1041402,
+            1009702,
+            979409,
+            915448,
+            1443468,
+            1157691,
+            1072034,
+            1585535,
+            1227593,
+            967284,
+            1005426,
+            972807,
+            1078040,
+            985948,
+            1004092,
+            970874,
+            1145249,
+            957564,
+            1012111,
+            964125
+          ],
+          "setup": {
+            "implementation_role": "same_policy_reference",
+            "preconditioner": "none",
+            "preconditioner_setup_elapsed_ns": 0,
+            "preconditioner_stored_bytes": 0,
+            "residual_policy": "standard with residual_refresh=50",
+            "setup_in_timed_call": false,
+            "setup_measurement": "single untimed setup probe",
+            "solver_family": "cg"
+          },
+          "solver_status": "converged",
+          "status": "measured",
+          "true_residual_norm": 2.012273074502139e-07
+        }
+      ],
+      "round_orders": [
+        [
+          "native",
+          "scipy-out",
+          "torch-eager-out"
+        ],
+        [
+          "torch-eager-out",
+          "native",
+          "scipy-out"
+        ],
+        [
+          "scipy-out",
+          "torch-eager-out",
+          "native"
+        ],
+        [
+          "native",
+          "torch-eager-out",
+          "scipy-out"
+        ],
+        [
+          "scipy-out",
+          "native",
+          "torch-eager-out"
+        ],
+        [
+          "torch-eager-out",
+          "scipy-out",
+          "native"
+        ],
+        [
+          "native",
+          "scipy-out",
+          "torch-eager-out"
+        ],
+        [
+          "torch-eager-out",
+          "native",
+          "scipy-out"
+        ],
+        [
+          "scipy-out",
+          "torch-eager-out",
+          "native"
+        ],
+        [
+          "native",
+          "torch-eager-out",
+          "scipy-out"
+        ],
+        [
+          "scipy-out",
+          "native",
+          "torch-eager-out"
+        ],
+        [
+          "torch-eager-out",
+          "scipy-out",
+          "native"
+        ],
+        [
+          "native",
+          "scipy-out",
+          "torch-eager-out"
+        ],
+        [
+          "torch-eager-out",
+          "native",
+          "scipy-out"
+        ],
+        [
+          "scipy-out",
+          "torch-eager-out",
+          "native"
+        ],
+        [
+          "native",
+          "torch-eager-out",
+          "scipy-out"
+        ],
+        [
+          "scipy-out",
+          "native",
+          "torch-eager-out"
+        ],
+        [
+          "torch-eager-out",
+          "scipy-out",
+          "native"
+        ],
+        [
+          "native",
+          "scipy-out",
+          "torch-eager-out"
+        ],
+        [
+          "torch-eager-out",
+          "native",
+          "scipy-out"
+        ],
+        [
+          "scipy-out",
+          "torch-eager-out",
+          "native"
+        ],
+        [
+          "native",
+          "torch-eager-out",
+          "scipy-out"
+        ],
+        [
+          "scipy-out",
+          "native",
+          "torch-eager-out"
+        ],
+        [
+          "torch-eager-out",
+          "scipy-out",
+          "native"
+        ],
+        [
+          "native",
+          "scipy-out",
+          "torch-eager-out"
+        ],
+        [
+          "torch-eager-out",
+          "native",
+          "scipy-out"
+        ],
+        [
+          "scipy-out",
+          "torch-eager-out",
+          "native"
+        ],
+        [
+          "native",
+          "torch-eager-out",
+          "scipy-out"
+        ],
+        [
+          "scipy-out",
+          "native",
+          "torch-eager-out"
+        ],
+        [
+          "torch-eager-out",
+          "scipy-out",
+          "native"
+        ]
+      ],
+      "sampling": {
+        "repetitions": 5,
+        "rounds": 30,
+        "warmups": 3
+      },
+      "schedule": "williams"
+    },
+    {
+      "case": {
+        "condition_scale": 100.0,
+        "grid": 32,
+        "name": "poisson-32",
+        "size": 1024,
+        "storage": "csr"
+      },
+      "cycle_rows": 6,
+      "dtype": "float64",
+      "input_sha256": "2be39617e771847e425d64a8d997d0eea8942b930852010d2ac2c83bb3e26ab7",
+      "input_storage_basis": "shared input NumPy/SciPy arrays, including original index dtype; excludes native owning copies and workspace",
+      "input_stored_bytes": 80388,
+      "layout": "CSR",
+      "nnz": 4992,
+      "results": [
+        {
+          "iterations": 129,
+          "matvecs": 133,
+          "name": "native",
+          "reason": null,
+          "reported_residual_norm": 1.3276021805939385e-06,
+          "residual_threshold": 1.36723178206423e-06,
+          "round_elapsed_ns": [
+            1783914,
+            1883633,
+            1949393,
+            1897161,
+            1724053,
+            1820945,
+            1741139,
+            1832426,
+            1934719,
+            1727853,
+            2141805,
+            2053333,
+            1666207,
+            1920697,
+            2082585,
+            2042097,
+            1689171,
+            1733437,
+            1788808,
+            1848278,
+            1851187,
+            1804817,
+            1744656,
+            1780785,
+            1692665,
+            1860676,
+            1865099,
+            1710595,
+            1803646,
+            1766232
+          ],
+          "setup": {
+            "implementation_role": "native",
+            "operator_setup_elapsed_ns": 11152,
+            "preconditioner": "none",
+            "preconditioner_setup_elapsed_ns": 0,
+            "preconditioner_stored_bytes": 0,
+            "residual_policy": "standard with residual_refresh=50",
+            "setup_in_timed_call": false,
+            "setup_measurement": "native plan setup outside timing; API setup repeats inside every timed solve",
+            "solver_family": "cg"
+          },
+          "solver_status": "converged",
+          "status": "measured",
+          "true_residual_norm": 1.3276021805939377e-06
+        },
+        {
+          "iterations": 129,
+          "matvecs": 133,
+          "name": "scipy-out",
+          "reason": null,
+          "reported_residual_norm": 1.3276021836412895e-06,
+          "residual_threshold": 1.36723178206423e-06,
+          "round_elapsed_ns": [
+            6408657,
+            6755832,
+            5969675,
+            7806344,
+            5951441,
+            6851700,
+            6854795,
+            6547475,
+            6280434,
+            6954182,
+            6087182,
+            6282647,
+            6309132,
+            6903400,
+            6294364,
+            6685918,
+            6183487,
+            6650965,
+            6710450,
+            6321259,
+            6408923,
+            7966254,
+            6667123,
+            6569789,
+            6362066,
+            7240634,
+            6104123,
+            6944827,
+            6271258,
+            6840962
+          ],
+          "setup": {
+            "implementation_role": "same_policy_reference",
+            "preconditioner": "none",
+            "preconditioner_setup_elapsed_ns": 0,
+            "preconditioner_stored_bytes": 0,
+            "residual_policy": "standard with residual_refresh=50",
+            "setup_in_timed_call": false,
+            "setup_measurement": "single untimed setup probe",
+            "solver_family": "cg"
+          },
+          "solver_status": "converged",
+          "status": "measured",
+          "true_residual_norm": 1.3276021836412895e-06
+        },
+        {
+          "iterations": 129,
+          "matvecs": 133,
+          "name": "torch-eager-out",
+          "reason": null,
+          "reported_residual_norm": 1.3276021822572482e-06,
+          "residual_threshold": 1.36723178206423e-06,
+          "round_elapsed_ns": [
+            6411367,
+            6403528,
+            7769697,
+            6593810,
+            8080623,
+            6725120,
+            6607451,
+            6198031,
+            6642328,
+            7360097,
+            7696309,
+            6314382,
+            7026812,
+            8176491,
+            6739025,
+            6892328,
+            6488849,
+            6980885,
+            6490228,
+            7003855,
+            6935812,
+            6355019,
+            6876818,
+            6170665,
+            6589912,
+            6456620,
+            7000151,
+            7105836,
+            7435588,
+            6359607
+          ],
+          "setup": {
+            "implementation_role": "same_policy_reference",
+            "preconditioner": "none",
+            "preconditioner_setup_elapsed_ns": 0,
+            "preconditioner_stored_bytes": 0,
+            "residual_policy": "standard with residual_refresh=50",
+            "setup_in_timed_call": false,
+            "setup_measurement": "single untimed setup probe",
+            "solver_family": "cg"
+          },
+          "solver_status": "converged",
+          "status": "measured",
+          "true_residual_norm": 1.3276021826572509e-06
+        }
+      ],
+      "round_orders": [
+        [
+          "native",
+          "scipy-out",
+          "torch-eager-out"
+        ],
+        [
+          "torch-eager-out",
+          "native",
+          "scipy-out"
+        ],
+        [
+          "scipy-out",
+          "torch-eager-out",
+          "native"
+        ],
+        [
+          "native",
+          "torch-eager-out",
+          "scipy-out"
+        ],
+        [
+          "scipy-out",
+          "native",
+          "torch-eager-out"
+        ],
+        [
+          "torch-eager-out",
+          "scipy-out",
+          "native"
+        ],
+        [
+          "native",
+          "scipy-out",
+          "torch-eager-out"
+        ],
+        [
+          "torch-eager-out",
+          "native",
+          "scipy-out"
+        ],
+        [
+          "scipy-out",
+          "torch-eager-out",
+          "native"
+        ],
+        [
+          "native",
+          "torch-eager-out",
+          "scipy-out"
+        ],
+        [
+          "scipy-out",
+          "native",
+          "torch-eager-out"
+        ],
+        [
+          "torch-eager-out",
+          "scipy-out",
+          "native"
+        ],
+        [
+          "native",
+          "scipy-out",
+          "torch-eager-out"
+        ],
+        [
+          "torch-eager-out",
+          "native",
+          "scipy-out"
+        ],
+        [
+          "scipy-out",
+          "torch-eager-out",
+          "native"
+        ],
+        [
+          "native",
+          "torch-eager-out",
+          "scipy-out"
+        ],
+        [
+          "scipy-out",
+          "native",
+          "torch-eager-out"
+        ],
+        [
+          "torch-eager-out",
+          "scipy-out",
+          "native"
+        ],
+        [
+          "native",
+          "scipy-out",
+          "torch-eager-out"
+        ],
+        [
+          "torch-eager-out",
+          "native",
+          "scipy-out"
+        ],
+        [
+          "scipy-out",
+          "torch-eager-out",
+          "native"
+        ],
+        [
+          "native",
+          "torch-eager-out",
+          "scipy-out"
+        ],
+        [
+          "scipy-out",
+          "native",
+          "torch-eager-out"
+        ],
+        [
+          "torch-eager-out",
+          "scipy-out",
+          "native"
+        ],
+        [
+          "native",
+          "scipy-out",
+          "torch-eager-out"
+        ],
+        [
+          "torch-eager-out",
+          "native",
+          "scipy-out"
+        ],
+        [
+          "scipy-out",
+          "torch-eager-out",
+          "native"
+        ],
+        [
+          "native",
+          "torch-eager-out",
+          "scipy-out"
+        ],
+        [
+          "scipy-out",
+          "native",
+          "torch-eager-out"
+        ],
+        [
+          "torch-eager-out",
+          "scipy-out",
+          "native"
+        ]
+      ],
+      "sampling": {
+        "repetitions": 5,
+        "rounds": 30,
+        "warmups": 3
+      },
+      "schedule": "williams"
+    },
+    {
+      "case": {
+        "condition_scale": 100.0,
+        "grid": 64,
+        "name": "poisson-64",
+        "size": 4096,
+        "storage": "csr"
+      },
+      "cycle_rows": 6,
+      "dtype": "float64",
+      "input_sha256": "366644870e9d921500fcf8ec3dc21b6daa83afdc9d3482e3846feb816df2483d",
+      "input_storage_basis": "shared input NumPy/SciPy arrays, including original index dtype; excludes native owning copies and workspace",
+      "input_stored_bytes": 324612,
+      "layout": "CSR",
+      "nnz": 20224,
+      "results": [
+        {
+          "iterations": 290,
+          "matvecs": 297,
+          "name": "native",
+          "reason": null,
+          "reported_residual_norm": 2.772948105165002e-06,
+          "residual_threshold": 2.8100752724193665e-06,
+          "round_elapsed_ns": [
+            14694743,
+            14795633,
+            15368686,
+            14818259,
+            15025875,
+            14487260,
+            16017261,
+            14693786,
+            15758519,
+            14578924,
+            16684414,
+            15465784,
+            15538466,
+            13740200,
+            14165899,
+            13258806,
+            13189559,
+            14172552,
+            14140359,
+            13619044,
+            14350773,
+            13863440,
+            13960234,
+            13746409,
+            14010212,
+            13576684,
+            13898387,
+            14029917,
+            14151371,
+            14568871
+          ],
+          "setup": {
+            "implementation_role": "native",
+            "operator_setup_elapsed_ns": 72936,
+            "preconditioner": "none",
+            "preconditioner_setup_elapsed_ns": 0,
+            "preconditioner_stored_bytes": 0,
+            "residual_policy": "standard with residual_refresh=50",
+            "setup_in_timed_call": false,
+            "setup_measurement": "native plan setup outside timing; API setup repeats inside every timed solve",
+            "solver_family": "cg"
+          },
+          "solver_status": "converged",
+          "status": "measured",
+          "true_residual_norm": 2.772948105165e-06
+        },
+        {
+          "iterations": 290,
+          "matvecs": 297,
+          "name": "scipy-out",
+          "reason": null,
+          "reported_residual_norm": 2.772948107370264e-06,
+          "residual_threshold": 2.8100752724193665e-06,
+          "round_elapsed_ns": [
+            32464986,
+            33077176,
+            31850455,
+            31536770,
+            31643226,
+            30956764,
+            31825463,
+            32361337,
+            30589762,
+            31201344,
+            32103788,
+            32225934,
+            26938393,
+            30144112,
+            29939894,
+            29109536,
+            28656363,
+            29365371,
+            28889782,
+            29092494,
+            28949475,
+            29998159,
+            28670856,
+            28765287,
+            28789398,
+            30435346,
+            30609679,
+            29160644,
+            31994846,
+            29468765
+          ],
+          "setup": {
+            "implementation_role": "same_policy_reference",
+            "preconditioner": "none",
+            "preconditioner_setup_elapsed_ns": 0,
+            "preconditioner_stored_bytes": 0,
+            "residual_policy": "standard with residual_refresh=50",
+            "setup_in_timed_call": false,
+            "setup_measurement": "single untimed setup probe",
+            "solver_family": "cg"
+          },
+          "solver_status": "converged",
+          "status": "measured",
+          "true_residual_norm": 2.7729481073702634e-06
+        },
+        {
+          "iterations": 290,
+          "matvecs": 297,
+          "name": "torch-eager-out",
+          "reason": null,
+          "reported_residual_norm": 2.772948105177536e-06,
+          "residual_threshold": 2.8100752724193665e-06,
+          "round_elapsed_ns": [
+            27985233,
+            26268202,
+            26764076,
+            29039636,
+            26087218,
+            27011430,
+            26079325,
+            26817864,
+            25542521,
+            25650248,
+            25915484,
+            27087943,
+            24433889,
+            24677841,
+            23755739,
+            24889511,
+            24816569,
+            23165764,
+            26610019,
+            23720929,
+            22759910,
+            24057776,
+            23349448,
+            24573215,
+            23807198,
+            24280560,
+            22737098,
+            24328634,
+            24399292,
+            22650385
+          ],
+          "setup": {
+            "implementation_role": "same_policy_reference",
+            "preconditioner": "none",
+            "preconditioner_setup_elapsed_ns": 0,
+            "preconditioner_stored_bytes": 0,
+            "residual_policy": "standard with residual_refresh=50",
+            "setup_in_timed_call": false,
+            "setup_measurement": "single untimed setup probe",
+            "solver_family": "cg"
+          },
+          "solver_status": "converged",
+          "status": "measured",
+          "true_residual_norm": 2.772948105438607e-06
+        }
+      ],
+      "round_orders": [
+        [
+          "native",
+          "scipy-out",
+          "torch-eager-out"
+        ],
+        [
+          "torch-eager-out",
+          "native",
+          "scipy-out"
+        ],
+        [
+          "scipy-out",
+          "torch-eager-out",
+          "native"
+        ],
+        [
+          "native",
+          "torch-eager-out",
+          "scipy-out"
+        ],
+        [
+          "scipy-out",
+          "native",
+          "torch-eager-out"
+        ],
+        [
+          "torch-eager-out",
+          "scipy-out",
+          "native"
+        ],
+        [
+          "native",
+          "scipy-out",
+          "torch-eager-out"
+        ],
+        [
+          "torch-eager-out",
+          "native",
+          "scipy-out"
+        ],
+        [
+          "scipy-out",
+          "torch-eager-out",
+          "native"
+        ],
+        [
+          "native",
+          "torch-eager-out",
+          "scipy-out"
+        ],
+        [
+          "scipy-out",
+          "native",
+          "torch-eager-out"
+        ],
+        [
+          "torch-eager-out",
+          "scipy-out",
+          "native"
+        ],
+        [
+          "native",
+          "scipy-out",
+          "torch-eager-out"
+        ],
+        [
+          "torch-eager-out",
+          "native",
+          "scipy-out"
+        ],
+        [
+          "scipy-out",
+          "torch-eager-out",
+          "native"
+        ],
+        [
+          "native",
+          "torch-eager-out",
+          "scipy-out"
+        ],
+        [
+          "scipy-out",
+          "native",
+          "torch-eager-out"
+        ],
+        [
+          "torch-eager-out",
+          "scipy-out",
+          "native"
+        ],
+        [
+          "native",
+          "scipy-out",
+          "torch-eager-out"
+        ],
+        [
+          "torch-eager-out",
+          "native",
+          "scipy-out"
+        ],
+        [
+          "scipy-out",
+          "torch-eager-out",
+          "native"
+        ],
+        [
+          "native",
+          "torch-eager-out",
+          "scipy-out"
+        ],
+        [
+          "scipy-out",
+          "native",
+          "torch-eager-out"
+        ],
+        [
+          "torch-eager-out",
+          "scipy-out",
+          "native"
+        ],
+        [
+          "native",
+          "scipy-out",
+          "torch-eager-out"
+        ],
+        [
+          "torch-eager-out",
+          "native",
+          "scipy-out"
+        ],
+        [
+          "scipy-out",
+          "torch-eager-out",
+          "native"
+        ],
+        [
+          "native",
+          "torch-eager-out",
+          "scipy-out"
+        ],
+        [
+          "scipy-out",
+          "native",
+          "torch-eager-out"
+        ],
+        [
+          "torch-eager-out",
+          "scipy-out",
+          "native"
+        ]
+      ],
+      "sampling": {
+        "repetitions": 5,
+        "rounds": 30,
+        "warmups": 3
+      },
+      "schedule": "williams"
+    },
+    {
+      "case": {
+        "condition_scale": 100.0,
+        "grid": 128,
+        "name": "poisson-128",
+        "size": 16384,
+        "storage": "csr"
+      },
+      "cycle_rows": 6,
+      "dtype": "float64",
+      "input_sha256": "366658110507894737aae729348095b3103c569c950fba3bf3c69a3f05205149",
+      "input_storage_basis": "shared input NumPy/SciPy arrays, including original index dtype; excludes native owning copies and workspace",
+      "input_stored_bytes": 1304580,
+      "layout": "CSR",
+      "nnz": 81408,
+      "results": [
+        {
+          "iterations": 395,
+          "matvecs": 404,
+          "name": "native",
+          "reason": null,
+          "reported_residual_norm": 5.661369681727516e-06,
+          "residual_threshold": 5.749348165496098e-06,
+          "round_elapsed_ns": [
+            76233379,
+            93651178,
+            85588828,
+            88391432,
+            84544737,
+            83297860,
+            79874469,
+            77224345,
+            81348357,
+            82738448,
+            82995702,
+            83555318,
+            81432837,
+            81522044,
+            85171088,
+            80238130,
+            84003014,
+            80789224,
+            87403466,
+            80217256,
+            76950813,
+            75291709,
+            75339091,
+            82392415,
+            76673254,
+            78381838,
+            76065086,
+            74865083,
+            77620912,
+            76056646
+          ],
+          "setup": {
+            "implementation_role": "native",
+            "operator_setup_elapsed_ns": 385934,
+            "preconditioner": "none",
+            "preconditioner_setup_elapsed_ns": 0,
+            "preconditioner_stored_bytes": 0,
+            "residual_policy": "standard with residual_refresh=50",
+            "setup_in_timed_call": false,
+            "setup_measurement": "native plan setup outside timing; API setup repeats inside every timed solve",
+            "solver_family": "cg"
+          },
+          "solver_status": "converged",
+          "status": "measured",
+          "true_residual_norm": 5.661369681727494e-06
+        },
+        {
+          "iterations": 395,
+          "matvecs": 404,
+          "name": "scipy-out",
+          "reason": null,
+          "reported_residual_norm": 5.661369679781247e-06,
+          "residual_threshold": 5.749348165496098e-06,
+          "round_elapsed_ns": [
+            139649766,
+            183200992,
+            189694547,
+            177109420,
+            188211813,
+            186257435,
+            162660031,
+            146663212,
+            153100318,
+            156081431,
+            155906602,
+            156273167,
+            157709213,
+            156833679,
+            157253039,
+            155593846,
+            157900940,
+            157649247,
+            158064977,
+            160847603,
+            152110881,
+            143162239,
+            145795798,
+            148120945,
+            143376860,
+            143267764,
+            144220548,
+            144094682,
+            144982302,
+            145424346
+          ],
+          "setup": {
+            "implementation_role": "same_policy_reference",
+            "preconditioner": "none",
+            "preconditioner_setup_elapsed_ns": 0,
+            "preconditioner_stored_bytes": 0,
+            "residual_policy": "standard with residual_refresh=50",
+            "setup_in_timed_call": false,
+            "setup_measurement": "single untimed setup probe",
+            "solver_family": "cg"
+          },
+          "solver_status": "converged",
+          "status": "measured",
+          "true_residual_norm": 5.661369679781243e-06
+        },
+        {
+          "iterations": 395,
+          "matvecs": 404,
+          "name": "torch-eager-out",
+          "reason": null,
+          "reported_residual_norm": 5.661369672915965e-06,
+          "residual_threshold": 5.749348165496098e-06,
+          "round_elapsed_ns": [
+            96907953,
+            147713210,
+            126849283,
+            125561136,
+            135217017,
+            140962999,
+            89581331,
+            90105673,
+            100330297,
+            99293777,
+            99350392,
+            115880657,
+            96136380,
+            99911972,
+            99318532,
+            95439110,
+            98687544,
+            99237299,
+            101123854,
+            100572584,
+            93241652,
+            92974590,
+            89909811,
+            90867359,
+            90552047,
+            91736910,
+            91061691,
+            94452748,
+            92543528,
+            90648789
+          ],
+          "setup": {
+            "implementation_role": "same_policy_reference",
+            "preconditioner": "none",
+            "preconditioner_setup_elapsed_ns": 0,
+            "preconditioner_stored_bytes": 0,
+            "residual_policy": "standard with residual_refresh=50",
+            "setup_in_timed_call": false,
+            "setup_measurement": "single untimed setup probe",
+            "solver_family": "cg"
+          },
+          "solver_status": "converged",
+          "status": "measured",
+          "true_residual_norm": 5.6613696727999775e-06
+        }
+      ],
+      "round_orders": [
+        [
+          "native",
+          "scipy-out",
+          "torch-eager-out"
+        ],
+        [
+          "torch-eager-out",
+          "native",
+          "scipy-out"
+        ],
+        [
+          "scipy-out",
+          "torch-eager-out",
+          "native"
+        ],
+        [
+          "native",
+          "torch-eager-out",
+          "scipy-out"
+        ],
+        [
+          "scipy-out",
+          "native",
+          "torch-eager-out"
+        ],
+        [
+          "torch-eager-out",
+          "scipy-out",
+          "native"
+        ],
+        [
+          "native",
+          "scipy-out",
+          "torch-eager-out"
+        ],
+        [
+          "torch-eager-out",
+          "native",
+          "scipy-out"
+        ],
+        [
+          "scipy-out",
+          "torch-eager-out",
+          "native"
+        ],
+        [
+          "native",
+          "torch-eager-out",
+          "scipy-out"
+        ],
+        [
+          "scipy-out",
+          "native",
+          "torch-eager-out"
+        ],
+        [
+          "torch-eager-out",
+          "scipy-out",
+          "native"
+        ],
+        [
+          "native",
+          "scipy-out",
+          "torch-eager-out"
+        ],
+        [
+          "torch-eager-out",
+          "native",
+          "scipy-out"
+        ],
+        [
+          "scipy-out",
+          "torch-eager-out",
+          "native"
+        ],
+        [
+          "native",
+          "torch-eager-out",
+          "scipy-out"
+        ],
+        [
+          "scipy-out",
+          "native",
+          "torch-eager-out"
+        ],
+        [
+          "torch-eager-out",
+          "scipy-out",
+          "native"
+        ],
+        [
+          "native",
+          "scipy-out",
+          "torch-eager-out"
+        ],
+        [
+          "torch-eager-out",
+          "native",
+          "scipy-out"
+        ],
+        [
+          "scipy-out",
+          "torch-eager-out",
+          "native"
+        ],
+        [
+          "native",
+          "torch-eager-out",
+          "scipy-out"
+        ],
+        [
+          "scipy-out",
+          "native",
+          "torch-eager-out"
+        ],
+        [
+          "torch-eager-out",
+          "scipy-out",
+          "native"
+        ],
+        [
+          "native",
+          "scipy-out",
+          "torch-eager-out"
+        ],
+        [
+          "torch-eager-out",
+          "native",
+          "scipy-out"
+        ],
+        [
+          "scipy-out",
+          "torch-eager-out",
+          "native"
+        ],
+        [
+          "native",
+          "torch-eager-out",
+          "scipy-out"
+        ],
+        [
+          "scipy-out",
+          "native",
+          "torch-eager-out"
+        ],
+        [
+          "torch-eager-out",
+          "scipy-out",
+          "native"
+        ]
+      ],
+      "sampling": {
+        "repetitions": 5,
+        "rounds": 30,
+        "warmups": 3
+      },
+      "schedule": "williams"
+    }
+  ],
+  "environment": {
+    "affinity": [
+      0
+    ],
+    "cmake": {
+      "fields": {
+        "CG_BUILD_PYTHON:BOOL": "ON",
+        "CG_ENABLE_CLANG_TIDY:BOOL": "OFF",
+        "CG_ENABLE_OPENMP:BOOL": "OFF",
+        "CG_ENABLE_SANITIZERS:BOOL": "OFF",
+        "CMAKE_BUILD_TYPE:STRING": "Release",
+        "CMAKE_CXX_COMPILER:FILEPATH": "/usr/bin/c++",
+        "CMAKE_CXX_FLAGS-ADVANCED:INTERNAL": "1",
+        "CMAKE_CXX_FLAGS:STRING": "",
+        "CMAKE_CXX_FLAGS_DEBUG-ADVANCED:INTERNAL": "1",
+        "CMAKE_CXX_FLAGS_DEBUG:STRING": "-g",
+        "CMAKE_CXX_FLAGS_MINSIZEREL-ADVANCED:INTERNAL": "1",
+        "CMAKE_CXX_FLAGS_MINSIZEREL:STRING": "-Os -DNDEBUG",
+        "CMAKE_CXX_FLAGS_RELEASE-ADVANCED:INTERNAL": "1",
+        "CMAKE_CXX_FLAGS_RELEASE:STRING": "-O3 -DNDEBUG",
+        "CMAKE_CXX_FLAGS_RELWITHDEBINFO-ADVANCED:INTERNAL": "1",
+        "CMAKE_CXX_FLAGS_RELWITHDEBINFO:STRING": "-O2 -g -DNDEBUG"
+      },
+      "path": "/home/threemonth03/Downloads/Conjugate-Gradient-Method-library/build/cpu-release/CMakeCache.txt"
+    },
+    "cpu": "x86_64",
+    "dynamic_thread_environment": {
+      "MKL_DYNAMIC": "FALSE",
+      "OMP_DYNAMIC": "FALSE"
+    },
+    "git_status": "?? benchmarks/cg_vs_direct_results.json\n?? benchmarks/compare_direct.py",
+    "logical_cpus": 24,
+    "machine": "x86_64",
+    "native": {
+      "build_info": {
+        "build_type": "Release",
+        "compiler": "GNU 16.0.1",
+        "flags": " -O3 -DNDEBUG",
+        "openmp": false
+      },
+      "module_path": "/home/threemonth03/Downloads/Conjugate-Gradient-Method-library/build/cpu-release/python/_cgcore.cpython-312-x86_64-linux-gnu.so",
+      "module_sha256": "14694adf56eaa27485546707adcab1c60129fe96461f6ab9a7706156ffbbf8f9",
+      "python_package_path": "/home/threemonth03/Downloads/Conjugate-Gradient-Method-library/python/cgpy/__init__.py"
+    },
+    "numpy_config": {
+      "Build Dependencies": {
+        "blas": {
+          "detection method": "pkgconfig",
+          "found": true,
+          "include directory": "/opt/_internal/cpython-3.12.7/lib/python3.12/site-packages/scipy_openblas64/include",
+          "lib directory": "/opt/_internal/cpython-3.12.7/lib/python3.12/site-packages/scipy_openblas64/lib",
+          "name": "scipy-openblas",
+          "openblas configuration": "OpenBLAS 0.3.29  USE64BITINT DYNAMIC_ARCH NO_AFFINITY Haswell MAX_THREADS=64",
+          "pc file directory": "/project/.openblas",
+          "version": "0.3.29"
+        },
+        "lapack": {
+          "detection method": "pkgconfig",
+          "found": true,
+          "include directory": "/opt/_internal/cpython-3.12.7/lib/python3.12/site-packages/scipy_openblas64/include",
+          "lib directory": "/opt/_internal/cpython-3.12.7/lib/python3.12/site-packages/scipy_openblas64/lib",
+          "name": "scipy-openblas",
+          "openblas configuration": "OpenBLAS 0.3.29  USE64BITINT DYNAMIC_ARCH NO_AFFINITY Haswell MAX_THREADS=64",
+          "pc file directory": "/project/.openblas",
+          "version": "0.3.29"
+        }
+      },
+      "Compilers": {
+        "c": {
+          "commands": "cc",
+          "linker": "ld.bfd",
+          "name": "gcc",
+          "version": "10.2.1"
+        },
+        "c++": {
+          "commands": "c++",
+          "linker": "ld.bfd",
+          "name": "gcc",
+          "version": "10.2.1"
+        },
+        "cython": {
+          "commands": "cython",
+          "linker": "cython",
+          "name": "cython",
+          "version": "3.1.0"
+        }
+      },
+      "Machine Information": {
+        "build": {
+          "cpu": "x86_64",
+          "endian": "little",
+          "family": "x86_64",
+          "system": "linux"
+        },
+        "host": {
+          "cpu": "x86_64",
+          "endian": "little",
+          "family": "x86_64",
+          "system": "linux"
+        }
+      },
+      "Python Information": {
+        "path": "/tmp/build-env-sgs8db9u/bin/python",
+        "version": "3.12"
+      },
+      "SIMD Extensions": {
+        "baseline": [
+          "SSE",
+          "SSE2",
+          "SSE3"
+        ],
+        "found": [
+          "SSSE3",
+          "SSE41",
+          "POPCNT",
+          "SSE42",
+          "AVX",
+          "F16C",
+          "FMA3",
+          "AVX2"
+        ],
+        "not found": [
+          "AVX512F",
+          "AVX512CD",
+          "AVX512_KNL",
+          "AVX512_KNM",
+          "AVX512_SKX",
+          "AVX512_CLX",
+          "AVX512_CNL",
+          "AVX512_ICL"
+        ]
+      }
+    },
+    "packages": {
+      "cgpy": null,
+      "numpy": "2.2.6",
+      "scipy": "1.15.3",
+      "threadpoolctl": "3.6.0",
+      "torch": "2.8.0+cpu"
+    },
+    "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+    "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+    "python_compiler": "GCC 13.3.0",
+    "python_executable": "/home/threemonth03/Downloads/Conjugate-Gradient-Method-library/.venv/bin/python",
+    "revision": "ccc8ec7a76a569e4e2505251af3cb7d2469eb594",
+    "thread_environment": {
+      "BLIS_NUM_THREADS": "1",
+      "MKL_NUM_THREADS": "1",
+      "NUMEXPR_NUM_THREADS": "1",
+      "OMP_NUM_THREADS": "1",
+      "OPENBLAS_NUM_THREADS": "1",
+      "VECLIB_MAXIMUM_THREADS": "1"
+    },
+    "threadpools": [
+      {
+        "architecture": "Haswell",
+        "filepath": "/home/threemonth03/Downloads/Conjugate-Gradient-Method-library/.venv/lib/python3.12/site-packages/numpy.libs/libscipy_openblas64_-56d6093b.so",
+        "internal_api": "openblas",
+        "num_threads": 1,
+        "prefix": "libscipy_openblas",
+        "threading_layer": "pthreads",
+        "user_api": "blas",
+        "version": "0.3.29"
+      },
+      {
+        "architecture": "Haswell",
+        "filepath": "/home/threemonth03/Downloads/Conjugate-Gradient-Method-library/.venv/lib/python3.12/site-packages/scipy.libs/libscipy_openblas-68440149.so",
+        "internal_api": "openblas",
+        "num_threads": 1,
+        "prefix": "libscipy_openblas",
+        "threading_layer": "pthreads",
+        "user_api": "blas",
+        "version": "0.3.28"
+      },
+      {
+        "filepath": "/home/threemonth03/Downloads/Conjugate-Gradient-Method-library/.venv/lib/python3.12/site-packages/torch/lib/libgomp.so.1",
+        "internal_api": "openmp",
+        "num_threads": 1,
+        "prefix": "libgomp",
+        "user_api": "openmp",
+        "version": null
+      }
+    ],
+    "torch": {
+      "config": "PyTorch built with:\n  - GCC 13.3\n  - C++ Version: 201703\n  - Intel(R) oneAPI Math Kernel Library Version 2024.2-Product Build 20240605 for Intel(R) 64 architecture applications\n  - Intel(R) MKL-DNN v3.7.1 (Git Hash 8d263e693366ef8db40acc569cc7d8edf644556d)\n  - OpenMP 201511 (a.k.a. OpenMP 4.5)\n  - LAPACK is enabled (usually provided by MKL)\n  - NNPACK is enabled\n  - CPU capability usage: AVX2\n  - Build settings: BLAS_INFO=mkl, BUILD_TYPE=Release, COMMIT_SHA=a1cb3cc05d46d198467bebbb6e8fba50a325d4e7, CXX_COMPILER=/opt/rh/gcc-toolset-13/root/usr/bin/c++, CXX_FLAGS= -fvisibility-inlines-hidden -DUSE_PTHREADPOOL -DNDEBUG -DUSE_KINETO -DLIBKINETO_NOCUPTI -DLIBKINETO_NOROCTRACER -DLIBKINETO_NOXPUPTI=ON -DUSE_FBGEMM -DUSE_PYTORCH_QNNPACK -DUSE_XNNPACK -DSYMBOLICATE_MOBILE_DEBUG_HANDLE -O2 -fPIC -DC10_NODEPRECATED -Wall -Wextra -Werror=return-type -Werror=non-virtual-dtor -Werror=range-loop-construct -Werror=bool-operation -Wnarrowing -Wno-missing-field-initializers -Wno-unknown-pragmas -Wno-unused-parameter -Wno-strict-overflow -Wno-strict-aliasing -Wno-stringop-overflow -Wsuggest-override -Wno-psabi -Wno-error=old-style-cast -faligned-new -Wno-maybe-uninitialized -fno-math-errno -fno-trapping-math -Werror=format -Wno-dangling-reference -Wno-error=dangling-reference -Wno-stringop-overflow, LAPACK_INFO=mkl, PERF_WITH_AVX=1, PERF_WITH_AVX2=1, TORCH_VERSION=2.8.0, USE_CUDA=0, USE_CUDNN=OFF, USE_CUSPARSELT=OFF, USE_GFLAGS=OFF, USE_GLOG=OFF, USE_GLOO=ON, USE_MKL=ON, USE_MKLDNN=ON, USE_MPI=OFF, USE_NCCL=OFF, USE_NNPACK=ON, USE_OPENMP=ON, USE_ROCM=OFF, USE_ROCM_KERNEL_ASSERT=OFF, USE_XCCL=OFF, USE_XPU=OFF, \n",
+      "interop_threads": 1,
+      "intraop_threads": 1
+    }
+  },
+  "metric": "time_to_solution",
+  "schema_version": 1,
+  "spec": {
+    "cases": [
+      {
+        "condition_scale": 100.0,
+        "grid": 8,
+        "name": "poisson-8",
+        "size": 64,
+        "storage": "csr"
+      },
+      {
+        "condition_scale": 100.0,
+        "grid": 32,
+        "name": "poisson-32",
+        "size": 1024,
+        "storage": "csr"
+      },
+      {
+        "condition_scale": 100.0,
+        "grid": 64,
+        "name": "poisson-64",
+        "size": 4096,
+        "storage": "csr"
+      },
+      {
+        "condition_scale": 100.0,
+        "grid": 128,
+        "name": "poisson-128",
+        "size": 16384,
+        "storage": "csr"
+      }
+    ],
+    "comparison": "implementations",
+    "implementations": [
+      "native",
+      "scipy-out",
+      "torch-eager-out"
+    ],
+    "sampling": {
+      "repetitions": 5,
+      "rounds": 30,
+      "warmups": 3
+    },
+    "scope": "prepared",
+    "seed": 20261015,
+    "solver": {
+      "algorithm": "standard",
+      "atol": 1e-12,
+      "fused": true,
+      "maxiter": 2000,
+      "preconditioner": "none",
+      "residual_refresh": 50,
+      "rtol": 1e-08
+    },
+    "suite": "cpu-csr-f64-v1",
+    "threads": 1
+  }
+}

@@ -84,9 +84,9 @@ def environment_metadata():
                     fields[key] = value
             cmake = {"path": str(cache), "fields": fields}
             break
-    cpu = platform.processor()
+    cpu = platform.processor() or platform.machine()
     cpuinfo = Path("/proc/cpuinfo")
-    if not cpu and cpuinfo.exists():
+    if cpuinfo.exists():
         for line in cpuinfo.read_text(errors="replace").splitlines():
             if line.startswith("model name"):
                 cpu = line.partition(":")[2].strip()

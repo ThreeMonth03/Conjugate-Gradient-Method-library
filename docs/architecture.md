@@ -35,6 +35,8 @@ Workspace owns five vectors: residual `r`, direction `p`, product `Ap`, true-res
 
 The backend exposes primitive operations and selected fused operations: matvec with `pᵀAp`, solution/residual update with residual reduction, and Jacobi application with `rᵀz`. `fused=False` keeps a separate-operation reference path. Fusion changes data traversal and summation order; it does not select the CG algorithm.
 
+Dense fused row reductions use independent accumulators to permit vectorization without fast-math or host-specific compiler flags. Odd tails and padded row strides are supported; tests compare against long-double sums and retain non-finite multiplication behavior. `make pyprof PYPROF_ARGS='--no-fused'` selects the native reference path for measurement.
+
 Standard CG and Jacobi PCG share the recurrence. PCG uses `z=M⁻¹r` and `rᵀz`, while convergence always uses the Euclidean true residual. Periodic replacement restarts the direction from the recomputed residual (or its preconditioned value). Candidate convergence and final results are verified even when periodic refresh is disabled. The explicit legacy algorithm remains selectable and does not support Jacobi.
 
 Stable norm evaluation prevents false zero residuals from squared-sum underflow. Required inner products still use ordinary float64 arithmetic: an unusable product returns `non_finite`, even if the inputs and reported residual are finite. This is deliberate failure reporting, not arbitrary-scale arithmetic support. SPD remains a caller precondition.

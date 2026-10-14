@@ -52,6 +52,42 @@ void validate_apply(DenseMatrixView A, ConstVectorView x, VectorView output)
     }
 }
 
+double row_dot(const double *row, const double *x, std::size_t size, bool optimized)
+{
+    if (!optimized)
+    {
+        double sum = 0.0;
+#ifdef _OPENMP
+#pragma omp simd reduction(+ : sum)
+#endif
+        for (std::size_t j = 0; j < size; ++j)
+        {
+            sum += row[j] * x[j];
+        }
+        return sum;
+    }
+    // Independent accumulators let ordinary optimization vectorize the row
+    // without fast-math, architecture flags, or alignment stronger than double.
+    double sum0 = 0.0;
+    double sum1 = 0.0;
+    double sum2 = 0.0;
+    double sum3 = 0.0;
+    std::size_t j = 0;
+    for (; j + 3 < size; j += 4)
+    {
+        sum0 += row[j] * x[j];
+        sum1 += row[j + 1] * x[j + 1];
+        sum2 += row[j + 2] * x[j + 2];
+        sum3 += row[j + 3] * x[j + 3];
+    }
+    double sum = (sum0 + sum1) + (sum2 + sum3);
+    for (; j < size; ++j)
+    {
+        sum += row[j] * x[j];
+    }
+    return sum;
+}
+
 } // namespace
 
 CpuBackend::CpuBackend(int threads, bool fused) : threads_(threads), fused_(fused)
@@ -234,15 +270,7 @@ void CpuBackend::apply(DenseMatrixView A, ConstVectorView x, VectorView output) 
     for (std::size_t i = 0; i < A.rows; ++i)
     {
         const auto *row = A.data + i * A.row_stride;
-        double sum = 0.0;
-#ifdef _OPENMP
-#pragma omp simd reduction(+ : sum)
-#endif
-        for (std::size_t j = 0; j < A.cols; ++j)
-        {
-            sum += row[j] * x.data[j];
-        }
-        output.data[i] = sum;
+        output.data[i] = row_dot(row, x.data, A.cols, fused_);
     }
 }
 
@@ -263,14 +291,7 @@ double CpuBackend::apply_dot(DenseMatrixView A, ConstVectorView p, VectorView ap
     for (std::size_t i = 0; i < A.rows; ++i)
     {
         const auto *row = A.data + i * A.row_stride;
-        double sum = 0.0;
-#ifdef _OPENMP
-#pragma omp simd reduction(+ : sum)
-#endif
-        for (std::size_t j = 0; j < A.cols; ++j)
-        {
-            sum += row[j] * p.data[j];
-        }
+        const double sum = row_dot(row, p.data, A.cols, true);
         ap.data[i] = sum;
         product += p.data[i] * sum;
     }
@@ -302,14 +323,7 @@ double CpuBackend::residual(DenseMatrixView A, ConstVectorView b, ConstVectorVie
     for (std::size_t i = 0; i < A.rows; ++i)
     {
         const auto *row = A.data + i * A.row_stride;
-        double sum = 0.0;
-#ifdef _OPENMP
-#pragma omp simd reduction(+ : sum)
-#endif
-        for (std::size_t j = 0; j < A.cols; ++j)
-        {
-            sum += row[j] * x.data[j];
-        }
+        const double sum = row_dot(row, x.data, A.cols, true);
         const double value = b_minus_ax ? b.data[i] - sum : sum - b.data[i];
         r.data[i] = value;
         squared_norm += value * value;

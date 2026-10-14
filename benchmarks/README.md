@@ -4,6 +4,9 @@
 builder, solver adapters, correctness gate, Williams scheduler and artifact
 writer. All dependencies belong in the project `.venv` / local build tree.
 
+See [recorded CPU results](results.md) for complete measurements, raw artifacts,
+hardware provenance, and reproduction commands.
+
 The sparse solver strategy suite is the primary CG/PCG-versus-direct comparison:
 
 ```bash
@@ -71,6 +74,8 @@ they are clearly separate from the official `scipy-cg` / `scipy-pcg` solvers.
 Jacobi PCG supports `--algorithm standard`; the explicit legacy algorithm and
 Jacobi combination is rejected. Normal implementation suites also accept
 `--preconditioner jacobi` when selecting their common preconditioner.
+`--no-fused` selects the native separate-operation kernel path; NumPy and
+PyTorch retain their eager operations. The selected flag is saved for replay.
 
 The underlying entry point is useful for selecting one comparison:
 

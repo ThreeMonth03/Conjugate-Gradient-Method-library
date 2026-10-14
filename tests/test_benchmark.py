@@ -226,6 +226,7 @@ def test_launcher_sets_child_thread_environment_and_replays(tmp_path):
         "smoke",
         "--implementations",
         "numpy-out",
+        "--no-fused",
         "--threads",
         "1",
         "--warmups",
@@ -243,6 +244,7 @@ def test_launcher_sets_child_thread_environment_and_replays(tmp_path):
     before = os.environ.get("OMP_NUM_THREADS")
     subprocess.run(command, env=env, check=True, capture_output=True, text=True)
     artifact = json.loads(output.read_text())
+    assert artifact["spec"]["solver"]["fused"] is False
     assert all(value == "1" for value in artifact["environment"]["thread_environment"].values())
     assert os.environ.get("OMP_NUM_THREADS") == before
     replay = tmp_path / "replay.json"
