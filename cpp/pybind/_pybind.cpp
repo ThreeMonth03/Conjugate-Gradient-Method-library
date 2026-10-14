@@ -3,6 +3,7 @@
 #include <pybind11/operators.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+#include <string>
 #include <utility>
 namespace py = pybind11;
 
@@ -10,15 +11,19 @@ PYBIND11_MODULE(_cgpy, m)
 {
     auto m_matrix = m.def_submodule("Matrix");
     py::class_<Matrix::Naive_Matrix>(m_matrix, "Naive_Matrix")
+        .def(py::init<Matrix::Naive_Matrix const &>())
         .def(py::init<size_t, size_t>())
         .def(py::init<size_t, size_t, std::vector<double> const &>())
         .def(py::init<std::vector<double> const &>())
-        .def(py::init<Matrix::Naive_Matrix const &>())
         .def(py::init<std::vector<std::vector<double>> const &>())
         .def("__getitem__", [](Matrix::Naive_Matrix &mat, std::pair<size_t, size_t> index) -> double
              { return mat(index.first, index.second); })
         .def("__repr__",
-             [](Matrix::Naive_Matrix &mat) -> std::vector<double> { return mat.buffer_vector(); })
+             [](const Matrix::Naive_Matrix &mat)
+             {
+                 return "Naive_Matrix(" + std::to_string(mat.nrow()) + ", " +
+                        std::to_string(mat.ncol()) + ")";
+             })
         .def("__setitem__", [](Matrix::Naive_Matrix &mat, std::pair<size_t, size_t> index,
                                double val) { mat(index.first, index.second) = val; })
         .def("__eq__", &Matrix::Naive_Matrix::operator==)
@@ -37,16 +42,20 @@ PYBIND11_MODULE(_cgpy, m)
         .def("tolist", &Matrix::Naive_Matrix::buffer_vector)
         .def("tolist2d", &Matrix::Naive_Matrix::buffer_vector2d);
     py::class_<Matrix::Accelerated_Matrix>(m_matrix, "Accelerated_Matrix")
+        .def(py::init<Matrix::Accelerated_Matrix const &>())
         .def(py::init<size_t, size_t>())
         .def(py::init<size_t, size_t, std::vector<double> const &>())
         .def(py::init<std::vector<double> const &>())
-        .def(py::init<Matrix::Accelerated_Matrix const &>())
         .def(py::init<std::vector<std::vector<double>> const &>())
         .def("__getitem__",
              [](Matrix::Accelerated_Matrix &mat, std::pair<size_t, size_t> index) -> double
              { return mat(index.first, index.second); })
-        .def("__repr__", [](Matrix::Accelerated_Matrix &mat) -> std::vector<double>
-             { return mat.buffer_vector(); })
+        .def("__repr__",
+             [](const Matrix::Accelerated_Matrix &mat)
+             {
+                 return "Accelerated_Matrix(" + std::to_string(mat.nrow()) + ", " +
+                        std::to_string(mat.ncol()) + ")";
+             })
         .def("__setitem__", [](Matrix::Accelerated_Matrix &mat, std::pair<size_t, size_t> index,
                                double val) { mat(index.first, index.second) = val; })
         .def("__eq__", &Matrix::Accelerated_Matrix::operator==)
@@ -78,11 +87,14 @@ PYBIND11_MODULE(_cgpy, m)
              py::arg("number_of_threads") = 1)
         .def("solve_by_Naive_Matrix", &cg_method::linear_CG::solve_by_Naive_Matrix)
         .def("solve_by_Accelerated_Matrix", &cg_method::linear_CG::solve_by_Accelerated_Matrix)
-        .def("set_epsilon", &cg_method::linear_CG::set_epsilon)
+        .def("set_epsilon",
+             [](cg_method::linear_CG &solver, double value) { solver.set_epsilon() = value; })
         .def("get_epsilon", &cg_method::linear_CG::get_epsilon)
-        .def("set_epoch", &cg_method::linear_CG::set_epoch)
+        .def("set_epoch",
+             [](cg_method::linear_CG &solver, int value) { solver.set_epoch() = value; })
         .def("get_epoch", &cg_method::linear_CG::get_epoch)
-        .def("set_number_of_threads", &cg_method::linear_CG::set_number_of_threads)
+        .def("set_number_of_threads", [](cg_method::linear_CG &solver, int value)
+             { solver.set_number_of_threads() = value; })
         .def("get_number_of_threads", &cg_method::linear_CG::get_number_of_threads);
     py::class_<cg_method::nonlinear_CG>(m_cg_method, "nonlinear_CG")
         .def_static("Naive_Fletcher_Reeves_next_iteration",
