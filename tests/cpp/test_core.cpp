@@ -54,6 +54,15 @@ TEST(Storage, ChecksShapeAndOverflowBeforeAccess)
                  std::invalid_argument);
 }
 
+TEST(Storage, RejectsUnalignedViewsBeforeReadingTheirData)
+{
+    alignas(double) unsigned char storage[sizeof(double) * 4 + 1] = {};
+    const auto *unaligned = reinterpret_cast<const double *>(storage + 1);
+    const cg::CpuBackend backend;
+    EXPECT_THROW((cg::DenseMatrixView(unaligned, 2, 2)), std::invalid_argument);
+    EXPECT_THROW(backend.dot({unaligned, 1}, {unaligned, 1}), std::invalid_argument);
+}
+
 TEST(Workspace, ReusesStorageAcrossSameAndSmallerSizes)
 {
     cg::Workspace workspace(32);

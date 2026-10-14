@@ -95,6 +95,10 @@ void validate(ConstVectorView view)
     {
         throw std::invalid_argument("nonempty vector has a null data pointer");
     }
+    if (view.size != 0 && reinterpret_cast<std::uintptr_t>(view.data) % alignof(double) != 0)
+    {
+        throw std::invalid_argument("float64 storage must be aligned for double access");
+    }
     end_address(view.data, view.size);
 }
 
