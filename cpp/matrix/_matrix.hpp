@@ -49,6 +49,8 @@ class Naive_Matrix
     double buffer(size_t i) const { return m_buffer[i]; }
     std::vector<double> buffer_vector() const
     {
+        if (size() == 0)
+            return {};
         return std::vector<double>(m_buffer, m_buffer + size());
     }
 
@@ -111,6 +113,8 @@ class Accelerated_Matrix
     double buffer(size_t i) const { return m_buffer[i]; }
     std::vector<double> buffer_vector() const
     {
+        if (size() == 0)
+            return {};
         return std::vector<double>(m_buffer, m_buffer + size());
     }
 
