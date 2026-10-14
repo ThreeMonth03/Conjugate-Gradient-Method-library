@@ -135,6 +135,12 @@ def collect_case(case_spec, run_spec):
         sampling = dict(saved_sampling)
     cycle = len(williams_rows(tuple(candidates)))
     sampling["rounds"] = ((sampling["rounds"] + cycle - 1) // cycle) * cycle
+    expected_orders = run_spec.get("expected_round_orders", {}).get(case_spec.name)
+    if expected_orders is not None:
+        rows = williams_rows(tuple(candidates))
+        generated = [list(rows[index % cycle]) for index in range(sampling["rounds"])]
+        if generated != expected_orders:
+            raise ValueError("replay timing schedule changed: " + case_spec.name)
     orders, elapsed = time_candidates(candidates, sampling)
     # Revalidate after measurement too, catching state-reset regressions.
     for entry in results:

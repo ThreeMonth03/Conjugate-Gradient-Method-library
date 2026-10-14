@@ -181,7 +181,8 @@ PYTHONPATH=python .venv/bin/python -m cgbench replay \
   build/benchmarks/cpu-t1.json --output build/benchmarks/replay.json
 ```
 
-Replay regenerates the recorded inputs/options and checks their hashes; it
+Replay regenerates the recorded inputs/options and checks their hashes,
+eligible candidates, resolved sampling counts and saved timing schedule; it
 does not promise identical wall time. `compare` warns when recorded specs or
 environments differ. CI should gate correctness and artifact collection in the
 smoke suite. Speed thresholds belong on a stable machine, separate from
