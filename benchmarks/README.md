@@ -6,6 +6,8 @@ writer. All dependencies belong in the project `.venv` / local build tree.
 
 See [recorded CPU results](results.md) for complete measurements, raw artifacts,
 hardware provenance, and reproduction commands.
+The [explicit dense BLAS results](blas-results.md) add both kernel modes in
+prepared and API scopes, with complete timing artifacts and comparison limits.
 
 The sparse solver strategy suite is the primary CG/PCG-versus-direct comparison:
 

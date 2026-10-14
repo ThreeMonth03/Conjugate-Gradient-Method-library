@@ -97,5 +97,6 @@ The CLI and pytest use the same cases and validation fixtures. Candidates must s
 Performance depends on matrix structure, conditioning, hardware, thread count, and setup reuse. Compare on the same machine with the same tolerances and initial guesses; shared-runner CI checks correctness rather than enforcing speed thresholds.
 
 The [recorded CPU results](benchmarks/results.md) include every measured case, original timing artifacts, and commands to reproduce or replay them.
+The [dense BLAS results](benchmarks/blas-results.md) compare both explicit kernels with NumPy and PyTorch in prepared and API scopes, including complete raw timings and uncertainty limits.
 
 An optional [CPU Docker environment](contrib/docker/README.md) keeps the compiler and dependencies inside a container.

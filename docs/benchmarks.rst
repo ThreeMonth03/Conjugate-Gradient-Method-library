@@ -61,3 +61,5 @@ shared CI enforces correctness instead of speed thresholds. The repository's
 and `recorded CPU results <https://github.com/ThreeMonth03/Conjugate-Gradient-Method-library/blob/main/benchmarks/results.md>`_
 retain the complete scope notes, reproducible commands and original artifacts.
 Those recorded runs predate the optional BLAS kernel and remain unchanged.
+The separate `explicit dense BLAS results <https://github.com/ThreeMonth03/Conjugate-Gradient-Method-library/blob/main/benchmarks/blas-results.md>`_
+cover both kernel modes and both scopes, with raw artifacts and timing limits.

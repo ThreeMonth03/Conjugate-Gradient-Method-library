@@ -1,0 +1,2034 @@
+{
+  "cases": [
+    {
+      "case": {
+        "condition_scale": 100.0,
+        "name": "dense-64",
+        "size": 64
+      },
+      "cycle_rows": 4,
+      "dtype": "float64",
+      "input_sha256": "e8985fd6c5ed371b92931d8ff1bbddf1a718eeeebd399f5ca2a62a45255e4cb6",
+      "input_storage_basis": "shared input NumPy/SciPy arrays, including original index dtype; excludes native owning copies and workspace",
+      "input_stored_bytes": 33792,
+      "layout": "C",
+      "nnz": null,
+      "results": [
+        {
+          "iterations": 49,
+          "matvecs": 51,
+          "name": "native",
+          "reason": null,
+          "reported_residual_norm": 2.0720758512003756e-06,
+          "residual_threshold": 2.7375571192211847e-06,
+          "round_elapsed_ns": [
+            225838,
+            214017,
+            210065,
+            442529,
+            309000,
+            212298,
+            209431,
+            214140,
+            242028,
+            274530,
+            256707,
+            235198,
+            201080,
+            218014,
+            213891,
+            241414,
+            204793,
+            235031,
+            213592,
+            223400,
+            222734,
+            219822,
+            201672,
+            249737,
+            205547,
+            218201,
+            223652,
+            214766,
+            204066,
+            233088,
+            237216,
+            217678
+          ],
+          "setup": {
+            "blas": null,
+            "dense_kernel": "native",
+            "implementation_role": "native",
+            "preconditioner": "none",
+            "preconditioner_setup_elapsed_ns": 0,
+            "preconditioner_stored_bytes": 0,
+            "residual_policy": "standard with residual_refresh=50",
+            "setup_in_timed_call": true,
+            "setup_measurement": "native plan setup outside timing; API setup repeats inside every timed solve",
+            "solver_family": "cg"
+          },
+          "solver_status": "converged",
+          "status": "measured",
+          "true_residual_norm": 2.072075851428609e-06
+        },
+        {
+          "iterations": 49,
+          "matvecs": 51,
+          "name": "native-blas",
+          "reason": null,
+          "reported_residual_norm": 2.0398498396536824e-06,
+          "residual_threshold": 2.7375571192211847e-06,
+          "round_elapsed_ns": [
+            137147,
+            146026,
+            209490,
+            143117,
+            135105,
+            147429,
+            147611,
+            157460,
+            138796,
+            172656,
+            270432,
+            146819,
+            130671,
+            144128,
+            167131,
+            157075,
+            130787,
+            152147,
+            159166,
+            148812,
+            131306,
+            145646,
+            153805,
+            145131,
+            130405,
+            183027,
+            164396,
+            141066,
+            154896,
+            165257,
+            184400,
+            162283
+          ],
+          "setup": {
+            "blas": {
+              "configuration": "OpenBLAS 0.3.30, sequential, USE_LOCKING=1, LP64, BLAS-only, prefix=cgpy_, CORE2 SSE3/SSSE3 baseline, runtime CORE2/HASWELL",
+              "enabled": true,
+              "integer_bits": 32,
+              "provider": "OpenBLAS",
+              "symbol_prefix": "cgpy_",
+              "thread_mode": "sequential"
+            },
+            "dense_kernel": "blas",
+            "implementation_role": "native",
+            "preconditioner": "none",
+            "preconditioner_setup_elapsed_ns": 0,
+            "preconditioner_stored_bytes": 0,
+            "residual_policy": "standard with residual_refresh=50",
+            "setup_in_timed_call": true,
+            "setup_measurement": "native plan setup outside timing; API setup repeats inside every timed solve",
+            "solver_family": "cg"
+          },
+          "solver_status": "converged",
+          "status": "measured",
+          "true_residual_norm": 2.039849839653683e-06
+        },
+        {
+          "iterations": 49,
+          "matvecs": 51,
+          "name": "numpy-out",
+          "reason": null,
+          "reported_residual_norm": 2.046567590506424e-06,
+          "residual_threshold": 2.7375571192211847e-06,
+          "round_elapsed_ns": [
+            1096775,
+            1093139,
+            1188514,
+            1138497,
+            1110623,
+            1124348,
+            1081311,
+            1257578,
+            1543837,
+            1259551,
+            1237352,
+            1149172,
+            1101162,
+            1105129,
+            1495359,
+            1181732,
+            1150391,
+            1213408,
+            1080987,
+            1157297,
+            1090097,
+            1102027,
+            1115468,
+            1158491,
+            1089873,
+            1122138,
+            1111680,
+            1120301,
+            1188111,
+            1150025,
+            1638004,
+            1160351
+          ],
+          "setup": {
+            "implementation_role": "same_policy_reference",
+            "preconditioner": "none",
+            "preconditioner_setup_elapsed_ns": 0,
+            "preconditioner_stored_bytes": 0,
+            "residual_policy": "standard with residual_refresh=50",
+            "setup_in_timed_call": true,
+            "setup_measurement": "single untimed setup probe",
+            "solver_family": "cg"
+          },
+          "solver_status": "converged",
+          "status": "measured",
+          "true_residual_norm": 2.046567590506424e-06
+        },
+        {
+          "iterations": 49,
+          "matvecs": 51,
+          "name": "torch-eager-out",
+          "reason": null,
+          "reported_residual_norm": 2.4465472827703722e-06,
+          "residual_threshold": 2.7375571192211847e-06,
+          "round_elapsed_ns": [
+            1641408,
+            1636374,
+            1799983,
+            1650691,
+            1671272,
+            1644091,
+            1546777,
+            1604145,
+            1652016,
+            1984804,
+            1868936,
+            1704016,
+            1646737,
+            1648682,
+            1777200,
+            1771614,
+            1845217,
+            1684684,
+            1533176,
+            1666317,
+            1630679,
+            1646794,
+            1567225,
+            1804155,
+            1965698,
+            1666591,
+            1656942,
+            1678555,
+            1602211,
+            2078076,
+            1825101,
+            1665223
+          ],
+          "setup": {
+            "implementation_role": "same_policy_reference",
+            "preconditioner": "none",
+            "preconditioner_setup_elapsed_ns": 0,
+            "preconditioner_stored_bytes": 0,
+            "residual_policy": "standard with residual_refresh=50",
+            "setup_in_timed_call": true,
+            "setup_measurement": "single untimed setup probe",
+            "solver_family": "cg"
+          },
+          "solver_status": "converged",
+          "status": "measured",
+          "true_residual_norm": 2.446547281546957e-06
+        }
+      ],
+      "round_orders": [
+        [
+          "native",
+          "native-blas",
+          "torch-eager-out",
+          "numpy-out"
+        ],
+        [
+          "native-blas",
+          "numpy-out",
+          "native",
+          "torch-eager-out"
+        ],
+        [
+          "numpy-out",
+          "torch-eager-out",
+          "native-blas",
+          "native"
+        ],
+        [
+          "torch-eager-out",
+          "native",
+          "numpy-out",
+          "native-blas"
+        ],
+        [
+          "native",
+          "native-blas",
+          "torch-eager-out",
+          "numpy-out"
+        ],
+        [
+          "native-blas",
+          "numpy-out",
+          "native",
+          "torch-eager-out"
+        ],
+        [
+          "numpy-out",
+          "torch-eager-out",
+          "native-blas",
+          "native"
+        ],
+        [
+          "torch-eager-out",
+          "native",
+          "numpy-out",
+          "native-blas"
+        ],
+        [
+          "native",
+          "native-blas",
+          "torch-eager-out",
+          "numpy-out"
+        ],
+        [
+          "native-blas",
+          "numpy-out",
+          "native",
+          "torch-eager-out"
+        ],
+        [
+          "numpy-out",
+          "torch-eager-out",
+          "native-blas",
+          "native"
+        ],
+        [
+          "torch-eager-out",
+          "native",
+          "numpy-out",
+          "native-blas"
+        ],
+        [
+          "native",
+          "native-blas",
+          "torch-eager-out",
+          "numpy-out"
+        ],
+        [
+          "native-blas",
+          "numpy-out",
+          "native",
+          "torch-eager-out"
+        ],
+        [
+          "numpy-out",
+          "torch-eager-out",
+          "native-blas",
+          "native"
+        ],
+        [
+          "torch-eager-out",
+          "native",
+          "numpy-out",
+          "native-blas"
+        ],
+        [
+          "native",
+          "native-blas",
+          "torch-eager-out",
+          "numpy-out"
+        ],
+        [
+          "native-blas",
+          "numpy-out",
+          "native",
+          "torch-eager-out"
+        ],
+        [
+          "numpy-out",
+          "torch-eager-out",
+          "native-blas",
+          "native"
+        ],
+        [
+          "torch-eager-out",
+          "native",
+          "numpy-out",
+          "native-blas"
+        ],
+        [
+          "native",
+          "native-blas",
+          "torch-eager-out",
+          "numpy-out"
+        ],
+        [
+          "native-blas",
+          "numpy-out",
+          "native",
+          "torch-eager-out"
+        ],
+        [
+          "numpy-out",
+          "torch-eager-out",
+          "native-blas",
+          "native"
+        ],
+        [
+          "torch-eager-out",
+          "native",
+          "numpy-out",
+          "native-blas"
+        ],
+        [
+          "native",
+          "native-blas",
+          "torch-eager-out",
+          "numpy-out"
+        ],
+        [
+          "native-blas",
+          "numpy-out",
+          "native",
+          "torch-eager-out"
+        ],
+        [
+          "numpy-out",
+          "torch-eager-out",
+          "native-blas",
+          "native"
+        ],
+        [
+          "torch-eager-out",
+          "native",
+          "numpy-out",
+          "native-blas"
+        ],
+        [
+          "native",
+          "native-blas",
+          "torch-eager-out",
+          "numpy-out"
+        ],
+        [
+          "native-blas",
+          "numpy-out",
+          "native",
+          "torch-eager-out"
+        ],
+        [
+          "numpy-out",
+          "torch-eager-out",
+          "native-blas",
+          "native"
+        ],
+        [
+          "torch-eager-out",
+          "native",
+          "numpy-out",
+          "native-blas"
+        ]
+      ],
+      "sampling": {
+        "repetitions": 5,
+        "rounds": 32,
+        "warmups": 3
+      },
+      "schedule": "williams"
+    },
+    {
+      "case": {
+        "condition_scale": 100.0,
+        "name": "dense-256",
+        "size": 256
+      },
+      "cycle_rows": 4,
+      "dtype": "float64",
+      "input_sha256": "96f633f1697698d7e55c0e06b38ab801460f1ba1aa3909deaae939aa1d2e6274",
+      "input_storage_basis": "shared input NumPy/SciPy arrays, including original index dtype; excludes native owning copies and workspace",
+      "input_stored_bytes": 528384,
+      "layout": "C",
+      "nnz": null,
+      "results": [
+        {
+          "iterations": 67,
+          "matvecs": 70,
+          "name": "native",
+          "reason": null,
+          "reported_residual_norm": 5.706522455692956e-06,
+          "residual_threshold": 6.342305622058719e-06,
+          "round_elapsed_ns": [
+            3002534,
+            3055985,
+            3021360,
+            3158409,
+            2885112,
+            3132977,
+            3055098,
+            3106107,
+            3115665,
+            3400040,
+            3088313,
+            3257721,
+            2732242,
+            3084577,
+            3018356,
+            3331715,
+            2999141,
+            3003937,
+            2976012,
+            3547359,
+            2940126,
+            3022386,
+            3126286,
+            3202092,
+            2891652,
+            3100410,
+            2834966,
+            2878381,
+            2792198,
+            3122312,
+            2771391,
+            2949791
+          ],
+          "setup": {
+            "blas": null,
+            "dense_kernel": "native",
+            "implementation_role": "native",
+            "preconditioner": "none",
+            "preconditioner_setup_elapsed_ns": 0,
+            "preconditioner_stored_bytes": 0,
+            "residual_policy": "standard with residual_refresh=50",
+            "setup_in_timed_call": true,
+            "setup_measurement": "native plan setup outside timing; API setup repeats inside every timed solve",
+            "solver_family": "cg"
+          },
+          "solver_status": "converged",
+          "status": "measured",
+          "true_residual_norm": 5.7065224669823535e-06
+        },
+        {
+          "iterations": 67,
+          "matvecs": 70,
+          "name": "native-blas",
+          "reason": null,
+          "reported_residual_norm": 6.023950183345519e-06,
+          "residual_threshold": 6.342305622058719e-06,
+          "round_elapsed_ns": [
+            1883600,
+            2318788,
+            2384433,
+            2051254,
+            1946902,
+            2010607,
+            2031330,
+            1899596,
+            2110800,
+            1959841,
+            1990038,
+            1955981,
+            2020605,
+            1931181,
+            2117723,
+            1895625,
+            2036275,
+            2009749,
+            2156455,
+            1978015,
+            1950572,
+            1996908,
+            2006471,
+            1910409,
+            2017327,
+            2078595,
+            1931486,
+            1918830,
+            2050413,
+            1832209,
+            2460945,
+            1720739
+          ],
+          "setup": {
+            "blas": {
+              "configuration": "OpenBLAS 0.3.30, sequential, USE_LOCKING=1, LP64, BLAS-only, prefix=cgpy_, CORE2 SSE3/SSSE3 baseline, runtime CORE2/HASWELL",
+              "enabled": true,
+              "integer_bits": 32,
+              "provider": "OpenBLAS",
+              "symbol_prefix": "cgpy_",
+              "thread_mode": "sequential"
+            },
+            "dense_kernel": "blas",
+            "implementation_role": "native",
+            "preconditioner": "none",
+            "preconditioner_setup_elapsed_ns": 0,
+            "preconditioner_stored_bytes": 0,
+            "residual_policy": "standard with residual_refresh=50",
+            "setup_in_timed_call": true,
+            "setup_measurement": "native plan setup outside timing; API setup repeats inside every timed solve",
+            "solver_family": "cg"
+          },
+          "solver_status": "converged",
+          "status": "measured",
+          "true_residual_norm": 6.023950183345518e-06
+        },
+        {
+          "iterations": 67,
+          "matvecs": 70,
+          "name": "numpy-out",
+          "reason": null,
+          "reported_residual_norm": 5.647321218382578e-06,
+          "residual_threshold": 6.342305622058719e-06,
+          "round_elapsed_ns": [
+            3590489,
+            3226234,
+            3483526,
+            3306604,
+            3595427,
+            3297192,
+            3512852,
+            3293899,
+            3458341,
+            3225665,
+            3332869,
+            3288840,
+            3373165,
+            3130703,
+            3857930,
+            3234801,
+            3412648,
+            3109717,
+            3493534,
+            3688208,
+            3262742,
+            3098922,
+            3429269,
+            3268408,
+            3342583,
+            3311105,
+            3416212,
+            3272583,
+            3197034,
+            2896428,
+            3146803,
+            2954371
+          ],
+          "setup": {
+            "implementation_role": "same_policy_reference",
+            "preconditioner": "none",
+            "preconditioner_setup_elapsed_ns": 0,
+            "preconditioner_stored_bytes": 0,
+            "residual_policy": "standard with residual_refresh=50",
+            "setup_in_timed_call": true,
+            "setup_measurement": "single untimed setup probe",
+            "solver_family": "cg"
+          },
+          "solver_status": "converged",
+          "status": "measured",
+          "true_residual_norm": 5.647321218382578e-06
+        },
+        {
+          "iterations": 67,
+          "matvecs": 70,
+          "name": "torch-eager-out",
+          "reason": null,
+          "reported_residual_norm": 5.7260278432024275e-06,
+          "residual_threshold": 6.342305622058719e-06,
+          "round_elapsed_ns": [
+            4150151,
+            4103408,
+            4732202,
+            4134183,
+            4089694,
+            4315820,
+            4097143,
+            4141782,
+            4274583,
+            4336112,
+            4121968,
+            4252858,
+            4096369,
+            4574392,
+            4183878,
+            4681047,
+            5380702,
+            4590032,
+            4126648,
+            4199813,
+            4574111,
+            4343089,
+            4158876,
+            4463627,
+            4127245,
+            4084164,
+            4040343,
+            3992377,
+            3988205,
+            3778549,
+            4308250,
+            3930908
+          ],
+          "setup": {
+            "implementation_role": "same_policy_reference",
+            "preconditioner": "none",
+            "preconditioner_setup_elapsed_ns": 0,
+            "preconditioner_stored_bytes": 0,
+            "residual_policy": "standard with residual_refresh=50",
+            "setup_in_timed_call": true,
+            "setup_measurement": "single untimed setup probe",
+            "solver_family": "cg"
+          },
+          "solver_status": "converged",
+          "status": "measured",
+          "true_residual_norm": 5.726027832758152e-06
+        }
+      ],
+      "round_orders": [
+        [
+          "native",
+          "native-blas",
+          "torch-eager-out",
+          "numpy-out"
+        ],
+        [
+          "native-blas",
+          "numpy-out",
+          "native",
+          "torch-eager-out"
+        ],
+        [
+          "numpy-out",
+          "torch-eager-out",
+          "native-blas",
+          "native"
+        ],
+        [
+          "torch-eager-out",
+          "native",
+          "numpy-out",
+          "native-blas"
+        ],
+        [
+          "native",
+          "native-blas",
+          "torch-eager-out",
+          "numpy-out"
+        ],
+        [
+          "native-blas",
+          "numpy-out",
+          "native",
+          "torch-eager-out"
+        ],
+        [
+          "numpy-out",
+          "torch-eager-out",
+          "native-blas",
+          "native"
+        ],
+        [
+          "torch-eager-out",
+          "native",
+          "numpy-out",
+          "native-blas"
+        ],
+        [
+          "native",
+          "native-blas",
+          "torch-eager-out",
+          "numpy-out"
+        ],
+        [
+          "native-blas",
+          "numpy-out",
+          "native",
+          "torch-eager-out"
+        ],
+        [
+          "numpy-out",
+          "torch-eager-out",
+          "native-blas",
+          "native"
+        ],
+        [
+          "torch-eager-out",
+          "native",
+          "numpy-out",
+          "native-blas"
+        ],
+        [
+          "native",
+          "native-blas",
+          "torch-eager-out",
+          "numpy-out"
+        ],
+        [
+          "native-blas",
+          "numpy-out",
+          "native",
+          "torch-eager-out"
+        ],
+        [
+          "numpy-out",
+          "torch-eager-out",
+          "native-blas",
+          "native"
+        ],
+        [
+          "torch-eager-out",
+          "native",
+          "numpy-out",
+          "native-blas"
+        ],
+        [
+          "native",
+          "native-blas",
+          "torch-eager-out",
+          "numpy-out"
+        ],
+        [
+          "native-blas",
+          "numpy-out",
+          "native",
+          "torch-eager-out"
+        ],
+        [
+          "numpy-out",
+          "torch-eager-out",
+          "native-blas",
+          "native"
+        ],
+        [
+          "torch-eager-out",
+          "native",
+          "numpy-out",
+          "native-blas"
+        ],
+        [
+          "native",
+          "native-blas",
+          "torch-eager-out",
+          "numpy-out"
+        ],
+        [
+          "native-blas",
+          "numpy-out",
+          "native",
+          "torch-eager-out"
+        ],
+        [
+          "numpy-out",
+          "torch-eager-out",
+          "native-blas",
+          "native"
+        ],
+        [
+          "torch-eager-out",
+          "native",
+          "numpy-out",
+          "native-blas"
+        ],
+        [
+          "native",
+          "native-blas",
+          "torch-eager-out",
+          "numpy-out"
+        ],
+        [
+          "native-blas",
+          "numpy-out",
+          "native",
+          "torch-eager-out"
+        ],
+        [
+          "numpy-out",
+          "torch-eager-out",
+          "native-blas",
+          "native"
+        ],
+        [
+          "torch-eager-out",
+          "native",
+          "numpy-out",
+          "native-blas"
+        ],
+        [
+          "native",
+          "native-blas",
+          "torch-eager-out",
+          "numpy-out"
+        ],
+        [
+          "native-blas",
+          "numpy-out",
+          "native",
+          "torch-eager-out"
+        ],
+        [
+          "numpy-out",
+          "torch-eager-out",
+          "native-blas",
+          "native"
+        ],
+        [
+          "torch-eager-out",
+          "native",
+          "numpy-out",
+          "native-blas"
+        ]
+      ],
+      "sampling": {
+        "repetitions": 5,
+        "rounds": 32,
+        "warmups": 3
+      },
+      "schedule": "williams"
+    },
+    {
+      "case": {
+        "condition_scale": 100.0,
+        "name": "dense-1024",
+        "size": 1024
+      },
+      "cycle_rows": 4,
+      "dtype": "float64",
+      "input_sha256": "58a504a95c04274e80597b08bb8363241cf0c16ddbb5060b0ec3758065181329",
+      "input_storage_basis": "shared input NumPy/SciPy arrays, including original index dtype; excludes native owning copies and workspace",
+      "input_stored_bytes": 8404992,
+      "layout": "C",
+      "nnz": null,
+      "results": [
+        {
+          "iterations": 70,
+          "matvecs": 73,
+          "name": "native",
+          "reason": null,
+          "reported_residual_norm": 9.504999833380736e-06,
+          "residual_threshold": 1.0790676564437561e-05,
+          "round_elapsed_ns": [
+            50574369,
+            49643735,
+            50167707,
+            49824883,
+            50238435,
+            50816224,
+            49709562,
+            50175207,
+            50522474,
+            49354309,
+            50442161,
+            50375940,
+            49027981,
+            49364183,
+            50327149,
+            49569967,
+            51542573,
+            48729843,
+            50238842,
+            52216463,
+            49639351,
+            49229246,
+            50411023,
+            51091655,
+            50688754,
+            49966008,
+            50325606,
+            51859903,
+            50696943,
+            50950472,
+            49748650,
+            50989028
+          ],
+          "setup": {
+            "blas": null,
+            "dense_kernel": "native",
+            "implementation_role": "native",
+            "preconditioner": "none",
+            "preconditioner_setup_elapsed_ns": 0,
+            "preconditioner_stored_bytes": 0,
+            "residual_policy": "standard with residual_refresh=50",
+            "setup_in_timed_call": true,
+            "setup_measurement": "native plan setup outside timing; API setup repeats inside every timed solve",
+            "solver_family": "cg"
+          },
+          "solver_status": "converged",
+          "status": "measured",
+          "true_residual_norm": 9.504999814488595e-06
+        },
+        {
+          "iterations": 70,
+          "matvecs": 73,
+          "name": "native-blas",
+          "reason": null,
+          "reported_residual_norm": 9.504999800580356e-06,
+          "residual_threshold": 1.0790676564437561e-05,
+          "round_elapsed_ns": [
+            49233813,
+            35703067,
+            33859217,
+            34951936,
+            34714149,
+            33644736,
+            34162797,
+            35286411,
+            34065927,
+            33591201,
+            33906968,
+            33658275,
+            34728688,
+            33324606,
+            33056776,
+            34147972,
+            35714612,
+            34077249,
+            34600799,
+            33963006,
+            36483222,
+            36237000,
+            34687574,
+            37375238,
+            33540600,
+            41378842,
+            33908596,
+            33422740,
+            34361166,
+            35099807,
+            37619600,
+            34580666
+          ],
+          "setup": {
+            "blas": {
+              "configuration": "OpenBLAS 0.3.30, sequential, USE_LOCKING=1, LP64, BLAS-only, prefix=cgpy_, CORE2 SSE3/SSSE3 baseline, runtime CORE2/HASWELL",
+              "enabled": true,
+              "integer_bits": 32,
+              "provider": "OpenBLAS",
+              "symbol_prefix": "cgpy_",
+              "thread_mode": "sequential"
+            },
+            "dense_kernel": "blas",
+            "implementation_role": "native",
+            "preconditioner": "none",
+            "preconditioner_setup_elapsed_ns": 0,
+            "preconditioner_stored_bytes": 0,
+            "residual_policy": "standard with residual_refresh=50",
+            "setup_in_timed_call": true,
+            "setup_measurement": "native plan setup outside timing; API setup repeats inside every timed solve",
+            "solver_family": "cg"
+          },
+          "solver_status": "converged",
+          "status": "measured",
+          "true_residual_norm": 9.504999800580351e-06
+        },
+        {
+          "iterations": 70,
+          "matvecs": 73,
+          "name": "numpy-out",
+          "reason": null,
+          "reported_residual_norm": 9.5049998481439e-06,
+          "residual_threshold": 1.0790676564437561e-05,
+          "round_elapsed_ns": [
+            38078106,
+            36672960,
+            36647591,
+            37087357,
+            38702982,
+            38015506,
+            38023746,
+            37570737,
+            37562773,
+            38055059,
+            37643632,
+            38262766,
+            42824946,
+            36915295,
+            38245030,
+            38864791,
+            36487703,
+            38746866,
+            36461080,
+            39815028,
+            37426137,
+            36455939,
+            38176790,
+            37238520,
+            40624266,
+            38797448,
+            38294329,
+            37917978,
+            37896917,
+            37888414,
+            37907094,
+            37321729
+          ],
+          "setup": {
+            "implementation_role": "same_policy_reference",
+            "preconditioner": "none",
+            "preconditioner_setup_elapsed_ns": 0,
+            "preconditioner_stored_bytes": 0,
+            "residual_policy": "standard with residual_refresh=50",
+            "setup_in_timed_call": true,
+            "setup_measurement": "single untimed setup probe",
+            "solver_family": "cg"
+          },
+          "solver_status": "converged",
+          "status": "measured",
+          "true_residual_norm": 9.5049998481439e-06
+        },
+        {
+          "iterations": 70,
+          "matvecs": 73,
+          "name": "torch-eager-out",
+          "reason": null,
+          "reported_residual_norm": 9.504999844009174e-06,
+          "residual_threshold": 1.0790676564437561e-05,
+          "round_elapsed_ns": [
+            41022837,
+            40676720,
+            39084071,
+            39108724,
+            39005226,
+            38961219,
+            39015596,
+            40020101,
+            40383158,
+            40676826,
+            39857156,
+            40386398,
+            38670417,
+            40697674,
+            38463979,
+            40495071,
+            39320481,
+            44480135,
+            39233362,
+            39769035,
+            40903186,
+            40189988,
+            39962581,
+            41330489,
+            42220201,
+            40425823,
+            39285233,
+            40623001,
+            40348680,
+            53627110,
+            41250449,
+            39786458
+          ],
+          "setup": {
+            "implementation_role": "same_policy_reference",
+            "preconditioner": "none",
+            "preconditioner_setup_elapsed_ns": 0,
+            "preconditioner_stored_bytes": 0,
+            "residual_policy": "standard with residual_refresh=50",
+            "setup_in_timed_call": true,
+            "setup_measurement": "single untimed setup probe",
+            "solver_family": "cg"
+          },
+          "solver_status": "converged",
+          "status": "measured",
+          "true_residual_norm": 9.50499983086256e-06
+        }
+      ],
+      "round_orders": [
+        [
+          "native",
+          "native-blas",
+          "torch-eager-out",
+          "numpy-out"
+        ],
+        [
+          "native-blas",
+          "numpy-out",
+          "native",
+          "torch-eager-out"
+        ],
+        [
+          "numpy-out",
+          "torch-eager-out",
+          "native-blas",
+          "native"
+        ],
+        [
+          "torch-eager-out",
+          "native",
+          "numpy-out",
+          "native-blas"
+        ],
+        [
+          "native",
+          "native-blas",
+          "torch-eager-out",
+          "numpy-out"
+        ],
+        [
+          "native-blas",
+          "numpy-out",
+          "native",
+          "torch-eager-out"
+        ],
+        [
+          "numpy-out",
+          "torch-eager-out",
+          "native-blas",
+          "native"
+        ],
+        [
+          "torch-eager-out",
+          "native",
+          "numpy-out",
+          "native-blas"
+        ],
+        [
+          "native",
+          "native-blas",
+          "torch-eager-out",
+          "numpy-out"
+        ],
+        [
+          "native-blas",
+          "numpy-out",
+          "native",
+          "torch-eager-out"
+        ],
+        [
+          "numpy-out",
+          "torch-eager-out",
+          "native-blas",
+          "native"
+        ],
+        [
+          "torch-eager-out",
+          "native",
+          "numpy-out",
+          "native-blas"
+        ],
+        [
+          "native",
+          "native-blas",
+          "torch-eager-out",
+          "numpy-out"
+        ],
+        [
+          "native-blas",
+          "numpy-out",
+          "native",
+          "torch-eager-out"
+        ],
+        [
+          "numpy-out",
+          "torch-eager-out",
+          "native-blas",
+          "native"
+        ],
+        [
+          "torch-eager-out",
+          "native",
+          "numpy-out",
+          "native-blas"
+        ],
+        [
+          "native",
+          "native-blas",
+          "torch-eager-out",
+          "numpy-out"
+        ],
+        [
+          "native-blas",
+          "numpy-out",
+          "native",
+          "torch-eager-out"
+        ],
+        [
+          "numpy-out",
+          "torch-eager-out",
+          "native-blas",
+          "native"
+        ],
+        [
+          "torch-eager-out",
+          "native",
+          "numpy-out",
+          "native-blas"
+        ],
+        [
+          "native",
+          "native-blas",
+          "torch-eager-out",
+          "numpy-out"
+        ],
+        [
+          "native-blas",
+          "numpy-out",
+          "native",
+          "torch-eager-out"
+        ],
+        [
+          "numpy-out",
+          "torch-eager-out",
+          "native-blas",
+          "native"
+        ],
+        [
+          "torch-eager-out",
+          "native",
+          "numpy-out",
+          "native-blas"
+        ],
+        [
+          "native",
+          "native-blas",
+          "torch-eager-out",
+          "numpy-out"
+        ],
+        [
+          "native-blas",
+          "numpy-out",
+          "native",
+          "torch-eager-out"
+        ],
+        [
+          "numpy-out",
+          "torch-eager-out",
+          "native-blas",
+          "native"
+        ],
+        [
+          "torch-eager-out",
+          "native",
+          "numpy-out",
+          "native-blas"
+        ],
+        [
+          "native",
+          "native-blas",
+          "torch-eager-out",
+          "numpy-out"
+        ],
+        [
+          "native-blas",
+          "numpy-out",
+          "native",
+          "torch-eager-out"
+        ],
+        [
+          "numpy-out",
+          "torch-eager-out",
+          "native-blas",
+          "native"
+        ],
+        [
+          "torch-eager-out",
+          "native",
+          "numpy-out",
+          "native-blas"
+        ]
+      ],
+      "sampling": {
+        "repetitions": 5,
+        "rounds": 32,
+        "warmups": 3
+      },
+      "schedule": "williams"
+    },
+    {
+      "case": {
+        "condition_scale": 100.0,
+        "name": "dense-2048",
+        "size": 2048
+      },
+      "cycle_rows": 4,
+      "dtype": "float64",
+      "input_sha256": "074f888f022f56e8ef847862a4554a716ce5571c6da3859a06568e2657f22bc9",
+      "input_storage_basis": "shared input NumPy/SciPy arrays, including original index dtype; excludes native owning copies and workspace",
+      "input_stored_bytes": 33587200,
+      "layout": "C",
+      "nnz": null,
+      "results": [
+        {
+          "iterations": 70,
+          "matvecs": 73,
+          "name": "native",
+          "reason": null,
+          "reported_residual_norm": 1.3229297186808814e-05,
+          "residual_threshold": 1.4741032408216817e-05,
+          "round_elapsed_ns": [
+            439640997,
+            430498501,
+            445210800,
+            431512743,
+            433677054,
+            434268263,
+            506646631,
+            521657057,
+            508928607,
+            427214123,
+            427291406,
+            424656543,
+            430371926,
+            479341163,
+            435670199,
+            431089167,
+            455928664,
+            421439812,
+            433613745,
+            428474002,
+            441032664,
+            440429416,
+            431929083,
+            434772774,
+            455503410,
+            427093006,
+            426241427,
+            427086337,
+            431662476,
+            499521118,
+            533077610,
+            454766233
+          ],
+          "setup": {
+            "blas": null,
+            "dense_kernel": "native",
+            "implementation_role": "native",
+            "preconditioner": "none",
+            "preconditioner_setup_elapsed_ns": 0,
+            "preconditioner_stored_bytes": 0,
+            "residual_policy": "standard with residual_refresh=50",
+            "setup_in_timed_call": true,
+            "setup_measurement": "native plan setup outside timing; API setup repeats inside every timed solve",
+            "solver_family": "cg"
+          },
+          "solver_status": "converged",
+          "status": "measured",
+          "true_residual_norm": 1.3229297184721373e-05
+        },
+        {
+          "iterations": 70,
+          "matvecs": 73,
+          "name": "native-blas",
+          "reason": null,
+          "reported_residual_norm": 1.3229297197827353e-05,
+          "residual_threshold": 1.4741032408216817e-05,
+          "round_elapsed_ns": [
+            270776396,
+            278408107,
+            266758391,
+            274678448,
+            262755762,
+            265729679,
+            285611935,
+            337622131,
+            267415665,
+            269955114,
+            266636070,
+            263500934,
+            266806432,
+            270192982,
+            287057947,
+            267615812,
+            266711780,
+            268574226,
+            284205098,
+            272200761,
+            269833299,
+            275328613,
+            278849137,
+            289236878,
+            273082465,
+            355252681,
+            266478932,
+            277770280,
+            273415389,
+            269977991,
+            343634567,
+            267357888
+          ],
+          "setup": {
+            "blas": {
+              "configuration": "OpenBLAS 0.3.30, sequential, USE_LOCKING=1, LP64, BLAS-only, prefix=cgpy_, CORE2 SSE3/SSSE3 baseline, runtime CORE2/HASWELL",
+              "enabled": true,
+              "integer_bits": 32,
+              "provider": "OpenBLAS",
+              "symbol_prefix": "cgpy_",
+              "thread_mode": "sequential"
+            },
+            "dense_kernel": "blas",
+            "implementation_role": "native",
+            "preconditioner": "none",
+            "preconditioner_setup_elapsed_ns": 0,
+            "preconditioner_stored_bytes": 0,
+            "residual_policy": "standard with residual_refresh=50",
+            "setup_in_timed_call": true,
+            "setup_measurement": "native plan setup outside timing; API setup repeats inside every timed solve",
+            "solver_family": "cg"
+          },
+          "solver_status": "converged",
+          "status": "measured",
+          "true_residual_norm": 1.3229297197827353e-05
+        },
+        {
+          "iterations": 70,
+          "matvecs": 73,
+          "name": "numpy-out",
+          "reason": null,
+          "reported_residual_norm": 1.3229297227918601e-05,
+          "residual_threshold": 1.4741032408216817e-05,
+          "round_elapsed_ns": [
+            286434349,
+            287614933,
+            293819457,
+            294500179,
+            292450469,
+            292205547,
+            289906619,
+            373012253,
+            283343419,
+            294858874,
+            282915707,
+            280394706,
+            281255951,
+            286110827,
+            278094242,
+            291357669,
+            292084441,
+            284180589,
+            278453100,
+            285496627,
+            301196226,
+            286349918,
+            288812291,
+            288374585,
+            451506570,
+            286110053,
+            294753429,
+            290651915,
+            284329477,
+            280665519,
+            367674686,
+            281264669
+          ],
+          "setup": {
+            "implementation_role": "same_policy_reference",
+            "preconditioner": "none",
+            "preconditioner_setup_elapsed_ns": 0,
+            "preconditioner_stored_bytes": 0,
+            "residual_policy": "standard with residual_refresh=50",
+            "setup_in_timed_call": true,
+            "setup_measurement": "single untimed setup probe",
+            "solver_family": "cg"
+          },
+          "solver_status": "converged",
+          "status": "measured",
+          "true_residual_norm": 1.3229297227918601e-05
+        },
+        {
+          "iterations": 70,
+          "matvecs": 73,
+          "name": "torch-eager-out",
+          "reason": null,
+          "reported_residual_norm": 1.3229297210803933e-05,
+          "residual_threshold": 1.4741032408216817e-05,
+          "round_elapsed_ns": [
+            308782597,
+            425169431,
+            328910504,
+            295423620,
+            295348780,
+            298763932,
+            297297948,
+            387545938,
+            295375639,
+            297815845,
+            288967600,
+            287788758,
+            299028158,
+            296785743,
+            295711065,
+            299523394,
+            290003651,
+            293625172,
+            308956542,
+            296329784,
+            296461791,
+            303020667,
+            302359223,
+            295996375,
+            310398030,
+            294368543,
+            286164978,
+            292811814,
+            292986206,
+            376445691,
+            363678441,
+            350030666
+          ],
+          "setup": {
+            "implementation_role": "same_policy_reference",
+            "preconditioner": "none",
+            "preconditioner_setup_elapsed_ns": 0,
+            "preconditioner_stored_bytes": 0,
+            "residual_policy": "standard with residual_refresh=50",
+            "setup_in_timed_call": true,
+            "setup_measurement": "single untimed setup probe",
+            "solver_family": "cg"
+          },
+          "solver_status": "converged",
+          "status": "measured",
+          "true_residual_norm": 1.322929720458035e-05
+        }
+      ],
+      "round_orders": [
+        [
+          "native",
+          "native-blas",
+          "torch-eager-out",
+          "numpy-out"
+        ],
+        [
+          "native-blas",
+          "numpy-out",
+          "native",
+          "torch-eager-out"
+        ],
+        [
+          "numpy-out",
+          "torch-eager-out",
+          "native-blas",
+          "native"
+        ],
+        [
+          "torch-eager-out",
+          "native",
+          "numpy-out",
+          "native-blas"
+        ],
+        [
+          "native",
+          "native-blas",
+          "torch-eager-out",
+          "numpy-out"
+        ],
+        [
+          "native-blas",
+          "numpy-out",
+          "native",
+          "torch-eager-out"
+        ],
+        [
+          "numpy-out",
+          "torch-eager-out",
+          "native-blas",
+          "native"
+        ],
+        [
+          "torch-eager-out",
+          "native",
+          "numpy-out",
+          "native-blas"
+        ],
+        [
+          "native",
+          "native-blas",
+          "torch-eager-out",
+          "numpy-out"
+        ],
+        [
+          "native-blas",
+          "numpy-out",
+          "native",
+          "torch-eager-out"
+        ],
+        [
+          "numpy-out",
+          "torch-eager-out",
+          "native-blas",
+          "native"
+        ],
+        [
+          "torch-eager-out",
+          "native",
+          "numpy-out",
+          "native-blas"
+        ],
+        [
+          "native",
+          "native-blas",
+          "torch-eager-out",
+          "numpy-out"
+        ],
+        [
+          "native-blas",
+          "numpy-out",
+          "native",
+          "torch-eager-out"
+        ],
+        [
+          "numpy-out",
+          "torch-eager-out",
+          "native-blas",
+          "native"
+        ],
+        [
+          "torch-eager-out",
+          "native",
+          "numpy-out",
+          "native-blas"
+        ],
+        [
+          "native",
+          "native-blas",
+          "torch-eager-out",
+          "numpy-out"
+        ],
+        [
+          "native-blas",
+          "numpy-out",
+          "native",
+          "torch-eager-out"
+        ],
+        [
+          "numpy-out",
+          "torch-eager-out",
+          "native-blas",
+          "native"
+        ],
+        [
+          "torch-eager-out",
+          "native",
+          "numpy-out",
+          "native-blas"
+        ],
+        [
+          "native",
+          "native-blas",
+          "torch-eager-out",
+          "numpy-out"
+        ],
+        [
+          "native-blas",
+          "numpy-out",
+          "native",
+          "torch-eager-out"
+        ],
+        [
+          "numpy-out",
+          "torch-eager-out",
+          "native-blas",
+          "native"
+        ],
+        [
+          "torch-eager-out",
+          "native",
+          "numpy-out",
+          "native-blas"
+        ],
+        [
+          "native",
+          "native-blas",
+          "torch-eager-out",
+          "numpy-out"
+        ],
+        [
+          "native-blas",
+          "numpy-out",
+          "native",
+          "torch-eager-out"
+        ],
+        [
+          "numpy-out",
+          "torch-eager-out",
+          "native-blas",
+          "native"
+        ],
+        [
+          "torch-eager-out",
+          "native",
+          "numpy-out",
+          "native-blas"
+        ],
+        [
+          "native",
+          "native-blas",
+          "torch-eager-out",
+          "numpy-out"
+        ],
+        [
+          "native-blas",
+          "numpy-out",
+          "native",
+          "torch-eager-out"
+        ],
+        [
+          "numpy-out",
+          "torch-eager-out",
+          "native-blas",
+          "native"
+        ],
+        [
+          "torch-eager-out",
+          "native",
+          "numpy-out",
+          "native-blas"
+        ]
+      ],
+      "sampling": {
+        "repetitions": 5,
+        "rounds": 32,
+        "warmups": 3
+      },
+      "schedule": "williams"
+    }
+  ],
+  "environment": {
+    "affinity": [
+      0
+    ],
+    "cmake": {
+      "fields": {
+        "CG_BLAS_BUILD_JOBS:STRING": "2",
+        "CG_BLAS_NM:FILEPATH": "/usr/bin/nm",
+        "CG_BLAS_OBJCOPY:FILEPATH": "/usr/bin/objcopy",
+        "CG_BUILD_PYTHON:BOOL": "ON",
+        "CG_ENABLE_BLAS:BOOL": "ON",
+        "CG_ENABLE_CLANG_TIDY:BOOL": "OFF",
+        "CG_ENABLE_OPENMP:BOOL": "OFF",
+        "CG_ENABLE_SANITIZERS:BOOL": "OFF",
+        "CMAKE_BUILD_TYPE:STRING": "Release",
+        "CMAKE_CXX_COMPILER:FILEPATH": "/usr/bin/c++",
+        "CMAKE_CXX_FLAGS-ADVANCED:INTERNAL": "1",
+        "CMAKE_CXX_FLAGS:STRING": "",
+        "CMAKE_CXX_FLAGS_DEBUG-ADVANCED:INTERNAL": "1",
+        "CMAKE_CXX_FLAGS_DEBUG:STRING": "-g",
+        "CMAKE_CXX_FLAGS_MINSIZEREL-ADVANCED:INTERNAL": "1",
+        "CMAKE_CXX_FLAGS_MINSIZEREL:STRING": "-Os -DNDEBUG",
+        "CMAKE_CXX_FLAGS_RELEASE-ADVANCED:INTERNAL": "1",
+        "CMAKE_CXX_FLAGS_RELEASE:STRING": "-O3 -DNDEBUG",
+        "CMAKE_CXX_FLAGS_RELWITHDEBINFO-ADVANCED:INTERNAL": "1",
+        "CMAKE_CXX_FLAGS_RELWITHDEBINFO:STRING": "-O2 -g -DNDEBUG"
+      },
+      "path": "/home/threemonth03/Downloads/Conjugate-Gradient-Method-library/build/cpu-blas/CMakeCache.txt"
+    },
+    "cpu": "13th Gen Intel(R) Core(TM) i7-13700K",
+    "dynamic_thread_environment": {
+      "MKL_DYNAMIC": "FALSE",
+      "OMP_DYNAMIC": "FALSE"
+    },
+    "git_status": "?? benchmarks/cg_vs_direct_results.json\n?? benchmarks/compare_direct.py",
+    "logical_cpus": 24,
+    "machine": "x86_64",
+    "native": {
+      "build_info": {
+        "blas": {
+          "configuration": "OpenBLAS 0.3.30, sequential, USE_LOCKING=1, LP64, BLAS-only, prefix=cgpy_, CORE2 SSE3/SSSE3 baseline, runtime CORE2/HASWELL",
+          "enabled": true,
+          "integer_bits": 32,
+          "provider": "OpenBLAS",
+          "symbol_prefix": "cgpy_",
+          "thread_mode": "sequential"
+        },
+        "build_type": "Release",
+        "compiler": "GNU 16.0.1",
+        "flags": " -O3 -DNDEBUG",
+        "openmp": false
+      },
+      "module_path": "/home/threemonth03/Downloads/Conjugate-Gradient-Method-library/build/cpu-blas/python/_cgcore.cpython-312-x86_64-linux-gnu.so",
+      "module_sha256": "38da769d7b7861646eda327e85ceecb3336d347d33942180f7484e0ec13828bc",
+      "python_package_path": "/home/threemonth03/Downloads/Conjugate-Gradient-Method-library/python/cgpy/__init__.py"
+    },
+    "numpy_config": {
+      "Build Dependencies": {
+        "blas": {
+          "detection method": "pkgconfig",
+          "found": true,
+          "include directory": "/opt/_internal/cpython-3.12.7/lib/python3.12/site-packages/scipy_openblas64/include",
+          "lib directory": "/opt/_internal/cpython-3.12.7/lib/python3.12/site-packages/scipy_openblas64/lib",
+          "name": "scipy-openblas",
+          "openblas configuration": "OpenBLAS 0.3.29  USE64BITINT DYNAMIC_ARCH NO_AFFINITY Haswell MAX_THREADS=64",
+          "pc file directory": "/project/.openblas",
+          "version": "0.3.29"
+        },
+        "lapack": {
+          "detection method": "pkgconfig",
+          "found": true,
+          "include directory": "/opt/_internal/cpython-3.12.7/lib/python3.12/site-packages/scipy_openblas64/include",
+          "lib directory": "/opt/_internal/cpython-3.12.7/lib/python3.12/site-packages/scipy_openblas64/lib",
+          "name": "scipy-openblas",
+          "openblas configuration": "OpenBLAS 0.3.29  USE64BITINT DYNAMIC_ARCH NO_AFFINITY Haswell MAX_THREADS=64",
+          "pc file directory": "/project/.openblas",
+          "version": "0.3.29"
+        }
+      },
+      "Compilers": {
+        "c": {
+          "commands": "cc",
+          "linker": "ld.bfd",
+          "name": "gcc",
+          "version": "10.2.1"
+        },
+        "c++": {
+          "commands": "c++",
+          "linker": "ld.bfd",
+          "name": "gcc",
+          "version": "10.2.1"
+        },
+        "cython": {
+          "commands": "cython",
+          "linker": "cython",
+          "name": "cython",
+          "version": "3.1.0"
+        }
+      },
+      "Machine Information": {
+        "build": {
+          "cpu": "x86_64",
+          "endian": "little",
+          "family": "x86_64",
+          "system": "linux"
+        },
+        "host": {
+          "cpu": "x86_64",
+          "endian": "little",
+          "family": "x86_64",
+          "system": "linux"
+        }
+      },
+      "Python Information": {
+        "path": "/tmp/build-env-sgs8db9u/bin/python",
+        "version": "3.12"
+      },
+      "SIMD Extensions": {
+        "baseline": [
+          "SSE",
+          "SSE2",
+          "SSE3"
+        ],
+        "found": [
+          "SSSE3",
+          "SSE41",
+          "POPCNT",
+          "SSE42",
+          "AVX",
+          "F16C",
+          "FMA3",
+          "AVX2"
+        ],
+        "not found": [
+          "AVX512F",
+          "AVX512CD",
+          "AVX512_KNL",
+          "AVX512_KNM",
+          "AVX512_SKX",
+          "AVX512_CLX",
+          "AVX512_CNL",
+          "AVX512_ICL"
+        ]
+      }
+    },
+    "packages": {
+      "cgpy": null,
+      "numpy": "2.2.6",
+      "scipy": "1.15.3",
+      "threadpoolctl": "3.6.0",
+      "torch": "2.8.0+cpu"
+    },
+    "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+    "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+    "python_compiler": "GCC 13.3.0",
+    "python_executable": "/home/threemonth03/Downloads/Conjugate-Gradient-Method-library/.venv/bin/python",
+    "revision": "abdc0424d10d1a9a569481439c824a80bdd207e2",
+    "thread_environment": {
+      "BLIS_NUM_THREADS": "1",
+      "MKL_NUM_THREADS": "1",
+      "NUMEXPR_NUM_THREADS": "1",
+      "OMP_NUM_THREADS": "1",
+      "OPENBLAS_NUM_THREADS": "1",
+      "VECLIB_MAXIMUM_THREADS": "1"
+    },
+    "threadpools": [
+      {
+        "architecture": "Haswell",
+        "filepath": "/home/threemonth03/Downloads/Conjugate-Gradient-Method-library/.venv/lib/python3.12/site-packages/numpy.libs/libscipy_openblas64_-56d6093b.so",
+        "internal_api": "openblas",
+        "num_threads": 1,
+        "prefix": "libscipy_openblas",
+        "threading_layer": "pthreads",
+        "user_api": "blas",
+        "version": "0.3.29"
+      },
+      {
+        "filepath": "/home/threemonth03/Downloads/Conjugate-Gradient-Method-library/.venv/lib/python3.12/site-packages/torch/lib/libgomp.so.1",
+        "internal_api": "openmp",
+        "num_threads": 1,
+        "prefix": "libgomp",
+        "user_api": "openmp",
+        "version": null
+      }
+    ],
+    "torch": {
+      "config": "PyTorch built with:\n  - GCC 13.3\n  - C++ Version: 201703\n  - Intel(R) oneAPI Math Kernel Library Version 2024.2-Product Build 20240605 for Intel(R) 64 architecture applications\n  - Intel(R) MKL-DNN v3.7.1 (Git Hash 8d263e693366ef8db40acc569cc7d8edf644556d)\n  - OpenMP 201511 (a.k.a. OpenMP 4.5)\n  - LAPACK is enabled (usually provided by MKL)\n  - NNPACK is enabled\n  - CPU capability usage: AVX2\n  - Build settings: BLAS_INFO=mkl, BUILD_TYPE=Release, COMMIT_SHA=a1cb3cc05d46d198467bebbb6e8fba50a325d4e7, CXX_COMPILER=/opt/rh/gcc-toolset-13/root/usr/bin/c++, CXX_FLAGS= -fvisibility-inlines-hidden -DUSE_PTHREADPOOL -DNDEBUG -DUSE_KINETO -DLIBKINETO_NOCUPTI -DLIBKINETO_NOROCTRACER -DLIBKINETO_NOXPUPTI=ON -DUSE_FBGEMM -DUSE_PYTORCH_QNNPACK -DUSE_XNNPACK -DSYMBOLICATE_MOBILE_DEBUG_HANDLE -O2 -fPIC -DC10_NODEPRECATED -Wall -Wextra -Werror=return-type -Werror=non-virtual-dtor -Werror=range-loop-construct -Werror=bool-operation -Wnarrowing -Wno-missing-field-initializers -Wno-unknown-pragmas -Wno-unused-parameter -Wno-strict-overflow -Wno-strict-aliasing -Wno-stringop-overflow -Wsuggest-override -Wno-psabi -Wno-error=old-style-cast -faligned-new -Wno-maybe-uninitialized -fno-math-errno -fno-trapping-math -Werror=format -Wno-dangling-reference -Wno-error=dangling-reference -Wno-stringop-overflow, LAPACK_INFO=mkl, PERF_WITH_AVX=1, PERF_WITH_AVX2=1, TORCH_VERSION=2.8.0, USE_CUDA=0, USE_CUDNN=OFF, USE_CUSPARSELT=OFF, USE_GFLAGS=OFF, USE_GLOG=OFF, USE_GLOO=ON, USE_MKL=ON, USE_MKLDNN=ON, USE_MPI=OFF, USE_NCCL=OFF, USE_NNPACK=ON, USE_OPENMP=ON, USE_ROCM=OFF, USE_ROCM_KERNEL_ASSERT=OFF, USE_XCCL=OFF, USE_XPU=OFF, \n",
+      "interop_threads": 1,
+      "intraop_threads": 1
+    }
+  },
+  "metric": "time_to_solution",
+  "schema_version": 1,
+  "spec": {
+    "cases": [
+      {
+        "condition_scale": 100.0,
+        "name": "dense-64",
+        "size": 64
+      },
+      {
+        "condition_scale": 100.0,
+        "name": "dense-256",
+        "size": 256
+      },
+      {
+        "condition_scale": 100.0,
+        "name": "dense-1024",
+        "size": 1024
+      },
+      {
+        "condition_scale": 100.0,
+        "name": "dense-2048",
+        "size": 2048
+      }
+    ],
+    "comparison": "implementations",
+    "implementations": [
+      "native",
+      "native-blas",
+      "numpy-out",
+      "torch-eager-out"
+    ],
+    "sampling": {
+      "repetitions": 5,
+      "rounds": 30,
+      "warmups": 3
+    },
+    "scope": "api",
+    "seed": 20261015,
+    "solver": {
+      "algorithm": "standard",
+      "atol": 1e-12,
+      "fused": true,
+      "maxiter": 2000,
+      "preconditioner": "none",
+      "residual_refresh": 50,
+      "rtol": 1e-08
+    },
+    "suite": "cpu-dense-f64-v1",
+    "threads": 1
+  }
+}

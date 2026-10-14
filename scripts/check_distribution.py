@@ -30,6 +30,8 @@ def check_sdist(path):
         "CMakeLists.txt",
         "CMakePresets.json",
         "pyproject.toml",
+        ".clang-format",
+        ".clang-tidy",
         "cmake/CGOpenBLAS.cmake",
         "cmake/NamespaceOpenBLAS.cmake",
         "src/blas.cpp",

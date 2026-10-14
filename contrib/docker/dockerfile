@@ -25,6 +25,8 @@ COPY cpp/matrix/*.cpp cpp/matrix/*.hpp cpp/matrix/
 COPY cpp/cg_method/*.cpp cpp/cg_method/*.hpp cpp/cg_method/
 COPY cpp/pybind/*.cpp cpp/pybind/
 COPY include/cg/*.hpp include/cg/
+COPY include/cg/detail/*.hpp include/cg/detail/
+COPY cmake/*.cmake cmake/
 COPY src/*.cpp src/
 COPY bindings/*.cpp bindings/
 COPY python/*.py python/
@@ -32,10 +34,12 @@ COPY python/cgpy/*.py python/cgpy/
 COPY python/cgbench/*.py python/cgbench/
 COPY python/README.md python/
 COPY docs/*.md docs/
+COPY docs/*.rst docs/conf.py docs/
+COPY scripts/*.py scripts/
 COPY tests/*.py tests/
 COPY tests/cpp/*.cpp tests/cpp/
 COPY demo/*.py demo/
-COPY benchmarks/README.md benchmarks/results.md benchmarks/
+COPY benchmarks/*.md benchmarks/
 COPY benchmarks/results/ benchmarks/results/
 
 CMD ["make", "test"]
