@@ -128,6 +128,8 @@ x = utils.custom_linear_CG(
 )
 ```
 
+Legacy nonlinear helpers stop when the gradient norm is below `tol`. Their Armijo search allows at most 256 backtracks, and the nonlinear solve allows at most 10,000 iterations. Non-finite values, unusable descent directions, stagnation, or exhausted limits raise `RuntimeError`. Residual and gradient stopping checks use a scaled norm to avoid false convergence when squaring tiny values underflows.
+
 Legacy `epsilon` is an absolute residual tolerance. Use the new API when comparing explicit and recurrence algorithms, fusion, workspace reuse, or Jacobi PCG under a shared stopping rule.
 
 The legacy linear wrapper raises `RuntimeError` on numerical breakdown. Reaching `epoch` still returns the current approximation for compatibility; use `cgpy` when you need an explicit convergence status.

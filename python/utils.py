@@ -1,6 +1,7 @@
 """Compatibility helpers for linear and nonlinear conjugate gradient methods."""
 
 from functools import partial
+from math import hypot
 
 import numpy as np
 from _cgpy import CG
@@ -57,7 +58,7 @@ def np_linear_CG(x, A, b, epsilon, epoch=10000000):
     for _ in range(epoch):
         if not np.all(np.isfinite(residual)):
             raise RuntimeError("Linear CG encountered a non-finite residual")
-        if np.linalg.norm(residual) <= epsilon:
+        if hypot(*np.ravel(residual)) <= epsilon:
             return x
         product = A.dot(direction)
         denominator = direction.dot(product)
@@ -174,7 +175,7 @@ def _nonlinear_cg(X, tol, alpha, beta, f, Df, update, line_search):
     current = gradient(point)
     direction = -current
     for _ in range(_MAX_NONLINEAR_ITERATIONS):
-        if np.linalg.norm(current) < tol:
+        if hypot(*np.ravel(current)) < tol:
             return point, objective(point)
         if not np.all(np.isfinite(direction)) or np.dot(current, direction) >= 0:
             direction = -current
@@ -189,7 +190,7 @@ def _nonlinear_cg(X, tol, alpha, beta, f, Df, update, line_search):
         if np.array_equal(following_point, point):
             raise RuntimeError("Nonlinear CG stagnated before reaching the gradient tolerance")
         following = gradient(following_point)
-        if np.linalg.norm(following) < tol:
+        if hypot(*np.ravel(following)) < tol:
             return following_point, objective(following_point)
         direction = np.asarray(update(current, following, direction), dtype=np.float64)
         point, current = following_point, following

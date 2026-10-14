@@ -298,3 +298,24 @@ def test_legacy_nonlinear_rejects_nan_line_search_step(monkeypatch):
             lambda x: x[0] ** 2,
             lambda x: 2 * x,
         )
+
+
+def test_legacy_numpy_linear_does_not_false_converge_on_tiny_rhs():
+    with pytest.raises(RuntimeError, match="finite positive curvature"):
+        utils.np_linear_CG(np.zeros(2), np.eye(2), np.array([1e-200, -1e-200]), epsilon=1e-208)
+
+
+@pytest.mark.parametrize(
+    "solver",
+    [utils.np_nonlinear_CG, utils.custom_naive_nonlinear_CG, utils.custom_accelerated_nonlinear_CG],
+)
+@pytest.mark.parametrize("initial", [0.0, 1.0])
+def test_legacy_nonlinear_does_not_false_converge_on_tiny_gradient(solver, initial):
+    def objective(x):
+        return x[0] ** 2 / 2 + 1e-200 * x[0]
+
+    def derivative(x):
+        return np.array([x[0] + 1e-200])
+
+    with pytest.raises(RuntimeError, match="descent direction"):
+        solver(np.array([initial]), 1e-208, 0.1, 0.8, objective, derivative)
