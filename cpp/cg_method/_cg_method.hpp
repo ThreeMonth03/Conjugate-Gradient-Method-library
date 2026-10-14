@@ -1,5 +1,5 @@
-#ifndef __CG_METHOD_HPP__
-#define __CG_METHOD_HPP__
+#ifndef CG_LEGACY_METHOD_HPP
+#define CG_LEGACY_METHOD_HPP
 
 #include <_matrix.hpp>
 #include <algorithm>

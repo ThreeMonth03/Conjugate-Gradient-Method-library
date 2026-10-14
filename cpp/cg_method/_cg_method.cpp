@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <cg/solver.hpp>
 #include <cmath>
+#include <stdexcept>
 #include <string>
 
 namespace cg_method

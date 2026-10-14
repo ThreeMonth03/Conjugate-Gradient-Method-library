@@ -1,5 +1,5 @@
-#ifndef __MATRIX_HPP__
-#define __MATRIX_HPP__
+#ifndef CG_LEGACY_MATRIX_HPP
+#define CG_LEGACY_MATRIX_HPP
 
 #include <algorithm>
 #include <cmath>
