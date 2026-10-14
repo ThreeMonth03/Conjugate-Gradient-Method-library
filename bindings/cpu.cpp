@@ -168,7 +168,7 @@ PYBIND11_MODULE(_cgcore, m)
         .def_property_readonly("num_threads", &PreparedSolver::threads)
         .def("solve_into", &PreparedSolver::solve_into, py::arg("b").noconvert(),
              py::arg("x").noconvert(), py::kw_only(), py::arg("workspace"), py::arg("rtol") = 1e-8,
-             py::arg("atol") = 0.0, py::arg("maxiter") = 1000, py::arg("algorithm") = "explicit",
+             py::arg("atol") = 0.0, py::arg("maxiter") = 1000, py::arg("algorithm") = "standard",
              py::arg("fused") = true, py::arg("residual_refresh") = 50,
              "Solve with aligned contiguous float64 arrays. Invalid arrays raise ValueError; "
              "negative or nonintegral iteration counts raise TypeError at the native boundary.");
@@ -183,7 +183,7 @@ PYBIND11_MODULE(_cgcore, m)
         },
         py::arg("A").noconvert(), py::arg("b").noconvert(), py::arg("x").noconvert(), py::kw_only(),
         py::arg("workspace"), py::arg("num_threads") = 1, py::arg("rtol") = 1e-8,
-        py::arg("atol") = 0.0, py::arg("maxiter") = 1000, py::arg("algorithm") = "explicit",
+        py::arg("atol") = 0.0, py::arg("maxiter") = 1000, py::arg("algorithm") = "standard",
         py::arg("fused") = true, py::arg("residual_refresh") = 50);
     m.def("openmp_enabled", &cg::CpuBackend::openmp_enabled);
 }

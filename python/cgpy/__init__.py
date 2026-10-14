@@ -91,7 +91,7 @@ def solve_into(
     rtol=1e-8,
     atol=0.0,
     maxiter=1000,
-    algorithm="explicit",
+    algorithm="standard",
     fused=True,
     residual_refresh=50,
 ):
@@ -127,7 +127,7 @@ def solve(
     rtol=1e-8,
     atol=0.0,
     maxiter=1000,
-    algorithm="explicit",
+    algorithm="standard",
     fused=True,
     residual_refresh=50,
 ):

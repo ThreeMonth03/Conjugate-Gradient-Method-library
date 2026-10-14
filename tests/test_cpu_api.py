@@ -16,7 +16,7 @@ def system(n=9):
     return A, b
 
 
-@pytest.mark.parametrize("algorithm", ["explicit"])
+@pytest.mark.parametrize("algorithm", ["explicit", "standard"])
 @pytest.mark.parametrize("fused", [False, True])
 def test_solve_preserves_inputs_and_meets_true_residual(algorithm, fused):
     A, b = system()

@@ -155,8 +155,33 @@ void CpuBackend::apply(DenseMatrixView A, ConstVectorView x, VectorView output) 
 
 double CpuBackend::apply_dot(DenseMatrixView A, ConstVectorView p, VectorView ap) const
 {
-    apply(A, p, ap);
-    return dot(p, ap);
+    same_size(p, ap);
+    validate_apply(A, p, ap);
+    if (!fused_)
+    {
+        apply(A, p, ap);
+        return dot(p, ap);
+    }
+    double product = 0.0;
+#ifdef _OPENMP
+#pragma omp parallel for reduction(+ : product) schedule(static)                                   \
+    num_threads(threads_) if (threads_ > 1 && A.rows >= 64 && A.cols >= 128)
+#endif
+    for (std::size_t i = 0; i < A.rows; ++i)
+    {
+        const auto *row = A.data + i * A.row_stride;
+        double sum = 0.0;
+#ifdef _OPENMP
+#pragma omp simd reduction(+ : sum)
+#endif
+        for (std::size_t j = 0; j < A.cols; ++j)
+        {
+            sum += row[j] * p.data[j];
+        }
+        ap.data[i] = sum;
+        product += p.data[i] * sum;
+    }
+    return product;
 }
 
 double CpuBackend::residual(DenseMatrixView A, ConstVectorView b, ConstVectorView x, VectorView r,
@@ -164,9 +189,34 @@ double CpuBackend::residual(DenseMatrixView A, ConstVectorView b, ConstVectorVie
 {
     same_size(b, r);
     no_overlap(b, r);
-    apply(A, x, r);
-    axpby(b_minus_ax ? 1.0 : -1.0, b, b_minus_ax ? -1.0 : 1.0, r, r);
-    return norm2(r);
+    validate_apply(A, x, r);
+    if (!fused_)
+    {
+        apply(A, x, r);
+        axpby(b_minus_ax ? 1.0 : -1.0, b, b_minus_ax ? -1.0 : 1.0, r, r);
+        return norm2(r);
+    }
+    double squared_norm = 0.0;
+#ifdef _OPENMP
+#pragma omp parallel for reduction(+ : squared_norm) schedule(static)                              \
+    num_threads(threads_) if (threads_ > 1 && A.rows >= 64 && A.cols >= 128)
+#endif
+    for (std::size_t i = 0; i < A.rows; ++i)
+    {
+        const auto *row = A.data + i * A.row_stride;
+        double sum = 0.0;
+#ifdef _OPENMP
+#pragma omp simd reduction(+ : sum)
+#endif
+        for (std::size_t j = 0; j < A.cols; ++j)
+        {
+            sum += row[j] * x.data[j];
+        }
+        const double value = b_minus_ax ? b.data[i] - sum : sum - b.data[i];
+        r.data[i] = value;
+        squared_norm += value * value;
+    }
+    return squared_norm;
 }
 
 double CpuBackend::update_x_r_norm2(VectorView x, VectorView r, ConstVectorView p,
@@ -180,9 +230,24 @@ double CpuBackend::update_x_r_norm2(VectorView x, VectorView r, ConstVectorView 
     no_overlap(x, ap);
     no_overlap(r, p);
     no_overlap(r, ap);
-    axpy(alpha, p, x);
-    axpy(-alpha, ap, r);
-    return norm2(r);
+    if (!fused_)
+    {
+        axpy(alpha, p, x);
+        axpy(-alpha, ap, r);
+        return norm2(r);
+    }
+    double squared_norm = 0.0;
+#ifdef _OPENMP
+#pragma omp parallel for simd reduction(+ : squared_norm) schedule(static)                         \
+    num_threads(threads_) if (threads_ > 1 && x.size >= 16384)
+#endif
+    for (std::size_t i = 0; i < x.size; ++i)
+    {
+        x.data[i] += alpha * p.data[i];
+        r.data[i] -= alpha * ap.data[i];
+        squared_norm += r.data[i] * r.data[i];
+    }
+    return squared_norm;
 }
 
 void CpuBackend::update_direction(ConstVectorView r, VectorView p, double beta,
