@@ -67,3 +67,16 @@ def test_legacy_solver_exposes_numerical_failure(accelerated, matrix, rhs, toler
     with pytest.raises(RuntimeError, match=status):
         solve(matrix_type(matrix), matrix_type(rhs), initial)
     np.testing.assert_array_equal(initial.tolist(), [0.0, 0.0])
+
+
+@pytest.mark.parametrize("invalid", [0, -1])
+def test_legacy_thread_setters_reject_invalid_values_without_changing_state(invalid):
+    matrix = Accelerated_Matrix([[1.0, 0.0], [0.0, 1.0]])
+    matrix.set_number_of_threads(2)
+    solver = CG.linear_CG()
+    solver.set_number_of_threads(2)
+    for target in (matrix, solver):
+        with pytest.raises(ValueError, match="positive"):
+            target.set_number_of_threads(invalid)
+        assert target.get_number_of_threads() == 2
+    assert (matrix * 2.0).tolist2d() == [[2.0, 0.0], [0.0, 2.0]]

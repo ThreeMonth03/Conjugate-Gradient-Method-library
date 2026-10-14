@@ -15,6 +15,53 @@ TEST(LegacyMatrix, RectangularMatrixVectorProduct)
     EXPECT_DOUBLE_EQ(product(1, 0), 21);
 }
 
+TEST(LegacyMatrix, RectangularHelpersMatchTheKnownProduct)
+{
+    const Matrix::Naive_Matrix left(2, 3, {1, 2, 3, 4, 5, 6});
+    const Matrix::Naive_Matrix right(3, 4, {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12});
+    const Matrix::Naive_Matrix expected(2, 4, {38, 44, 50, 56, 83, 98, 113, 128});
+    EXPECT_EQ(Matrix::multiply_naive(left, right), expected);
+    for (const std::size_t tile : {1u, 2u, 4u, 100u})
+    {
+        EXPECT_EQ(Matrix::multiply_tile(left, right, tile), expected);
+    }
+    EXPECT_THROW(Matrix::multiply_tile(left, right, 0), std::invalid_argument);
+}
+
+TEST(LegacyMatrix, ScalarMultiplyPreservesRectangularAndEmptyShapes)
+{
+    Matrix::Naive_Matrix source(2, 3, {1, 2, 3, 4, 5, 6});
+    const auto result = source * 0.25;
+    EXPECT_EQ(result.nrow(), 2u);
+    EXPECT_EQ(result.ncol(), 3u);
+    EXPECT_DOUBLE_EQ(result(0, 2), 0.75);
+    EXPECT_DOUBLE_EQ(result(1, 2), 1.5);
+    EXPECT_DOUBLE_EQ(source(1, 2), 6.0);
+    Matrix::Naive_Matrix empty(3, 0);
+    const auto empty_result = empty * 2.0;
+    EXPECT_EQ(empty_result.nrow(), 3u);
+    EXPECT_EQ(empty_result.ncol(), 0u);
+    EXPECT_TRUE(empty_result.buffer_vector().empty());
+}
+
+TEST(LegacyMatrix, AllAcceleratedMultiplyPathsRejectInvalidThreadCounts)
+{
+    for (const int invalid : {0, -1})
+    {
+        Matrix::Accelerated_Matrix matrix(2, 2, {1, 0, 0, 1});
+        Matrix::Accelerated_Matrix scalar(1, 1, {2});
+        matrix.set_number_of_threads() = invalid;
+        EXPECT_THROW(matrix * 2.0, std::invalid_argument);
+        EXPECT_THROW(matrix * scalar, std::invalid_argument);
+        EXPECT_THROW(matrix * matrix, std::invalid_argument);
+        matrix.set_number_of_threads() = 1;
+        scalar.set_number_of_threads() = invalid;
+        EXPECT_THROW(scalar * matrix, std::invalid_argument);
+        scalar.set_number_of_threads() = 1;
+        EXPECT_DOUBLE_EQ((scalar * matrix)(0, 0), 2);
+    }
+}
+
 TEST(LegacyCG, SolvesFromZeroInitialGuess)
 {
     Matrix::Naive_Matrix matrix(2, 2, std::vector<double>{4, 1, 1, 3});

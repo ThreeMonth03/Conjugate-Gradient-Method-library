@@ -72,8 +72,13 @@ PYBIND11_MODULE(_cgpy, m)
         .def("__matmul__",
              static_cast<Matrix::Accelerated_Matrix (Matrix::Accelerated_Matrix::*)(
                  Matrix::Accelerated_Matrix const &)>(&Matrix::Accelerated_Matrix::operator*))
-        .def("set_number_of_threads", [](Matrix::Accelerated_Matrix &mat, int number_of_threads)
-             { mat.set_number_of_threads() = number_of_threads; })
+        .def("set_number_of_threads",
+             [](Matrix::Accelerated_Matrix &mat, int number_of_threads)
+             {
+                 if (number_of_threads < 1)
+                     throw std::invalid_argument("Thread count must be positive");
+                 mat.set_number_of_threads() = number_of_threads;
+             })
         .def("get_number_of_threads", &Matrix::Accelerated_Matrix::get_number_of_threads)
         .def("norm", &Matrix::Accelerated_Matrix::norm)
         .def_property_readonly("nrow", &Matrix::Accelerated_Matrix::nrow)
@@ -93,8 +98,13 @@ PYBIND11_MODULE(_cgpy, m)
         .def("set_epoch",
              [](cg_method::linear_CG &solver, int value) { solver.set_epoch() = value; })
         .def("get_epoch", &cg_method::linear_CG::get_epoch)
-        .def("set_number_of_threads", [](cg_method::linear_CG &solver, int value)
-             { solver.set_number_of_threads() = value; })
+        .def("set_number_of_threads",
+             [](cg_method::linear_CG &solver, int value)
+             {
+                 if (value < 1)
+                     throw std::invalid_argument("Thread count must be positive");
+                 solver.set_number_of_threads() = value;
+             })
         .def("get_number_of_threads", &cg_method::linear_CG::get_number_of_threads);
     py::class_<cg_method::nonlinear_CG>(m_cg_method, "nonlinear_CG")
         .def_static("Naive_Fletcher_Reeves_next_iteration",
@@ -109,6 +119,4 @@ PYBIND11_MODULE(_cgpy, m)
                     &cg_method::nonlinear_CG::Accelerated_Hager_Zhang_next_iteration)
         .def_static("Accelerated_Dai_Yuan_next_iteration",
                     &cg_method::nonlinear_CG::Accelerated_Dai_Yuan_next_iteration);
-    // m.def("multiply_naive", &multiply_naive);
-    // m.def("multiply_tile", &multiply_tile);
 }
