@@ -1,6 +1,8 @@
+#include <cg/csr.hpp>
 #include <cg/solver.hpp>
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 
 #include <atomic>
 #include <cstdint>
@@ -82,9 +84,9 @@ cg::CgOptions options(double rtol, double atol, std::size_t maxiter, const std::
     return result;
 }
 
-cg::SolveInfo run(cg::DenseMatrixView A, const py::array &b, py::array &x,
-                  PythonWorkspace &workspace, int threads, bool fused,
-                  const cg::CgOptions &settings)
+template <class Operator>
+cg::SolveInfo run(const Operator &A, const py::array &b, py::array &x, PythonWorkspace &workspace,
+                  int threads, bool fused, const cg::CgOptions &settings)
 {
     vector_array(b, false);
     vector_array(x, true);
@@ -102,45 +104,61 @@ cg::SolveInfo run(cg::DenseMatrixView A, const py::array &b, py::array &x,
     return result;
 }
 
-class PreparedSolver
+cg::DenseMatrix snapshot(const py::array &A)
+{
+    const auto view = matrix_view(A);
+    if (view.rows == 0 || view.rows != view.cols)
+        throw std::invalid_argument("A must be a nonempty square matrix");
+    return {view.rows, view.cols,
+            std::vector<double>(view.data, view.data + view.rows * view.cols)};
+}
+
+cg::DenseMatrixView operator_view(const cg::DenseMatrix &A) { return A.view(); }
+const cg::CsrMatrix &operator_view(const cg::CsrMatrix &A) { return A; }
+
+template <class Matrix> class PreparedSolver
 {
   public:
-    PreparedSolver(const py::array &A, int threads)
-        : matrix_(snapshot(A)), threads_(cg::CpuBackend(threads).threads())
+    PreparedSolver(Matrix matrix, int threads)
+        : matrix_(std::move(matrix)), threads_(cg::CpuBackend(threads).threads())
     {
+        if (matrix_.rows() == 0 || matrix_.rows() != matrix_.cols())
+            throw std::invalid_argument("A must be a nonempty square matrix");
     }
-
     std::unique_ptr<PythonWorkspace> create_workspace() const
     {
         return std::make_unique<PythonWorkspace>(matrix_.rows());
     }
-
     cg::SolveInfo solve_into(const py::array &b, py::array x, PythonWorkspace &workspace,
                              double rtol, double atol, std::size_t maxiter,
                              const std::string &algorithm, bool fused,
                              std::size_t residual_refresh) const
     {
-        return run(matrix_.view(), b, x, workspace, threads_, fused,
+        return run(operator_view(matrix_), b, x, workspace, threads_, fused,
                    options(rtol, atol, maxiter, algorithm, residual_refresh));
     }
-
     std::size_t size() const { return matrix_.rows(); }
     int threads() const { return threads_; }
 
   private:
-    static cg::DenseMatrix snapshot(const py::array &A)
-    {
-        const auto view = matrix_view(A);
-        if (view.rows == 0 || view.rows != view.cols)
-        {
-            throw std::invalid_argument("A must be a nonempty square matrix");
-        }
-        return {view.rows, view.cols,
-                std::vector<double>(view.data, view.data + view.rows * view.cols)};
-    }
-    cg::DenseMatrix matrix_;
+    Matrix matrix_;
     int threads_;
 };
+
+template <class Matrix> auto bind_prepared(py::module_ &m, const char *name)
+{
+    using Plan = PreparedSolver<Matrix>;
+    return py::class_<Plan>(m, name)
+        .def("create_workspace", &Plan::create_workspace)
+        .def_property_readonly("size", &Plan::size)
+        .def_property_readonly("num_threads", &Plan::threads)
+        .def("solve_into", &Plan::solve_into, py::arg("b").noconvert(), py::arg("x").noconvert(),
+             py::kw_only(), py::arg("workspace"), py::arg("rtol") = 1e-8, py::arg("atol") = 0.0,
+             py::arg("maxiter") = 1000, py::arg("algorithm") = "standard", py::arg("fused") = true,
+             py::arg("residual_refresh") = 50,
+             "Solve with aligned contiguous float64 arrays. Invalid arrays raise ValueError; "
+             "negative or nonintegral iteration counts raise TypeError at the native boundary.");
+}
 } // namespace
 
 PYBIND11_MODULE(_cgcore, m)
@@ -160,18 +178,40 @@ PYBIND11_MODULE(_cgcore, m)
         .def_property_readonly("size", [](const PythonWorkspace &w) { return w.value.size(); })
         .def_property_readonly("capacity",
                                [](const PythonWorkspace &w) { return w.value.capacity(); });
-    py::class_<PreparedSolver>(m, "PreparedSolver")
-        .def(py::init<const py::array &, int>(), py::arg("A").noconvert(),
-             py::arg("num_threads") = 1)
-        .def("create_workspace", &PreparedSolver::create_workspace)
-        .def_property_readonly("size", &PreparedSolver::size)
-        .def_property_readonly("num_threads", &PreparedSolver::threads)
-        .def("solve_into", &PreparedSolver::solve_into, py::arg("b").noconvert(),
-             py::arg("x").noconvert(), py::kw_only(), py::arg("workspace"), py::arg("rtol") = 1e-8,
-             py::arg("atol") = 0.0, py::arg("maxiter") = 1000, py::arg("algorithm") = "standard",
-             py::arg("fused") = true, py::arg("residual_refresh") = 50,
-             "Solve with aligned contiguous float64 arrays. Invalid arrays raise ValueError; "
-             "negative or nonintegral iteration counts raise TypeError at the native boundary.");
+    py::class_<cg::CsrMatrix>(m, "CSRMatrix")
+        .def(py::init(
+                 [](std::vector<std::size_t> indptr, std::vector<std::size_t> indices,
+                    std::vector<double> data, std::pair<std::size_t, std::size_t> shape)
+                 {
+                     return cg::CsrMatrix(shape.first, shape.second, std::move(indptr),
+                                          std::move(indices), std::move(data));
+                 }),
+             py::arg("indptr"), py::arg("indices"), py::arg("data"), py::arg("shape"))
+        .def_property_readonly("shape", [](const cg::CsrMatrix &A)
+                               { return py::make_tuple(A.rows(), A.cols()); })
+        .def_property_readonly("nnz", &cg::CsrMatrix::nnz);
+    bind_prepared<cg::DenseMatrix>(m, "PreparedSolver")
+        .def(py::init(
+                 [](const py::array &A, int threads)
+                 {
+                     return std::make_unique<PreparedSolver<cg::DenseMatrix>>(snapshot(A), threads);
+                 }),
+             py::arg("A").noconvert(), py::arg("num_threads") = 1);
+    bind_prepared<cg::CsrMatrix>(m, "PreparedCsrSolver")
+        .def(py::init<cg::CsrMatrix, int>(), py::arg("A"), py::arg("num_threads") = 1);
+    m.def(
+        "solve_csr_into",
+        [](const cg::CsrMatrix &A, const py::array &b, py::array x, PythonWorkspace &workspace,
+           int threads, double rtol, double atol, std::size_t maxiter, const std::string &algorithm,
+           bool fused, std::size_t residual_refresh)
+        {
+            return run(A, b, x, workspace, threads, fused,
+                       options(rtol, atol, maxiter, algorithm, residual_refresh));
+        },
+        py::arg("A"), py::arg("b").noconvert(), py::arg("x").noconvert(), py::kw_only(),
+        py::arg("workspace"), py::arg("num_threads") = 1, py::arg("rtol") = 1e-8,
+        py::arg("atol") = 0.0, py::arg("maxiter") = 1000, py::arg("algorithm") = "standard",
+        py::arg("fused") = true, py::arg("residual_refresh") = 50);
     m.def(
         "solve_into",
         [](const py::array &A, const py::array &b, py::array x, PythonWorkspace &workspace,
@@ -186,4 +226,14 @@ PYBIND11_MODULE(_cgcore, m)
         py::arg("atol") = 0.0, py::arg("maxiter") = 1000, py::arg("algorithm") = "standard",
         py::arg("fused") = true, py::arg("residual_refresh") = 50);
     m.def("openmp_enabled", &cg::CpuBackend::openmp_enabled);
+    m.def("build_info",
+          []
+          {
+              py::dict result;
+              result["compiler"] = CG_COMPILER;
+              result["build_type"] = CG_BUILD_TYPE;
+              result["flags"] = CG_BUILD_FLAGS;
+              result["openmp"] = cg::CpuBackend::openmp_enabled();
+              return result;
+          });
 }

@@ -4,12 +4,23 @@ from dataclasses import dataclass
 from operator import index
 
 import numpy as np
-from _cgcore import PreparedSolver, SolveInfo, Workspace, openmp_enabled
+from _cgcore import CSRMatrix as _CSRMatrix
+from _cgcore import (
+    PreparedCsrSolver,
+    PreparedSolver,
+    SolveInfo,
+    Workspace,
+    build_info,
+    openmp_enabled,
+)
+from _cgcore import solve_csr_into as _solve_csr_into
 from _cgcore import solve_into as _solve_into
 
 _MAX_SIZE_T = np.iinfo(np.uintp).max
 
 __all__ = [
+    "CSRMatrix",
+    "build_info",
     "PreparedSolver",
     "SolveInfo",
     "SolveResult",
@@ -76,8 +87,35 @@ def _iteration_limits(maxiter, residual_refresh):
     return counts
 
 
+class CSRMatrix:
+    """Own canonical CSR arrays. Rows must have sorted, unique column indices."""
+
+    def __init__(self, indptr, indices, data, shape):
+        rowptr, columns = np.asarray(indptr), np.asarray(indices)
+        if rowptr.ndim != 1 or columns.ndim != 1:
+            raise ValueError("CSR index arrays must be one-dimensional")
+        if rowptr.dtype.kind not in "iu" or (columns.size and columns.dtype.kind not in "iu"):
+            raise ValueError("CSR index arrays must contain integers")
+        if np.any(rowptr < 0) or np.any(columns < 0):
+            raise ValueError("CSR indices must be nonnegative")
+        values = _real_array(data, "data")
+        if values.ndim != 1:
+            raise ValueError("CSR data must be one-dimensional")
+        self._native = _CSRMatrix(rowptr, columns, values, shape)
+
+    @property
+    def shape(self):
+        return self._native.shape
+
+    @property
+    def nnz(self):
+        return self._native.nnz
+
+
 def prepare(A, *, num_threads=1):
     """Snapshot A for repeated solves; each active solve needs its own workspace."""
+    if isinstance(A, CSRMatrix):
+        return PreparedCsrSolver(A._native, num_threads)
     return PreparedSolver(_matrix(A), num_threads)
 
 
@@ -103,8 +141,10 @@ def solve_into(
     The workspace must match the system size and cannot serve concurrent calls.
     """
     maxiter, residual_refresh = _iteration_limits(maxiter, residual_refresh)
-    return _solve_into(
-        A,
+    implementation = _solve_csr_into if isinstance(A, CSRMatrix) else _solve_into
+    native_A = A._native if isinstance(A, CSRMatrix) else A
+    return implementation(
+        native_A,
         b,
         x,
         workspace=workspace,
@@ -138,7 +178,11 @@ def solve(
     Compatible A and b arrays are borrowed only for this synchronous call.
     """
     maxiter, residual_refresh = _iteration_limits(maxiter, residual_refresh)
-    A = _matrix(A)
+    if isinstance(A, CSRMatrix):
+        if A.shape[0] == 0 or A.shape[0] != A.shape[1]:
+            raise ValueError("A must be a nonempty square matrix")
+    else:
+        A = _matrix(A)
     b = np.require(_real_array(b, "b"), dtype=np.float64, requirements=("C", "A"))
     if b.ndim != 1 or b.size != A.shape[0]:
         raise ValueError("b must be a vector matching A")
