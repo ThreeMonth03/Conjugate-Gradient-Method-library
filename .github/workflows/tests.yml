@@ -90,4 +90,4 @@ jobs:
           build/wheel-smoke/bin/python -m pip install --cache-dir .cache/pip -c requirements/dev.lock dist/*.whl
           mkdir -p build/wheel-smoke/run
           cd build/wheel-smoke/run
-          ../bin/python -c 'import _cgpy, utils; assert _cgpy.Matrix.Naive_Matrix(2, 2).nrow == 2'
+          ../bin/python -c 'import _cgpy, utils, cgpy; assert _cgpy.Matrix.Naive_Matrix(2, 2).nrow == 2; assert cgpy.solve([[2.]], [4.]).converged'
