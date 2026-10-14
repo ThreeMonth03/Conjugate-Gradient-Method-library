@@ -62,6 +62,7 @@ def environment_metadata():
             "module_path": str(binary),
             "module_sha256": hashlib.sha256(binary.read_bytes()).hexdigest(),
             "build_info": build_info() if callable(build_info) else None,
+            "python_package_path": getattr(package, "__file__", None),
         }
         # Use only an ancestor cache of the binary actually imported. Installed
         # wheels may have no adjacent cache; never substitute another build.

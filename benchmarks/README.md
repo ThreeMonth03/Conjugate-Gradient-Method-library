@@ -60,6 +60,9 @@ time/storage are disclosed. Every candidate is charged the output reset from
 the same x0, although a direct factor solve does not use an initial guess.
 Saved input, inverse-diagonal, CSC and L/U/permutation array bytes describe
 stored numerical arrays, not peak RSS or all allocator/SuperLU overhead.
+CSR input bytes count the shared SciPy arrays with their original index dtype.
+They are not the native owning CSR size: native size_t indices may use more
+bytes, and native snapshots/workspace are excluded from this shared-input count.
 
 For implementation comparisons, use the dense/CSR suites below or optional
 `scipy-reference-cg` / `scipy-reference-pcg` / `torch-cg` / `torch-pcg` candidates.
@@ -184,7 +187,7 @@ environments differ. CI should gate correctness and artifact collection in the
 smoke suite. Speed thresholds belong on a stable machine, separate from
 ordinary shared-runner PR checks.
 
-These comparisons measure implementations of the same CG algorithm. Dense
+The implementation suites measure the same CG recurrence and policy. Dense
 `numpy.linalg.solve` / `torch.linalg.solve` use direct solvers and belong in a
 separately labeled application comparison. The independent mature SciPy CG
 solver is part of the sparse strategy suite with its stopping/replacement

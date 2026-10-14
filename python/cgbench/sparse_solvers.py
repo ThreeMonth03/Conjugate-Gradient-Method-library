@@ -86,10 +86,6 @@ class ScipyKrylovExecutor:
         status = "converged" if info == 0 else "max_iterations"
         if not np.isfinite(norm):
             status = "non_finite"
-        elif norm != 0.0 and (
-            norm < np.sqrt(np.finfo(np.float64).tiny) or norm > np.sqrt(np.finfo(np.float64).max)
-        ):
-            status = "non_finite"
         return Outcome(x, status, self.iterations, self.matvecs, norm)
 
     def benchmark_metadata(self):
@@ -135,6 +131,7 @@ class SparseLUExecutor:
         self.factorization_ns = None
         self.factor = None
         self.last_factor = None
+        self.factor_bytes = None
         self.profile_first_call = True
         if reuse:
             start = time.perf_counter_ns()
@@ -155,8 +152,9 @@ class SparseLUExecutor:
             self.factorization_ns = time.perf_counter_ns() - start
         else:
             factor = self.splu(self.csc)
+        if self.profile_first_call:
+            self.last_factor = factor
         self.profile_first_call = False
-        self.last_factor = factor
         np.copyto(x, factor.solve(self.rhs))
         residual = self.rhs - self.matrix @ x
         true_norm = l2_from_square(float(np.dot(residual, residual)), residual)
@@ -177,11 +175,14 @@ class SparseLUExecutor:
 
     def benchmark_metadata(self):
         factor = self.last_factor if self.last_factor is not None else self.factor
-        factor_bytes = None
-        if factor is not None:
+        if self.factor_bytes is None and factor is not None:
             # L/U conversion is intentionally outside all timed blocks.
-            factor_bytes = self._sparse_bytes(factor.L) + self._sparse_bytes(factor.U)
-            factor_bytes += factor.perm_r.nbytes + factor.perm_c.nbytes
+            self.factor_bytes = self._sparse_bytes(factor.L) + self._sparse_bytes(factor.U)
+            self.factor_bytes += factor.perm_r.nbytes + factor.perm_c.nbytes
+        if not self.reuse:
+            # Keep only measured storage counts, not a previous factor while
+            # timing construction of a new one on the next invocation.
+            self.last_factor = None
         return {
             "implementation_role": "algorithm_comparison",
             "solver_family": "sparse_lu_reuse" if self.reuse else "sparse_lu_total",
@@ -191,7 +192,9 @@ class SparseLUExecutor:
             "format_conversion_elapsed_ns": self.conversion_ns,
             "csc_stored_bytes": self._sparse_bytes(self.csc),
             "factorization_setup_elapsed_ns": self.factorization_ns,
-            "factor_stored_bytes": int(factor_bytes) if factor_bytes is not None else None,
+            "factor_stored_bytes": int(self.factor_bytes)
+            if self.factor_bytes is not None
+            else None,
             "factorization_in_timed_call": not self.reuse,
             "setup_measurement": "single untimed setup/correctness probe",
         }

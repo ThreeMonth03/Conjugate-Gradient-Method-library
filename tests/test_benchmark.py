@@ -393,12 +393,26 @@ def test_sparse_direct_setup_memory_and_true_residual(solver_options, scope, imp
     assert metadata["factor_stored_bytes"] > 0
     assert metadata["factorization_setup_elapsed_ns"] >= 0
     assert metadata["factorization_in_timed_call"] == implementation.endswith("total")
+    if implementation == "scipy-lu-total":
+        assert executor.last_factor is None
     expected = first.x.copy()
     first.x.fill(1e6)
     second = executor()
     assert check_outcome(second, arrays, solver_options)["eligible"]
     np.testing.assert_array_equal(second.x, expected)
     assert second.iterations == 0 and second.matvecs == 1
+
+
+@pytest.mark.parametrize("implementation", ("scipy-cg", "scipy-pcg"))
+def test_official_scipy_tiny_residual_respects_absolute_tolerance(solver_options, implementation):
+    sparse = pytest.importorskip("scipy.sparse")
+    rhs = np.array([1e-200, -1e-200])
+    arrays = (2.0 * sparse.eye(2, format="csr"), rhs, np.zeros(2))
+    options = {**solver_options, "atol": 1e-199}
+    outcome = make_executor(implementation, arrays, options, "prepared", 1)()
+    assert outcome.converged
+    assert check_outcome(outcome, arrays, options)["eligible"]
+    assert not check_outcome(outcome, arrays, {**options, "atol": 0.0})["eligible"]
 
 
 def test_sparse_solver_collection_uses_same_inputs_and_separate_algorithm_tags(smoke_spec):

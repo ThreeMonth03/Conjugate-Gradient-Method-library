@@ -162,6 +162,7 @@ def collect_case(case_spec, run_spec):
                 else matrix.nbytes
             )
         ),
+        "input_storage_basis": "shared input NumPy/SciPy arrays, including original index dtype; excludes native owning copies and workspace",
         "sampling": sampling,
         "schedule": "williams",
         "cycle_rows": cycle,

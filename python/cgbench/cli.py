@@ -168,6 +168,10 @@ def main(argv=None):
             or any(name not in IMPLEMENTATIONS for name in names)
         ):
             raise SystemExit("implementations must be unique names: " + ",".join(IMPLEMENTATIONS))
+        if any(
+            name in ("scipy-cg", "scipy-pcg", "scipy-lu-total", "scipy-lu-reuse") for name in names
+        ):
+            comparison = "sparse-solvers"
         if not all(
             math.isfinite(value) and value >= 0 for value in (arguments.rtol, arguments.atol)
         ):
