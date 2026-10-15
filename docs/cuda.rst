@@ -162,7 +162,7 @@ before returning; exported native vectors have no pending producer work.
 
 Prepared matrix and Jacobi snapshots can be shared, but each overlapping solve
 needs its own output and workspace. The workspace owns device vectors,
-reduction buffers and pinned scalar storage. A cuBLAS workspace additionally
+reduction buffers and inline host scalar storage. A cuBLAS workspace additionally
 owns its handle and 4 MiB scratch allocation; overlapping
 reuse raises an error. It fixes the device/stream used for its solve. No API
 reinterprets a NumPy host pointer as a device pointer.

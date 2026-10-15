@@ -1,5 +1,6 @@
+#include <cg/runtime/cuda/detail/runtime.hpp>
 #include <cg/runtime/detail/checked_size.hpp>
-#include <cg/storage/cuda/detail/allocation.hpp>
+#include <cg/storage/cuda/device_memory.hpp>
 
 namespace cg
 {
@@ -25,16 +26,6 @@ void DeviceDeleter::operator()(void *pointer) const noexcept
     {
         on_device_noexcept(device, [&] { (void)cudaFree(pointer); });
     }
-}
-PinnedScalar pinned_scalar()
-{
-    void *pointer = nullptr;
-    check(cudaMallocHost(&pointer, sizeof(double)), "cudaMallocHost");
-    return PinnedScalar(static_cast<double *>(pointer));
-}
-void PinnedDeleter::operator()(double *pointer) const noexcept
-{
-    (void)cudaFreeHost(pointer);
 }
 
 } // namespace detail

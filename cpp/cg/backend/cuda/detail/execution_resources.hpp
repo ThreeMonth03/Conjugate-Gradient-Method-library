@@ -2,7 +2,7 @@
 
 #include <cg/backend/cuda/dense_kernel.hpp>
 #include <cg/backend/cuda/detail/blas_handle.hpp>
-#include <cg/storage/cuda/detail/allocation.hpp>
+#include <cg/storage/cuda/device_memory.hpp>
 
 #include <optional>
 
