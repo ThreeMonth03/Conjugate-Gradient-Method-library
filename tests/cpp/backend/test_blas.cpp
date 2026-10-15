@@ -1,6 +1,6 @@
-#include <cg/backend/cpu/blas.hpp>
+#include <cg/backend/cpu/detail/blas.hpp>
 #include <cg/cg.hpp>
-#include <cg/storage/validation.hpp>
+#include <cg/storage/detail/validation.hpp>
 
 #include <gtest/gtest.h>
 
@@ -122,15 +122,16 @@ TEST_F(Blas, ReducesTheActualProductAndPreservesBothResidualSigns)
     for (const bool fused : {false, true})
     {
         const cg::CpuBackend backend(1, fused, cg::DenseKernel::blas);
-        EXPECT_DOUBLE_EQ(backend.apply_dot(A.view(), p, output), 50);
+        EXPECT_DOUBLE_EQ(backend.apply_and_dot(A.view(), p, output), 50);
         EXPECT_DOUBLE_EQ(output.data()[0], 7);
         EXPECT_DOUBLE_EQ(output.data()[1], -6);
         EXPECT_DOUBLE_EQ(output.data()[2], 10);
-        EXPECT_DOUBLE_EQ(backend.residual(A.view(), b, p, output), 18);
+        EXPECT_DOUBLE_EQ(backend.residual_squared_norm(A.view(), b, p, output), 18);
         EXPECT_DOUBLE_EQ(output.data()[0], 1);
         EXPECT_DOUBLE_EQ(output.data()[1], 4);
         EXPECT_DOUBLE_EQ(output.data()[2], 1);
-        EXPECT_DOUBLE_EQ(backend.residual(A.view(), b, p, output, false), 18);
+        EXPECT_DOUBLE_EQ(backend.residual_squared_norm(A.view(), b, p, output, cg::ResidualSign::product_minus_rhs),
+                         18);
         EXPECT_DOUBLE_EQ(output.data()[0], -1);
         EXPECT_DOUBLE_EQ(output.data()[1], -4);
         EXPECT_DOUBLE_EQ(output.data()[2], -1);
@@ -150,13 +151,14 @@ TEST_F(Blas, EmptyMatricesDoNotPassNullStorageToTheProvider)
         {
             EXPECT_DOUBLE_EQ(output.data()[i], 0);
         }
-        EXPECT_DOUBLE_EQ(backend.residual(no_columns, b, {}, output), 14);
+        EXPECT_DOUBLE_EQ(backend.residual_squared_norm(no_columns, b, {}, output), 14);
         EXPECT_DOUBLE_EQ(output.data()[1], -2);
-        EXPECT_DOUBLE_EQ(backend.residual(no_columns, b, {}, output, false), 14);
+        EXPECT_DOUBLE_EQ(backend.residual_squared_norm(no_columns, b, {}, output, cg::ResidualSign::product_minus_rhs),
+                         14);
         EXPECT_DOUBLE_EQ(output.data()[1], 2);
         EXPECT_NO_THROW(backend.apply(no_rows, x, {}));
-        EXPECT_DOUBLE_EQ(backend.apply_dot(empty, {}, {}), 0);
-        EXPECT_DOUBLE_EQ(backend.residual(empty, {}, {}, {}), 0);
+        EXPECT_DOUBLE_EQ(backend.apply_and_dot(empty, {}, {}), 0);
+        EXPECT_DOUBLE_EQ(backend.residual_squared_norm(empty, {}, {}, {}), 0);
     }
 }
 
@@ -169,8 +171,8 @@ TEST_F(Blas, RejectsInvalidShapesAndAliasingBeforeChangingOutput)
     EXPECT_THROW(cg::detail::validate_raw_vector(nullptr, 2), std::invalid_argument);
     EXPECT_THROW(backend.apply(A.view(), x, x), std::invalid_argument);
     EXPECT_THROW(backend.apply(A.view(), x, {A.data(), 2}), std::invalid_argument);
-    EXPECT_THROW(backend.apply_dot(A.view(), x, x), std::invalid_argument);
-    EXPECT_THROW(backend.residual(A.view(), output, x, output), std::invalid_argument);
+    EXPECT_THROW(backend.apply_and_dot(A.view(), x, x), std::invalid_argument);
+    EXPECT_THROW(backend.residual_squared_norm(A.view(), output, x, output), std::invalid_argument);
     EXPECT_DOUBLE_EQ(output.data()[0], 7);
     EXPECT_DOUBLE_EQ(output.data()[1], 8);
 }
@@ -186,8 +188,8 @@ TEST_F(Blas, RejectsInt32DimensionAndStrideOverflowBeforeAnyProviderAccess)
     double a = 2, x = 3, output = 7;
     const cg::DenseMatrixView wide_stride(&a, 1, 1, too_large);
     EXPECT_THROW(backend.apply(wide_stride, {&x, 1}, {&output, 1}), std::invalid_argument);
-    EXPECT_THROW(backend.apply_dot(wide_stride, {&x, 1}, {&output, 1}), std::invalid_argument);
-    EXPECT_THROW(backend.residual(wide_stride, {&a, 1}, {&x, 1}, {&output, 1}), std::invalid_argument);
+    EXPECT_THROW(backend.apply_and_dot(wide_stride, {&x, 1}, {&output, 1}), std::invalid_argument);
+    EXPECT_THROW(backend.residual_squared_norm(wide_stride, {&a, 1}, {&x, 1}, {&output, 1}), std::invalid_argument);
     // These intentionally oversized views must be rejected without reading
     // their data, including when the other matrix dimension is zero.
     const cg::DenseMatrixView wide(nullptr, 0, too_large), tall(nullptr, too_large, 0);
@@ -203,7 +205,7 @@ TEST_F(Blas, KeepsVectorFusionIndependentOfTheDenseKernel)
     {
         std::vector<double> x({0, 0, 0}), r({8, -2, 11});
         const cg::CpuBackend backend(1, fused, cg::DenseKernel::blas);
-        EXPECT_DOUBLE_EQ(backend.update_x_r_norm2(x, r, p, ap, 1), 18);
+        EXPECT_DOUBLE_EQ(backend.update_x_r_squared_norm(x, r, p, ap, 1), 18);
         EXPECT_DOUBLE_EQ(x.data()[0], 2);
         EXPECT_DOUBLE_EQ(r.data()[1], 4);
         backend.update_direction(r, x, 2);
@@ -226,8 +228,8 @@ TEST_F(Blas, PrivateProviderPreservesNonfiniteProductsEvenForZeroInputs)
             const cg::CpuBackend backend(1, fused, cg::DenseKernel::blas);
             backend.apply(A.view(), zero, output);
             EXPECT_TRUE(std::isnan(output.data()[0]));
-            EXPECT_TRUE(std::isnan(backend.apply_dot(A.view(), zero, output)));
-            EXPECT_TRUE(std::isnan(backend.residual(A.view(), b, zero, output)));
+            EXPECT_TRUE(std::isnan(backend.apply_and_dot(A.view(), zero, output)));
+            EXPECT_TRUE(std::isnan(backend.residual_squared_norm(A.view(), b, zero, output)));
             cg::Workspace workspace(size);
             for (const auto algorithm : {cg::Algorithm::explicit_residual, cg::Algorithm::recurrence})
             {
@@ -372,8 +374,8 @@ TEST_F(Blas, RejectsCsrInsteadOfSilentlySelectingNativeKernels)
     cg::Workspace workspace(2);
     const cg::CpuBackend backend(1, true, cg::DenseKernel::blas);
     EXPECT_THROW(backend.apply(A, x, output), std::invalid_argument);
-    EXPECT_THROW(backend.apply_dot(A, x, output), std::invalid_argument);
-    EXPECT_THROW(backend.residual(A, b, x, output), std::invalid_argument);
+    EXPECT_THROW(backend.apply_and_dot(A, x, output), std::invalid_argument);
+    EXPECT_THROW(backend.residual_squared_norm(A, b, x, output), std::invalid_argument);
     EXPECT_THROW(cg::solve_into(A, b, output, workspace, backend), std::invalid_argument);
     EXPECT_DOUBLE_EQ(output.data()[0], 7);
     EXPECT_DOUBLE_EQ(output.data()[1], 8);

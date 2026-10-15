@@ -4,8 +4,9 @@ Coding conventions
 This project adopts selected conventions from the
 `SOLVCON coding style <https://doc.solvcon.net/devguide/style.html>`_ and
 `binding organization <https://doc.solvcon.net/devguide/binding.html>`_.
-``make lint`` enforces formatter and Python lint settings; ownership and
-dependency boundaries also require review.
+``make lint`` enforces formatter and Python lint settings. Clang-tidy checks
+native type/function naming; architecture tests enforce feature dependencies.
+Ownership contracts also require review.
 
 Layout and dependencies
 -----------------------
@@ -16,16 +17,24 @@ extension entry points and shared Python conversion support. Python packages
 follow functional responsibility. Create a directory for a coherent purpose.
 
 Storage owns resources. Matrix types enforce representation invariants.
-Backends execute operations. Preconditioners own prepared state. The solver
-coordinates iteration and convergence. Bindings translate Python objects
+Backends execute operations using their own execution resources.
+Preconditioners own prepared state. The solver coordinates iteration,
+convergence and prepared operator snapshots. Bindings translate Python objects
 and manage the language boundary. Core headers and targets do not depend on
-Python or pybind11. Private binding headers are not public C++ interfaces.
+Python or pybind11. Keep private helpers under ``detail/``; export an explicit
+public header list. Use ``cpu.cpp`` and ``cuda.cpp`` for feature registrations.
 
 Names and formatting
 --------------------
 
 * Use ``snake_case`` for files, functions and variables, and ``PascalCase``
-  for classes. Treat abbreviations as words in new type names.
+  for classes and enum types. Treat abbreviations as words: ``CsrMatrix``,
+  ``CgOptions`` and ``SparseLuExecutor``. Enum values use ``snake_case``.
+* Use ``normalize_*`` when conversion may change representation,
+  ``validate_*`` for checks, ``parse_*`` for configuration translation and
+  ``as_*_view`` for borrowed views. Name returned quantities explicitly:
+  ``norm`` and ``squared_norm`` have different units; ``apply_and_dot``
+  describes a fused operation. Prefer enum choices to ambiguous booleans.
 * Prefix C++ class data members with ``m_``. Plain data structs use
   descriptive unprefixed fields.
 * Mathematical symbols such as A, b, x, r, p, Ap and z are appropriate in
@@ -49,6 +58,14 @@ Use C++20 standard containers and RAII. CPU arrays use ``std::vector`` for
 ownership and ``std::span`` for borrowing. Validate foreign pointers before
 constructing a span. Device storage uses a standard owner with CUDA-aware
 cleanup; host containers cannot own device allocations.
+
+Use value types for options/results and composition for owned state. A
+prepared solver holds a matrix variant and optional Jacobi state; it does
+not need a subclass for each storage/preconditioner combination. The shared
+numerical engine accepts the operations it needs through templates. Benchmark
+references use a small Python protocol so array implementations can be
+substituted without depending on concrete classes. Add a virtual interface or
+plugin registry only when an actual use case needs it.
 
 Preserve const correctness and state lifetime, aliasing and concurrency
 requirements at public boundaries. Types with coupled representation

@@ -19,7 +19,7 @@ void register_cuda_matrix(py::module_ &m)
             "from_host",
             [](const py::array &host, int device, std::uintptr_t stream)
             {
-                const auto source = host_matrix(host);
+                const auto source = as_host_matrix_view(host);
                 const gpu::Context context(device, stream);
                 py::gil_scoped_release release;
                 auto result = std::make_unique<gpu::DenseMatrix>(source, context);
@@ -33,14 +33,14 @@ void register_cuda_matrix(py::module_ &m)
                 const gpu::Context context(device, stream);
                 const auto array = device_array(source, 2, context, false);
                 py::gil_scoped_release release;
-                auto result = std::make_unique<gpu::DenseMatrix>(matrix_view(array), context);
+                auto result = std::make_unique<gpu::DenseMatrix>(as_dense_matrix_view(array), context);
                 return result;
             },
             py::arg("source"), py::arg("device") = 0, py::arg("stream") = 0)
         .def_property_readonly("shape",
                                [](const gpu::DenseMatrix &value) { return py::make_tuple(value.rows(), value.cols()); })
         .def_property_readonly("device", &gpu::DenseMatrix::device);
-    py::class_<gpu::CsrMatrix>(m, "CSRMatrix")
+    py::class_<gpu::CsrMatrix>(m, "CsrMatrix")
         .def_static(
             "from_host",
             [](const cg::CsrMatrix &host, int device, std::uintptr_t stream)

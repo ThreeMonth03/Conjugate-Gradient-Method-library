@@ -10,8 +10,9 @@ C++20 CPU comparison
 --------------------
 
 Measured on 2026-10-15 against baseline
-``abdba2421a06b6fcdef5cb4439c6dbc9c4eeb394``. This comparison covers the
-C++20 implementation delivered with this page, using an Apple M1 on
+``abdba2421a06b6fcdef5cb4439c6dbc9c4eeb394`` and measured implementation
+``05cdc861a2cc2689fc98e15b252158924b0156c8``. This historical comparison uses an
+Apple M1 on
 macOS 26.6.2, CPython 3.12.9, NumPy 2.2.6 and SciPy 1.15.3.
 Both builds use AppleClang 21.0.0.21000334, Release ``-O3 -DNDEBUG``,
 one native thread, and no OpenMP, BLAS or CUDA. macOS affinity is not pinned.
@@ -24,7 +25,7 @@ Fresh-process sampling uses four blocks per build in A-B-B-A-B-A-A-B order,
 with five warmups, 20 rounds and three solves per sample. The paired protocol
 uses identical Python harness/wrapper files for both native cores, a new
 worker pair per case, five warmup pairs and 50 alternating pairs, batching
-toward 10 ms. The CPU wrapper is unchanged by the C++20 update.
+toward 10 ms. The two measured revisions use the same CPU wrapper.
 Both intervals use 10,000 bootstrap resamples and a 5% regression budget.
 
 Fresh-process intervals support no material regression in 17 cases;
@@ -32,7 +33,7 @@ Fresh-process intervals support no material regression in 17 cases;
 All 22 paired intervals support no material regression; the largest upper
 bound is 1.0312. Paired intervals are conditional on two persistent workers
 per case. Neither protocol establishes performance on another host, with
-other backend settings or on a GPU. Ratios are current/baseline; the
+other backend settings or on a GPU. Ratios are measured implementation/baseline; the
 milliseconds below are fresh-process medians, and brackets are per-case
 95% intervals without simultaneous coverage adjustment.
 

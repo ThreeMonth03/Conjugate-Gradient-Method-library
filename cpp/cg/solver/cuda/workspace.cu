@@ -1,4 +1,5 @@
 #include <cg/solver/cuda/detail/workspace.hpp>
+#include <cg/solver/cuda/detail/workspace_use_guard.hpp>
 
 namespace cg
 {
@@ -16,15 +17,15 @@ std::size_t Workspace::size() const noexcept
 }
 int Workspace::device() const noexcept
 {
-    return m_impl->context.device();
+    return m_impl->execution.context.device();
 }
 std::uintptr_t Workspace::stream() const noexcept
 {
-    return m_impl->context.stream();
+    return m_impl->execution.context.stream();
 }
 DenseKernel Workspace::dense_kernel() const noexcept
 {
-    return m_impl->kernel;
+    return m_impl->execution.kernel;
 }
 VectorView Workspace::residual() noexcept
 {
@@ -46,6 +47,10 @@ VectorView Workspace::preconditioned() noexcept
 {
     return m_impl->z.view();
 }
+const Context &Workspace::execution_context() const noexcept
+{
+    return m_impl->execution.context;
+}
 bool Workspace::try_acquire() noexcept
 {
     return !m_impl->active.exchange(true);
@@ -54,6 +59,38 @@ void Workspace::release() noexcept
 {
     m_impl->active.store(false);
 }
+
+namespace detail
+{
+
+WorkspaceUseGuard::WorkspaceUseGuard(Workspace &workspace, const Context &context)
+    : m_workspace(workspace), m_context(context)
+{
+    if (!workspace.try_acquire())
+    {
+        throw std::invalid_argument("CUDA workspace is already in use by another solve");
+    }
+}
+WorkspaceUseGuard::~WorkspaceUseGuard()
+{
+    if (!m_completed)
+    {
+        try
+        {
+            m_context.synchronize();
+        }
+        catch (...)
+        {
+        }
+    }
+    m_workspace.release();
+}
+ExecutionResources &WorkspaceUseGuard::resources() noexcept
+{
+    return m_workspace.m_impl->execution;
+}
+
+} // namespace detail
 
 } // namespace cuda
 } // namespace cg

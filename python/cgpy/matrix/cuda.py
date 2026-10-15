@@ -2,8 +2,8 @@
 
 import typing
 
+from .._interop import host
 from .._runtime import cuda as cuda_runtime
-from .._runtime import validation
 from . import csr
 
 
@@ -24,7 +24,7 @@ class DenseMatrix:
         """Normalize a real 2D host array and explicitly upload a snapshot."""
         result = cls.__new__(cls)
         result._native = cuda_runtime.load().DenseMatrix.from_host(
-            validation.host_array(source, 2), device, stream
+            host.normalize_host_array(source, 2), device, stream
         )
         return result
 
@@ -54,7 +54,7 @@ class DenseMatrix:
         return self._native.device
 
 
-class CSRMatrix:
+class CsrMatrix:
     """Own an immutable canonical CSR device snapshot.
 
     Columns must be sorted, unique and in range in each row; pointers must be
@@ -63,17 +63,17 @@ class CSRMatrix:
     """
 
     def __init__(self) -> None:
-        raise TypeError("use CSRMatrix.from_host or CSRMatrix.from_device")
+        raise TypeError("use CsrMatrix.from_host or CsrMatrix.from_device")
 
     @classmethod
     def from_host(
         cls, source: object, *, device: int = 0, stream: int = 0
     ) -> typing.Self:
-        """Explicitly upload a public CPU cgpy.CSRMatrix snapshot."""
-        if not isinstance(source, csr.CSRMatrix):
-            raise TypeError("source must be cgpy.CSRMatrix")
+        """Explicitly upload a public CPU cgpy.CsrMatrix snapshot."""
+        if not isinstance(source, csr.CsrMatrix):
+            raise TypeError("source must be cgpy.CsrMatrix")
         result = cls.__new__(cls)
-        result._native = cuda_runtime.load().CSRMatrix.from_host(
+        result._native = cuda_runtime.load().CsrMatrix.from_host(
             source._native, device, stream
         )
         return result
@@ -89,7 +89,7 @@ class CSRMatrix:
         selected device. A setup-time index download is included in this call.
         """
         result = cls.__new__(cls)
-        result._native = cuda_runtime.load().CSRMatrix.from_device(
+        result._native = cuda_runtime.load().CsrMatrix.from_device(
             indptr, indices, data, shape, device, stream
         )
         return result

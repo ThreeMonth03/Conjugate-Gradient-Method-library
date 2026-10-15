@@ -118,8 +118,8 @@ def _check_executor_outcome(execute, outcome, arrays, options):
 
 def collect_case(case_spec, run_spec):
     """Use exactly the case builder and solver adapters exercised by pytest."""
-    from . import backends
     from . import cases as case_module
+    from . import execution
 
     matrix, rhs, initial, known_solution = case_module.make_case(
         case_spec, run_spec["seed"]
@@ -136,7 +136,7 @@ def collect_case(case_spec, run_spec):
     options = run_spec["solver"]
     for name in run_spec["implementations"]:
         try:
-            execute = backends.make_executor(
+            execute = execution.make_executor(
                 name,
                 arrays,
                 options,

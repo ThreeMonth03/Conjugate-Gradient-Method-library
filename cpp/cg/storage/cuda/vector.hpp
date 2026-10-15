@@ -1,6 +1,6 @@
 #pragma once
 
-#include <cg/backend/cuda/context.hpp>
+#include <cg/runtime/cuda/context.hpp>
 #include <cg/storage/cuda/device_memory.hpp>
 #include <cg/storage/cuda/vector_view.hpp>
 #include <cg/storage/vector_view.hpp>

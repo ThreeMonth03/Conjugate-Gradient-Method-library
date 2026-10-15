@@ -1,6 +1,6 @@
 #include <cg/matrix/cuda/dense_matrix.hpp>
-#include <cg/matrix/cuda/validation.hpp>
-#include <cg/matrix/validation.hpp>
+#include <cg/matrix/cuda/detail/validation.hpp>
+#include <cg/matrix/detail/validation.hpp>
 
 #include <utility>
 
@@ -10,7 +10,7 @@ namespace cuda
 {
 
 DenseMatrix::DenseMatrix(cg::DenseMatrixView host, const Context &context)
-    : m_rows(host.rows), m_cols(host.cols), m_values(detail::product(host.rows, host.cols), context)
+    : m_rows(host.rows), m_cols(host.cols), m_values(detail::checked_product(host.rows, host.cols), context)
 {
     cg::detail::validate(host);
     detail::DeviceGuard guard(context.device());
@@ -24,7 +24,7 @@ DenseMatrix::DenseMatrix(cg::DenseMatrixView host, const Context &context)
     context.synchronize();
 }
 DenseMatrix::DenseMatrix(DenseMatrixView source, const Context &context)
-    : m_rows(source.rows), m_cols(source.cols), m_values(detail::product(source.rows, source.cols), context)
+    : m_rows(source.rows), m_cols(source.cols), m_values(detail::checked_product(source.rows, source.cols), context)
 {
     detail::validate(source, context);
     detail::DeviceGuard guard(context.device());

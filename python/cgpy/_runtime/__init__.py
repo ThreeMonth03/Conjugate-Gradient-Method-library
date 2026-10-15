@@ -1,1 +1,1 @@
-"""Private validation and optional runtime loading."""
+"""Private optional native runtime loading."""

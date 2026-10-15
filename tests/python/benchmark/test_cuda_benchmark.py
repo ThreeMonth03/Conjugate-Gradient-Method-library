@@ -8,8 +8,8 @@ from types import SimpleNamespace
 
 import numpy as np
 import pytest
+from cgbench.adapters.cuda import CudaNativeExecutor
 from cgbench.artifacts import load_artifact, validate_artifact, write_artifact
-from cgbench.backends import TorchOps, make_executor
 from cgbench.cases import SUITES, input_hash, make_case
 from cgbench.cli import main
 from cgbench.collector import (
@@ -18,11 +18,10 @@ from cgbench.collector import (
     collect_case,
     time_candidates,
 )
-from cgbench.cuda_backends import (
-    CudaNativeExecutor,
-    TorchCudaOps,
-    preflight_cuda,
-)
+from cgbench.cuda_runtime import preflight_cuda
+from cgbench.execution import make_executor
+from cgbench.reference.torch import TorchOps
+from cgbench.reference.torch_cuda import TorchCudaOps
 
 
 @pytest.fixture
@@ -168,14 +167,14 @@ def test_gpu_fences_bracket_completed_blocks_not_individual_repetitions():
 
 
 def test_explicit_cuda_unavailability_fails_without_cpu_fallback(monkeypatch):
-    from cgbench import cuda_backends
+    from cgbench import cuda_runtime
 
     def absent(device):
         raise RuntimeError(
             f"CUDA requested but native CUDA device {device} is unavailable"
         )
 
-    monkeypatch.setattr(cuda_backends, "native_cuda", absent)
+    monkeypatch.setattr(cuda_runtime, "native_cuda", absent)
     with pytest.raises(RuntimeError, match="CUDA requested.*unavailable"):
         preflight_cuda(["cuda-native"], 0)
     with pytest.raises(ValueError, match="explicit CUDA"):
@@ -260,7 +259,7 @@ def test_native_adapter_charges_device_reset_and_keeps_transfers_at_gates(
         solve=solve,
     )
     monkeypatch.setattr(
-        "cgbench.cuda_backends.native_cuda", lambda device: cuda
+        "cgbench.cuda_runtime.native_cuda", lambda device: cuda
     )
     executor = CudaNativeExecutor(arrays, options, scope, 2, "native")
     assert counts["upload"] == 2
@@ -422,7 +421,7 @@ def _require_gpu(implementation):
         if not torch.cuda.is_available():
             pytest.skip("CUDA PyTorch/device unavailable")
     else:
-        from cgbench.cuda_backends import native_cuda
+        from cgbench.cuda_runtime import native_cuda
 
         try:
             native_cuda(0)

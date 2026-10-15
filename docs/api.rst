@@ -34,6 +34,8 @@ mutation until the call returns.
 dense-only and accepts ``num_threads=1``. ``fused`` independently controls the
 remaining CPU vector operations. A prepared solver fixes its matrix snapshot,
 thread count, preconditioner and dense-kernel choice when it is constructed.
+Dense and CSR inputs return the same ``PreparedSolver`` type. ``CsrMatrix``
+is the public spelling in both CPU and CUDA APIs.
 
 Repeated solves
 ---------------
@@ -60,21 +62,18 @@ the GIL; this does not make concurrent mutation of borrowed NumPy arrays safe.
 .. autoclass:: cgpy.PreparedSolver
    :members:
 
-.. autoclass:: cgpy.PreparedCsrSolver
-   :members:
-
 .. autoclass:: cgpy.Workspace
    :members:
 
 CSR and results
 ---------------
 
-.. autoclass:: cgpy.CSRMatrix
+.. autoclass:: cgpy.CsrMatrix
    :members:
 
 .. doctest::
 
-   >>> A = cgpy.CSRMatrix([0, 2, 4], [0, 1, 0, 1], [4.0, 1.0, 1.0, 3.0], (2, 2))
+   >>> A = cgpy.CsrMatrix([0, 2, 4], [0, 1, 0, 1], [4.0, 1.0, 1.0, 3.0], (2, 2))
    >>> A.shape, A.nnz
    ((2, 2), 4)
    >>> result = cgpy.solve(A, np.array([1.0, 2.0]), preconditioner="jacobi")

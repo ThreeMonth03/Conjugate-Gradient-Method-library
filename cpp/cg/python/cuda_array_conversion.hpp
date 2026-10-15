@@ -4,9 +4,9 @@
 
 #include <cg/python/array_conversion.hpp>
 #include <pybind11/stl.h>
-#include <cg/backend/cuda/context.hpp>
-#include <cg/backend/cuda/detail/runtime.hpp>
 #include <cg/matrix/cuda/dense_matrix_view.hpp>
+#include <cg/runtime/cuda/context.hpp>
+#include <cg/runtime/cuda/detail/runtime.hpp>
 #include <cg/storage/cuda/vector_view.hpp>
 #include <cuda_runtime_api.h>
 
@@ -26,7 +26,6 @@ inline void check(cudaError_t error)
 {
     gpu::detail::check(error, "CUDA");
 }
-using DeviceScope = gpu::detail::DeviceGuard;
 
 struct DeviceArray
 {
@@ -39,11 +38,11 @@ struct DeviceArray
 };
 
 DeviceArray device_array(py::object object, int ndim, const gpu::Context &context, bool writable, bool integer = false);
-gpu::ConstVectorView vector_view(const DeviceArray &array);
-gpu::VectorView mutable_view(const DeviceArray &array);
-gpu::DenseMatrixView matrix_view(const DeviceArray &array);
-void host_array(const py::array &array, int ndim);
-cg::DenseMatrixView host_matrix(const py::array &array);
+gpu::ConstVectorView as_vector_view(const DeviceArray &array);
+gpu::VectorView as_mutable_vector_view(const DeviceArray &array);
+gpu::DenseMatrixView as_dense_matrix_view(const DeviceArray &array);
+void validate_host_array(const py::array &array, int ndim);
+cg::DenseMatrixView as_host_matrix_view(const py::array &array);
 
 } // namespace python
 } // namespace cg

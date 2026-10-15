@@ -12,20 +12,20 @@ from .._runtime.cuda import (
     runtime_info,
     synchronize,
 )
-from ..matrix.cuda import CSRMatrix, DenseMatrix
+from ..matrix.cuda import CsrMatrix, DenseMatrix
 from ..solver.cuda import (
     PreparedSolver,
+    Workspace,
     prepare,
     prepare_host,
     solve,
     solve_into,
 )
-from ..solver.cuda_workspace import Workspace
 from ..solver.result import SolveResult
 from ..storage.cuda import Vector
 
 __all__ = [
-    "CSRMatrix",
+    "CsrMatrix",
     "DenseMatrix",
     "PreparedSolver",
     "SolveResult",

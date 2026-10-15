@@ -1,5 +1,5 @@
 #include <cg/matrix/dense_matrix.hpp>
-#include <cg/matrix/validation.hpp>
+#include <cg/matrix/detail/validation.hpp>
 
 #include <limits>
 #include <stdexcept>

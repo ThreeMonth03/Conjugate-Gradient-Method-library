@@ -11,6 +11,9 @@ from cgpy import cuda
 
 
 def test_cuda_module_is_importable_and_reports_actual_capability():
+    assert cuda.CsrMatrix.__name__ == "CsrMatrix"
+    assert not hasattr(cuda, "CSRMatrix")
+    assert not hasattr(cuda, "PreparedCsrSolver")
     assert isinstance(cuda.enabled(), bool)
     assert isinstance(cuda.is_available(), bool)
     assert cuda.build_info()["enabled"] == cuda.enabled()
@@ -45,7 +48,7 @@ def cpu_csr(matrix):
     from scipy.sparse import csr_matrix
 
     value = csr_matrix(matrix)
-    return cgpy.CSRMatrix(value.indptr, value.indices, value.data, value.shape)
+    return cgpy.CsrMatrix(value.indptr, value.indices, value.data, value.shape)
 
 
 @pytest.mark.parametrize(
@@ -64,7 +67,7 @@ def test_device_modes_solve_to_true_residual_and_preserve_inputs(
     operator = (
         gpu.DenseMatrix.from_host(matrix)
         if kind == "dense"
-        else gpu.CSRMatrix.from_host(cpu_csr(matrix))
+        else gpu.CsrMatrix.from_host(cpu_csr(matrix))
     )
     b = gpu.Vector.from_host(rhs)
     initial = gpu.Vector.from_host(np.full(rhs.shape, 0.25))
@@ -151,7 +154,7 @@ def test_unsupported_modes_layouts_aliases_and_workspaces_reject_before_writes(
             gpu.solve_into(A, b, x, workspace=workspace, dense_kernel=mode)
     with pytest.raises(ValueError, match="CSR|native"):
         gpu.prepare(
-            gpu.CSRMatrix.from_host(cpu_csr(matrix)), dense_kernel="cublas"
+            gpu.CsrMatrix.from_host(cpu_csr(matrix)), dense_kernel="cublas"
         )
     with pytest.raises(ValueError):
         gpu.solve_into(A, b, x, workspace=gpu.Workspace(rhs.size - 1))
@@ -318,7 +321,7 @@ def test_device_csr_snapshot_validates_canonical_indices(gpu, dtype):
     values = torch.tensor(
         [4.0, 1.0, 1.0, 3.0], device="cuda", dtype=torch.float64
     )
-    matrix = gpu.CSRMatrix.from_device(pointers, columns, values, (2, 2))
+    matrix = gpu.CsrMatrix.from_device(pointers, columns, values, (2, 2))
     assert matrix.nnz == 4
     values.fill_(np.nan)
     answer = gpu.solve(
@@ -328,7 +331,7 @@ def test_device_csr_snapshot_validates_canonical_indices(gpu, dtype):
     np.testing.assert_allclose(answer.x.to_host(), [1 / 11, 7 / 11])
     for bad in ([1, 0, 0, 1], [0, 0, 0, 1], [0, 2, 0, 1]):
         with pytest.raises(ValueError):
-            gpu.CSRMatrix.from_device(
+            gpu.CsrMatrix.from_device(
                 pointers,
                 torch.tensor(bad, device="cuda", dtype=index_dtype),
                 torch.ones(4, device="cuda", dtype=torch.float64),

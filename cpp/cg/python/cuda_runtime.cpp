@@ -22,7 +22,7 @@ void register_cuda_runtime(py::module_ &m)
         "runtime_info",
         [](int device)
         {
-            DeviceScope selected(device);
+            gpu::detail::DeviceGuard selected(device);
             cudaDeviceProp property{};
             check(cudaGetDeviceProperties(&property, device));
             std::ostringstream uuid;

@@ -47,6 +47,7 @@ def main():
                 result.x, expected, rtol=1e-8, atol=1e-12
             )
         plan = cgpy.prepare(matrix, dense_kernel=mode, preconditioner="jacobi")
+        assert type(plan) is cgpy.PreparedSolver
         output = np.zeros(2)
         solved = plan.solve_into(
             rhs, output, workspace=plan.create_workspace()
@@ -77,12 +78,21 @@ def main():
             pass
         else:
             raise AssertionError("disabled wheel silently accepted BLAS")
-    csr = cgpy.CSRMatrix([0, 2, 4], [0, 1, 0, 1], [4.0, 1.0, 1.0, 3.0], (2, 2))
+    csr = cgpy.CsrMatrix([0, 2, 4], [0, 1, 0, 1], [4.0, 1.0, 1.0, 3.0], (2, 2))
     result = cgpy.solve(
         csr, rhs, preconditioner="jacobi", dense_kernel="native"
     )
     assert result.converged
     np.testing.assert_allclose(result.x, expected)
+    plan = cgpy.prepare(csr, preconditioner="jacobi")
+    assert type(plan) is cgpy.PreparedSolver
+    output = np.zeros(2)
+    assert plan.solve_into(
+        rhs, output, workspace=plan.create_workspace(), atol=0
+    ).converged
+    np.testing.assert_allclose(output, expected)
+    assert not hasattr(cgpy, "CSRMatrix")
+    assert not hasattr(cgpy, "PreparedCsrSolver")
     from cgpy import cuda
 
     assert cuda.enabled() is expected_cuda
@@ -122,7 +132,7 @@ def main():
                 )
                 assert solved.converged
                 np.testing.assert_allclose(output.to_host(), expected)
-            gpu_csr = cuda.CSRMatrix.from_host(csr)
+            gpu_csr = cuda.CsrMatrix.from_host(csr)
             answer = cuda.solve(gpu_csr, gpu_rhs, preconditioner="jacobi")
             assert answer.converged
             np.testing.assert_allclose(answer.x.to_host(), expected)

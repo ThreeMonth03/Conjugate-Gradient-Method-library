@@ -1,6 +1,6 @@
 #include <cg/backend/cpu/backend.hpp>
 #include <cg/matrix/csr_matrix.hpp>
-#include <cg/storage/validation.hpp>
+#include <cg/storage/detail/validation.hpp>
 
 #include <stdexcept>
 
@@ -55,7 +55,7 @@ void CpuBackend::apply(const CsrMatrix &A, ConstVectorView x, VectorView output)
     }
 }
 
-double CpuBackend::apply_dot(const CsrMatrix &A, ConstVectorView p, VectorView ap) const
+double CpuBackend::apply_and_dot(const CsrMatrix &A, ConstVectorView p, VectorView ap) const
 {
     if (dense_kernel() == DenseKernel::blas)
     {
@@ -64,7 +64,7 @@ double CpuBackend::apply_dot(const CsrMatrix &A, ConstVectorView p, VectorView a
     validate_apply(A, p, ap);
     if (p.size() != ap.size())
     {
-        throw std::invalid_argument("CSR apply_dot requires a square matrix");
+        throw std::invalid_argument("CSR apply_and_dot requires a square matrix");
     }
     if (!m_fused)
     {
@@ -88,9 +88,10 @@ double CpuBackend::apply_dot(const CsrMatrix &A, ConstVectorView p, VectorView a
     return product;
 }
 
-double CpuBackend::residual(const CsrMatrix &A, ConstVectorView b, ConstVectorView x, VectorView r,
-                            bool b_minus_ax) const
+double CpuBackend::residual_squared_norm(const CsrMatrix &A, ConstVectorView b, ConstVectorView x, VectorView r,
+                                         ResidualSign sign) const
 {
+    const bool b_minus_ax = sign == ResidualSign::rhs_minus_product;
     if (dense_kernel() == DenseKernel::blas)
     {
         throw std::invalid_argument("BLAS dense kernels do not support CSR matrices");
@@ -105,7 +106,7 @@ double CpuBackend::residual(const CsrMatrix &A, ConstVectorView b, ConstVectorVi
     {
         apply(A, x, r);
         axpby(b_minus_ax ? 1.0 : -1.0, b, b_minus_ax ? -1.0 : 1.0, r, r);
-        return norm2(r);
+        return squared_norm(r);
     }
     const auto *indptr = A.indptr().data();
     const auto *indices = A.indices().data();

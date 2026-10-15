@@ -17,7 +17,7 @@ def sparse_system():
 @pytest.mark.parametrize("fused", [False, True])
 def test_csr_matches_dense_and_owns_snapshot(algorithm, fused):
     indptr, indices, values, dense = sparse_system()
-    A = cgpy.CSRMatrix(indptr, indices, values, dense.shape)
+    A = cgpy.CsrMatrix(indptr, indices, values, dense.shape)
     values[:] = 0
     indices[:] = 0
     indptr[:] = 0
@@ -54,17 +54,17 @@ def test_csr_matches_dense_and_owns_snapshot(algorithm, fused):
 )
 def test_csr_rejects_malformed_storage(indptr, indices, values):
     with pytest.raises(ValueError):
-        cgpy.CSRMatrix(indptr, indices, values, (2, 2))
+        cgpy.CsrMatrix(indptr, indices, values, (2, 2))
 
 
 def test_csr_input_alias_and_nonfinite_status():
     indptr, indices, values, dense = sparse_system()
-    A = cgpy.CSRMatrix(indptr, indices, values, dense.shape)
+    A = cgpy.CsrMatrix(indptr, indices, values, dense.shape)
     b = np.ones(3)
     with pytest.raises(ValueError):
         cgpy.solve_into(A, b, b, workspace=cgpy.Workspace(3))
     values[0] = np.nan
-    bad = cgpy.CSRMatrix(indptr, indices, values, dense.shape)
+    bad = cgpy.CsrMatrix(indptr, indices, values, dense.shape)
     assert cgpy.solve(bad, b).status == "non_finite"
 
 
@@ -76,7 +76,7 @@ def test_csr_input_alias_and_nonfinite_status():
     ],
 )
 def test_prepare_requires_nonempty_square_csr(shape, indptr, indices, data):
-    A = cgpy.CSRMatrix(indptr, indices, data, shape)
+    A = cgpy.CsrMatrix(indptr, indices, data, shape)
     with pytest.raises(ValueError, match="nonempty square"):
         cgpy.prepare(A)
     with pytest.raises(ValueError, match="nonempty square"):

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <cg/matrix/cuda/validation.hpp>
+#include <cg/matrix/cuda/detail/validation.hpp>
 
 namespace cg
 {

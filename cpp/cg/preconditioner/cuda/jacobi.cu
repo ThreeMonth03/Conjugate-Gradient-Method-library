@@ -1,5 +1,5 @@
-#include <cg/backend/cuda/backend.hpp>
-#include <cg/matrix/cuda/validation.hpp>
+#include <cg/backend/cuda/detail/backend.hpp>
+#include <cg/matrix/cuda/detail/validation.hpp>
 #include <cg/preconditioner/cuda/detail/kernels.hpp>
 #include <cg/preconditioner/cuda/jacobi.hpp>
 
@@ -25,9 +25,9 @@ JacobiPreconditioner::JacobiPreconditioner(const CsrMatrix &A, const Context &co
     }
     detail::initialize_jacobi(A.view(), m_inverse.view(), context);
 }
-double JacobiPreconditioner::apply_dot(ConstVectorView r, VectorView z, const Backend &backend) const
+double JacobiPreconditioner::apply_and_dot(ConstVectorView r, VectorView z, const detail::Backend &backend) const
 {
-    return backend.multiply_dot(m_inverse.view(), r, z);
+    return backend.multiply_and_dot(m_inverse.view(), r, z);
 }
 
 } // namespace cuda

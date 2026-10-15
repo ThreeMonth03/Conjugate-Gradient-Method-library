@@ -10,7 +10,7 @@ def test_jacobi_converges_faster_on_diagonally_scaled_spd(sparse):
     n = 16
     diagonal = np.geomspace(1.0, 1e5, n)
     A = (
-        cgpy.CSRMatrix(np.arange(n + 1), np.arange(n), diagonal, (n, n))
+        cgpy.CsrMatrix(np.arange(n + 1), np.arange(n), diagonal, (n, n))
         if sparse
         else np.diag(diagonal)
     )
@@ -40,13 +40,13 @@ def test_jacobi_converges_faster_on_diagonally_scaled_spd(sparse):
 def test_jacobi_rejects_invalid_diagonal(diagonal):
     with pytest.raises(ValueError):
         cgpy.prepare(np.diag(diagonal), preconditioner="jacobi")
-    A = cgpy.CSRMatrix([0, 1, 2], [0, 1], diagonal, (2, 2))
+    A = cgpy.CsrMatrix([0, 1, 2], [0, 1], diagonal, (2, 2))
     with pytest.raises(ValueError):
         cgpy.prepare(A, preconditioner="jacobi")
 
 
 def test_jacobi_requires_diagonal_and_standard_algorithm():
-    A = cgpy.CSRMatrix([0, 1, 2], [1, 0], [1.0, 1.0], (2, 2))
+    A = cgpy.CsrMatrix([0, 1, 2], [1, 0], [1.0, 1.0], (2, 2))
     with pytest.raises(ValueError):
         cgpy.prepare(A, preconditioner="jacobi")
     for options in (

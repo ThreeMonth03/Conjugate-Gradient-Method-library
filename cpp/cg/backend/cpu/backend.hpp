@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cg/backend/residual_sign.hpp>
 #include <cg/matrix/dense_matrix_view.hpp>
 #include <cg/storage/vector_view.hpp>
 
@@ -33,25 +34,26 @@ class CpuBackend
 
     void copy(ConstVectorView source, VectorView destination) const;
     double dot(ConstVectorView x, ConstVectorView y) const;
-    // Stable L2 norm. norm2 is the squared sum used by the recurrence and may
+    // Stable L2 norm. squared_norm is the squared sum used by the recurrence and may
     // overflow or underflow when the norm itself is still representable.
     double norm(ConstVectorView x) const;
-    double norm2(ConstVectorView x) const;
+    double squared_norm(ConstVectorView x) const;
     void multiply(ConstVectorView x, ConstVectorView y, VectorView output) const;
     // z = factors * r; return dot(r,z). The output must be disjoint from inputs.
-    double multiply_dot(ConstVectorView factors, ConstVectorView r, VectorView z) const;
+    double multiply_and_dot(ConstVectorView factors, ConstVectorView r, VectorView z) const;
     void axpy(double alpha, ConstVectorView x, VectorView y) const;
     void axpby(double alpha, ConstVectorView x, double beta, ConstVectorView y, VectorView output) const;
     void apply(DenseMatrixView A, ConstVectorView x, VectorView output) const;
-    double apply_dot(DenseMatrixView A, ConstVectorView p, VectorView ap) const;
+    double apply_and_dot(DenseMatrixView A, ConstVectorView p, VectorView ap) const;
     // The residual sign is explicit to define the explicit-residual formulation.
-    double residual(DenseMatrixView A, ConstVectorView b, ConstVectorView x, VectorView r,
-                    bool b_minus_ax = true) const;
+    double residual_squared_norm(DenseMatrixView A, ConstVectorView b, ConstVectorView x, VectorView r,
+                                 ResidualSign sign = ResidualSign::rhs_minus_product) const;
     void apply(const CsrMatrix &A, ConstVectorView x, VectorView output) const;
-    double apply_dot(const CsrMatrix &A, ConstVectorView p, VectorView ap) const;
-    double residual(const CsrMatrix &A, ConstVectorView b, ConstVectorView x, VectorView r,
-                    bool b_minus_ax = true) const;
-    double update_x_r_norm2(VectorView x, VectorView r, ConstVectorView p, ConstVectorView ap, double alpha) const;
+    double apply_and_dot(const CsrMatrix &A, ConstVectorView p, VectorView ap) const;
+    double residual_squared_norm(const CsrMatrix &A, ConstVectorView b, ConstVectorView x, VectorView r,
+                                 ResidualSign sign = ResidualSign::rhs_minus_product) const;
+    double update_x_r_squared_norm(VectorView x, VectorView r, ConstVectorView p, ConstVectorView ap,
+                                   double alpha) const;
     void update_direction(ConstVectorView r, VectorView p, double beta, double residual_scale = 1.0) const;
 
     private:
@@ -59,11 +61,5 @@ class CpuBackend
     bool m_fused;
     DenseKernel m_dense_kernel;
 };
-
-namespace detail
-{
-// The view was validated by the operation that produced squared_norm.
-double norm_from_squared(ConstVectorView x, double squared_norm);
-} // namespace detail
 
 } // namespace cg

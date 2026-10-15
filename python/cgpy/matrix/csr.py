@@ -4,10 +4,10 @@ import numpy as np
 import numpy.typing as npt
 
 from .. import _core
-from .._runtime import validation
+from .._interop import host
 
 
-class CSRMatrix:
+class CsrMatrix:
     """Own a validated canonical compressed sparse row matrix.
 
     Parameters
@@ -41,7 +41,7 @@ class CSRMatrix:
     Examples
     --------
     >>> import cgpy
-    >>> A = cgpy.CSRMatrix([0, 2, 4], [0, 1, 0, 1], [4., 1., 1., 3.], (2, 2))
+    >>> A = cgpy.CsrMatrix([0, 2, 4], [0, 1, 0, 1], [4., 1., 1., 3.], (2, 2))
     >>> A.shape, A.nnz
     ((2, 2), 4)
     """
@@ -62,10 +62,10 @@ class CSRMatrix:
             raise ValueError("CSR index arrays must contain integers")
         if np.any(rowptr < 0) or np.any(columns < 0):
             raise ValueError("CSR indices must be nonnegative")
-        values = validation.real_array(data, "data")
+        values = host.normalize_real_array(data, "data")
         if values.ndim != 1:
             raise ValueError("CSR data must be one-dimensional")
-        self._native = _core.CSRMatrix(rowptr, columns, values, shape)
+        self._native = _core.CsrMatrix(rowptr, columns, values, shape)
 
     @property
     def shape(self) -> tuple[int, ...]:

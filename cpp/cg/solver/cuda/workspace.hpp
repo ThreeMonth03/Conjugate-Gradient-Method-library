@@ -1,7 +1,7 @@
 #pragma once
 
-#include <cg/backend/cuda/context.hpp>
 #include <cg/backend/cuda/dense_kernel.hpp>
+#include <cg/runtime/cuda/context.hpp>
 #include <cg/storage/cuda/vector_view.hpp>
 
 #include <memory>
@@ -11,7 +11,11 @@ namespace cg
 namespace cuda
 {
 
-class Backend;
+class PreparedSolver;
+namespace detail
+{
+class WorkspaceUseGuard;
+}
 // One active solve per workspace. The workspace owns its reduction buffers,
 // pinned scalar, and optional cuBLAS resources, allocated before any solve.
 class Workspace
@@ -30,13 +34,15 @@ class Workspace
     VectorView product() noexcept;
     VectorView scratch() noexcept;
     VectorView preconditioned() noexcept;
-    bool try_acquire() noexcept;
-    void release() noexcept;
 
     private:
+    const Context &execution_context() const noexcept;
+    bool try_acquire() noexcept;
+    void release() noexcept;
     struct Impl;
     std::unique_ptr<Impl> m_impl;
-    friend class Backend;
+    friend class detail::WorkspaceUseGuard;
+    friend class PreparedSolver;
 };
 
 } // namespace cuda

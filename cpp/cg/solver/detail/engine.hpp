@@ -1,6 +1,8 @@
 #pragma once
 
+#include <cg/backend/residual_sign.hpp>
 #include <cg/solver/options.hpp>
+#include <cg/solver/solve_info.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -25,7 +27,7 @@ SolveInfo solve_explicit(const Matrix &A, Input b, Output x, Work &workspace, co
     auto p = workspace.direction();
     auto ap = workspace.product();
     const double b_norm = backend.norm(b);
-    double rho = backend.residual(A, b, x, r, false);
+    double rho = backend.residual_squared_norm(A, b, x, r, ResidualSign::product_minus_rhs);
     ++info.matvecs;
     info.residual_norm = norm_from_squared(r, rho);
     if (!std::isfinite(b_norm) || !std::isfinite(info.residual_norm))
@@ -51,7 +53,7 @@ SolveInfo solve_explicit(const Matrix &A, Input b, Output x, Work &workspace, co
     backend.axpby(-1.0, r, 0.0, r, p);
     for (std::size_t iteration = 0; iteration < options.maxiter; ++iteration)
     {
-        const double denominator = backend.apply_dot(A, p, ap);
+        const double denominator = backend.apply_and_dot(A, p, ap);
         ++info.matvecs;
         const double numerator = backend.dot(r, p);
         if (!std::isfinite(denominator) || !std::isfinite(numerator))
@@ -77,7 +79,7 @@ SolveInfo solve_explicit(const Matrix &A, Input b, Output x, Work &workspace, co
         }
         backend.axpy(alpha, p, x);
         ++info.iterations;
-        rho = backend.residual(A, b, x, r, false);
+        rho = backend.residual_squared_norm(A, b, x, r, ResidualSign::product_minus_rhs);
         ++info.matvecs;
         info.residual_norm = norm_from_squared(r, rho);
         if (!std::isfinite(info.residual_norm))
@@ -121,7 +123,7 @@ SolveInfo solve_recurrence(const Matrix &A, Input b, Output x, Work &workspace, 
     auto true_r = workspace.scratch();
     auto z = workspace.preconditioned();
     const double b_norm = backend.norm(b);
-    double rho = backend.residual(A, b, x, r);
+    double rho = backend.residual_squared_norm(A, b, x, r);
     ++info.matvecs;
     info.residual_norm = norm_from_squared(r, rho);
     if (!std::isfinite(b_norm) || !std::isfinite(info.residual_norm))
@@ -148,7 +150,7 @@ SolveInfo solve_recurrence(const Matrix &A, Input b, Output x, Work &workspace, 
     // freshly computed norm, including breakdown and iteration-limit exits.
     const auto finish = [&](Status status)
     {
-        const double true_rho = backend.residual(A, b, x, true_r);
+        const double true_rho = backend.residual_squared_norm(A, b, x, true_r);
         ++info.matvecs;
         info.residual_norm = norm_from_squared(true_r, true_rho);
         info.status = std::isfinite(info.residual_norm) ? status : Status::non_finite;
@@ -160,7 +162,7 @@ SolveInfo solve_recurrence(const Matrix &A, Input b, Output x, Work &workspace, 
     };
     if (M != nullptr)
     {
-        rho = M->apply_dot(r, z, backend);
+        rho = M->apply_and_dot(r, z, backend);
         if (unusable_squared_scalar(rho))
         {
             return finish(Status::non_finite);
@@ -173,7 +175,7 @@ SolveInfo solve_recurrence(const Matrix &A, Input b, Output x, Work &workspace, 
     }
     for (std::size_t iteration = 0; iteration < options.maxiter; ++iteration)
     {
-        const double denominator = backend.apply_dot(A, p, ap);
+        const double denominator = backend.apply_and_dot(A, p, ap);
         ++info.matvecs;
         if (!std::isfinite(denominator))
         {
@@ -192,7 +194,7 @@ SolveInfo solve_recurrence(const Matrix &A, Input b, Output x, Work &workspace, 
         {
             return finish(Status::non_finite);
         }
-        const double residual_squared = backend.update_x_r_norm2(x, r, p, ap, alpha);
+        const double residual_squared = backend.update_x_r_squared_norm(x, r, p, ap, alpha);
         ++info.iterations;
         const double recurrence_norm = norm_from_squared(r, residual_squared);
         if (!std::isfinite(recurrence_norm))
@@ -208,7 +210,7 @@ SolveInfo solve_recurrence(const Matrix &A, Input b, Output x, Work &workspace, 
         const bool last_iteration = info.iterations == options.maxiter;
         if (candidate || refresh || last_iteration)
         {
-            const double true_rho = backend.residual(A, b, x, true_r);
+            const double true_rho = backend.residual_squared_norm(A, b, x, true_r);
             ++info.matvecs;
             info.residual_norm = norm_from_squared(true_r, true_rho);
             if (!std::isfinite(info.residual_norm))
@@ -235,7 +237,7 @@ SolveInfo solve_recurrence(const Matrix &A, Input b, Output x, Work &workspace, 
             backend.copy(true_r, r);
             if (M != nullptr)
             {
-                rho = M->apply_dot(r, z, backend);
+                rho = M->apply_and_dot(r, z, backend);
                 if (unusable_squared_scalar(rho))
                 {
                     info.status = Status::non_finite;
@@ -251,7 +253,7 @@ SolveInfo solve_recurrence(const Matrix &A, Input b, Output x, Work &workspace, 
             ++info.restarts;
             continue;
         }
-        const double next_rho = M == nullptr ? residual_squared : M->apply_dot(r, z, backend);
+        const double next_rho = M == nullptr ? residual_squared : M->apply_and_dot(r, z, backend);
         if (unusable_squared_scalar(next_rho))
         {
             return finish(Status::non_finite);

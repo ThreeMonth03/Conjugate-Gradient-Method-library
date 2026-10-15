@@ -159,7 +159,7 @@ def validate_artifact(data):
     if device not in ("cpu", "cuda"):
         raise ValueError("artifact device must be cpu or cuda")
     if device == "cuda":
-        from . import backends
+        from . import execution
 
         ordinal = spec.get("cuda_device")
         if type(ordinal) is not int or ordinal < 0:
@@ -167,7 +167,7 @@ def validate_artifact(data):
                 "artifact CUDA device must be a nonnegative integer"
             )
         if any(
-            name not in backends.CUDA_IMPLEMENTATIONS
+            name not in execution.CUDA_IMPLEMENTATIONS
             for name in spec.get("implementations", [])
         ):
             raise ValueError("CUDA artifact cannot contain CPU candidates")

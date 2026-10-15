@@ -94,7 +94,7 @@ Device data and prepared solves
 
 Host transfers use explicitly named methods. Dense input is copied to
 row-major float64 device storage. CSR upload accepts the same owning canonical
-host ``cgpy.CSRMatrix`` used by CPU functions, without dense conversion.
+host ``cgpy.CsrMatrix`` used by CPU functions, without dense conversion.
 
 .. doctest:: cuda-device
    :skipif: not cuda.is_available()
@@ -115,8 +115,8 @@ host ``cgpy.CSRMatrix`` used by CPU functions, without dense conversion.
    >>> answer.converged
    True
    >>> np.testing.assert_allclose(answer.x.to_host(), [1 / 11, 7 / 11])
-   >>> host_csr = cgpy.CSRMatrix([0, 2, 4], [0, 1, 0, 1], [4., 1., 1., 3.], (2, 2))
-   >>> device_csr = cuda.CSRMatrix.from_host(host_csr)
+   >>> host_csr = cgpy.CsrMatrix([0, 2, 4], [0, 1, 0, 1], [4., 1., 1., 3.], (2, 2))
+   >>> device_csr = cuda.CsrMatrix.from_host(host_csr)
    >>> answer = cuda.solve(device_csr, b, preconditioner="jacobi")
    >>> answer.converged
    True

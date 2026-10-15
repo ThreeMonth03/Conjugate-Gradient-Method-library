@@ -1,90 +1,11 @@
 #include <cg/cg.hpp>
+#include <support/allocation_failure.hpp>
 
 #include <gtest/gtest.h>
 
-#include <cstdlib>
 #include <new>
 #include <utility>
 #include <vector>
-
-namespace
-{
-
-thread_local int allocations_before_failure = -1;
-
-class FailAllocation
-{
-    public:
-    explicit FailAllocation(int successful_allocations) { allocations_before_failure = successful_allocations; }
-    ~FailAllocation() { allocations_before_failure = -1; }
-    FailAllocation(const FailAllocation &) = delete;
-    FailAllocation &operator=(const FailAllocation &) = delete;
-};
-
-} // namespace
-
-// This replacement belongs to a separate test executable. Only the copy
-// expression runs with injection enabled; GoogleTest assertions run afterwards.
-void *operator new(std::size_t size)
-{
-    if (allocations_before_failure == 0)
-    {
-        throw std::bad_alloc();
-    }
-    if (allocations_before_failure > 0)
-    {
-        --allocations_before_failure;
-    }
-    if (void *allocation = std::malloc(size == 0 ? 1 : size))
-    {
-        return allocation;
-    }
-    throw std::bad_alloc();
-}
-
-void *operator new[](std::size_t size)
-{
-    return ::operator new(size);
-}
-void *operator new(std::size_t size, const std::nothrow_t &) noexcept
-{
-    try
-    {
-        return ::operator new(size);
-    }
-    catch (...)
-    {
-        return nullptr;
-    }
-}
-void *operator new[](std::size_t size, const std::nothrow_t &tag) noexcept
-{
-    return ::operator new(size, tag);
-}
-void operator delete(void *allocation) noexcept
-{
-    std::free(allocation);
-}
-void operator delete[](void *allocation) noexcept
-{
-    std::free(allocation);
-}
-void operator delete(void *allocation, std::size_t) noexcept
-{
-    std::free(allocation);
-}
-void operator delete[](void *allocation, std::size_t) noexcept
-{
-    std::free(allocation);
-}
-void operator delete(void *allocation, const std::nothrow_t &) noexcept
-{
-    std::free(allocation);
-}
-void operator delete[](void *allocation, const std::nothrow_t &) noexcept
-{
-    std::free(allocation);
-}
 
 namespace
 {
@@ -96,7 +17,7 @@ TEST(MatrixAssignment, DenseAllocationFailurePreservesShapeStorageAndValues)
     const auto *storage = target.data();
     bool threw = false;
     {
-        const FailAllocation failure(0);
+        const cg::test::AllocationFailureGuard failure(0);
         try
         {
             target = source;
@@ -135,7 +56,7 @@ TEST(MatrixAssignment, CsrFailureAtEveryCopiedArrayPreservesCanonicalStorage)
         const auto *values = target.values().data();
         bool threw = false;
         {
-            const FailAllocation failure(allocation);
+            const cg::test::AllocationFailureGuard failure(allocation);
             try
             {
                 target = source;
@@ -175,7 +96,7 @@ TEST(MatrixAssignment, SelfCopyDoesNotAllocateAndSwapPreservesCompleteValues)
     auto &dense_alias = dense;
     auto &sparse_alias = sparse;
     {
-        const FailAllocation failure(0);
+        const cg::test::AllocationFailureGuard failure(0);
         dense = dense_alias;
         sparse = sparse_alias;
         dense.swap(other_dense);
