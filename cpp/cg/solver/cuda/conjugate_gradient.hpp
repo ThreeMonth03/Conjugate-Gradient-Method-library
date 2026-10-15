@@ -14,8 +14,9 @@ namespace cuda
 
 class JacobiPreconditioner;
 
-// Both algorithms and their numerical/refresh policy are shared with the CPU
-// solver. Return is synchronous on context.stream(), including scalar checks.
+// Algorithms retain the CPU numerical/refresh policy. The explicit workspace
+// execution mode selects the host-controlled or device-scalar engine. Return
+// is synchronous on context.stream(), including scalar/status checks.
 SolveInfo solve_into(DenseMatrixView A, ConstVectorView b, VectorView x, Workspace &workspace, const Context &context,
                      const CgOptions &options = {}, bool fused = true, DenseKernel kernel = DenseKernel::native,
                      const JacobiPreconditioner *M = nullptr);

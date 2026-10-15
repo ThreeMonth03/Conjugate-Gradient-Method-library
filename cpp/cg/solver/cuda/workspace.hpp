@@ -11,6 +11,12 @@ namespace cg
 namespace cuda
 {
 
+enum class ExecutionMode
+{
+    host,
+    device
+};
+
 class PreparedSolver;
 namespace detail
 {
@@ -21,7 +27,8 @@ class WorkspaceUseGuard;
 class Workspace
 {
     public:
-    Workspace(std::size_t size, const Context &context, DenseKernel kernel = DenseKernel::native);
+    Workspace(std::size_t size, const Context &context, DenseKernel kernel = DenseKernel::native,
+              ExecutionMode mode = ExecutionMode::host);
     ~Workspace();
     Workspace(const Workspace &) = delete;
     Workspace &operator=(const Workspace &) = delete;
@@ -29,6 +36,7 @@ class Workspace
     int device() const noexcept;
     std::uintptr_t stream() const noexcept;
     DenseKernel dense_kernel() const noexcept;
+    ExecutionMode execution_mode() const noexcept;
     VectorView residual() noexcept;
     VectorView direction() noexcept;
     VectorView product() noexcept;

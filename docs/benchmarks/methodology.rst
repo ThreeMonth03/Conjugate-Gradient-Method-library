@@ -55,6 +55,17 @@ Timing boundaries
   Uploads and correctness downloads stay outside solve timing. This is
   neither kernel-only timing nor end-to-end host-to-host latency.
 
+CUDA defaults to native ``execution_mode="host"``. Select
+``--cuda-execution-mode device`` explicitly to benchmark native device scalar
+control; this adds ``solver.execution_mode="device"`` to the artifact. Default
+host specs retain their existing schema and replay behavior. The flag selects
+only native CUDA execution: the eager Torch reference keeps its own scalar
+control and records that the native mode does not apply to it. Both modes use
+the same input fixtures, numerical options, reset and completion boundaries.
+Device status packets, residual checks and final completion remain timed.
+Keep distinct mode artifacts and inspect their operation counts before
+interpreting a latency difference.
+
 Setup probes and stored-array counts are supplementary measurements.
 Stored bytes exclude owning snapshots, workspace, allocator and internal
 solver storage; they are not peak process or GPU memory.

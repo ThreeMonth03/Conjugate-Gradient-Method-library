@@ -3,6 +3,7 @@
 import argparse
 import concurrent.futures
 import importlib.util
+import math
 import pathlib
 import subprocess
 import sys
@@ -109,35 +110,60 @@ def main():
         if cuda.is_available():
             gpu_matrix = cuda.DenseMatrix.from_host(matrix)
             gpu_rhs = cuda.Vector.from_host(rhs)
-            for mode in ("native", "cublas"):
-                for algorithm in ("standard", "explicit"):
-                    for fused in (False, True):
-                        answer = cuda.solve(
-                            gpu_matrix,
-                            gpu_rhs,
-                            dense_kernel=mode,
-                            algorithm=algorithm,
-                            fused=fused,
-                        )
-                        assert answer.converged
-                        np.testing.assert_allclose(
-                            answer.x.to_host(), expected
-                        )
-                plan = cuda.prepare(
-                    gpu_matrix, dense_kernel=mode, preconditioner="jacobi"
-                )
-                output = plan.create_vector()
-                solved = plan.solve_into(
-                    gpu_rhs, output, workspace=plan.create_workspace()
-                )
-                assert solved.converged
-                np.testing.assert_allclose(output.to_host(), expected)
             gpu_csr = cuda.CsrMatrix.from_host(csr)
-            answer = cuda.solve(gpu_csr, gpu_rhs, preconditioner="jacobi")
-            assert answer.converged
-            np.testing.assert_allclose(answer.x.to_host(), expected)
+
+            def check_device_answer(vector, solved):
+                assert solved.converged
+                host_answer = vector.to_host()
+                np.testing.assert_allclose(host_answer, expected)
+                true_residual = math.hypot(*(rhs - matrix @ host_answer))
+                assert true_residual <= 1e-8 * math.hypot(*rhs)
+
+            for execution_mode in ("host", "device"):
+                for mode in ("native", "cublas"):
+                    for algorithm in ("standard", "explicit"):
+                        for fused in (False, True):
+                            answer = cuda.solve(
+                                gpu_matrix,
+                                gpu_rhs,
+                                dense_kernel=mode,
+                                algorithm=algorithm,
+                                fused=fused,
+                                execution_mode=execution_mode,
+                            )
+                            check_device_answer(answer.x, answer)
+                    plan = cuda.prepare(
+                        gpu_matrix, dense_kernel=mode, preconditioner="jacobi"
+                    )
+                    assert plan.create_workspace().execution_mode == "host"
+                    workspace = plan.create_workspace(
+                        execution_mode=execution_mode
+                    )
+                    assert workspace.execution_mode == execution_mode
+                    try:
+                        workspace.execution_mode = "host"
+                    except AttributeError:
+                        pass
+                    else:
+                        raise AssertionError(
+                            "workspace execution mode is mutable"
+                        )
+                    output = plan.create_vector()
+                    for _ in range(2):
+                        output.fill(0.0)
+                        solved = plan.solve_into(
+                            gpu_rhs, output, workspace=workspace
+                        )
+                        check_device_answer(output, solved)
+                answer = cuda.solve(
+                    gpu_csr,
+                    gpu_rhs,
+                    preconditioner="jacobi",
+                    execution_mode=execution_mode,
+                )
+                check_device_answer(answer.x, answer)
             print(
-                "Installed CUDA wheel: native/cuBLAS/CSR/Jacobi device checks passed."
+                "Installed CUDA wheel: host/device native/cuBLAS/CSR/Jacobi and true-residual checks passed."
             )
         else:
             print(

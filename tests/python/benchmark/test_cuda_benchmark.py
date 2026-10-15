@@ -41,6 +41,7 @@ def options():
     "arguments,message",
     [
         (["--device", "cuda"], "requires explicit"),
+        (["--cuda-execution-mode", "device"], "requires CUDA"),
         (
             ["--device", "cuda", "--implementations", "numpy-out"],
             "CPU fallback",
@@ -107,6 +108,27 @@ def test_cuda_cli_records_explicit_policy_without_changing_cpu_defaults(
     )
     assert captured[-1]["solver"]["fused"] is False
     assert captured[-1]["comparison"] == "implementations"
+    assert "execution_mode" not in captured[-1]["solver"]
+    host_spec = copy.deepcopy(captured[-1])
+    arguments = [
+        "run",
+        "--device",
+        "cuda",
+        "--cuda-device",
+        "2",
+        "--suite",
+        "smoke-cuda-dense",
+        "--implementations",
+        "cuda-native,cuda-cublas,torch-cuda-eager",
+        "--no-fused",
+        "--cuda-execution-mode",
+        "device",
+    ]
+    assert main(arguments) == 0
+    assert captured[-1] == {
+        **host_spec,
+        "solver": {**host_spec["solver"], "execution_mode": "device"},
+    }
 
 
 @pytest.mark.parametrize(
@@ -184,9 +206,12 @@ def test_explicit_cuda_unavailability_fails_without_cpu_fallback(monkeypatch):
 
 
 @pytest.mark.parametrize("scope", ("prepared", "api"))
+@pytest.mark.parametrize("execution_mode", ("host", "device"))
 def test_native_adapter_charges_device_reset_and_keeps_transfers_at_gates(
-    options, scope, monkeypatch
+    options, scope, execution_mode, monkeypatch
 ):
+    if execution_mode == "device":
+        options = {**options, "execution_mode": execution_mode}
     arrays = make_case(SUITES["smoke"][0])[:3]
     expected = np.linalg.solve(arrays[0], arrays[1])
     counts = {
@@ -217,12 +242,14 @@ def test_native_adapter_charges_device_reset_and_keeps_transfers_at_gates(
         preconditioner_nbytes = 0
 
         def create_workspace(self, **kwargs):
+            assert kwargs["execution_mode"] == execution_mode
             return object()
 
         def create_vector(self, **kwargs):
             return Vector(np.empty_like(expected))
 
         def solve_into(self, b, x, **kwargs):
+            assert "execution_mode" not in kwargs
             counts["prepared"] += 1
             np.testing.assert_array_equal(x.value, arrays[2])
             x.value[:] = expected
@@ -235,6 +262,7 @@ def test_native_adapter_charges_device_reset_and_keeps_transfers_at_gates(
 
     def solve(matrix, b, x0, **kwargs):
         assert kwargs["device"] == 2
+        assert kwargs["execution_mode"] == execution_mode
         counts["one_shot"] += 1
         result = Vector(np.empty_like(expected))
         result.copy_from_device(x0)
@@ -262,6 +290,8 @@ def test_native_adapter_charges_device_reset_and_keeps_transfers_at_gates(
         "cgbench.cuda_runtime.native_cuda", lambda device: cuda
     )
     executor = CudaNativeExecutor(arrays, options, scope, 2, "native")
+    assert executor.benchmark_metadata()["execution_mode"] == execution_mode
+    assert "execution_mode" not in executor.options
     assert counts["upload"] == 2
     for _ in range(2):
         outcome = executor()
@@ -322,6 +352,20 @@ def test_cuda_artifact_roundtrip_and_invalid_device_schema(tmp_path, options):
         bad["spec"]["cuda_device"] = value
         with pytest.raises(ValueError, match="nonnegative integer"):
             validate_artifact(bad)
+    for mode in (None, "auto", True):
+        bad = copy.deepcopy(data)
+        bad["spec"]["solver"]["execution_mode"] = mode
+        with pytest.raises(ValueError, match="execution_mode"):
+            validate_artifact(bad)
+    for mode in ("host", "device"):
+        good = copy.deepcopy(data)
+        good["spec"]["solver"]["execution_mode"] = mode
+        assert validate_artifact(good) is good
+    bad = copy.deepcopy(data)
+    bad["spec"]["device"] = "cpu"
+    bad["spec"]["solver"]["execution_mode"] = "device"
+    with pytest.raises(ValueError, match="requires CUDA"):
+        validate_artifact(bad)
     bad = copy.deepcopy(data)
     bad["spec"]["implementations"] = ["numpy-out"]
     with pytest.raises(ValueError, match="cannot contain CPU"):
@@ -437,8 +481,9 @@ def _require_gpu(implementation):
     "algorithm,preconditioner",
     (("standard", "none"), ("standard", "jacobi"), ("explicit", "none")),
 )
+@pytest.mark.parametrize("execution_mode", ("host", "device"))
 def test_actual_cuda_dense_resident_modes_reset_and_converge(
-    options, implementation, scope, algorithm, preconditioner
+    options, implementation, scope, algorithm, preconditioner, execution_mode
 ):
     _require_gpu(implementation)
     arrays = make_case(SUITES["smoke"][0])[:3]
@@ -446,6 +491,7 @@ def test_actual_cuda_dense_resident_modes_reset_and_converge(
         **options,
         "algorithm": algorithm,
         "preconditioner": preconditioner,
+        "execution_mode": execution_mode,
     }
     executor = make_executor(
         implementation, arrays, options, scope, 1, device="cuda"
@@ -468,13 +514,18 @@ def test_actual_cuda_dense_resident_modes_reset_and_converge(
 
 @pytest.mark.parametrize("implementation", ("cuda-native", "torch-cuda-eager"))
 @pytest.mark.parametrize("scope", ("prepared", "api"))
+@pytest.mark.parametrize("execution_mode", ("host", "device"))
 def test_actual_cuda_csr_pcg_shares_cpu_fixture(
-    options, implementation, scope
+    options, implementation, scope, execution_mode
 ):
     _require_gpu(implementation)
     pytest.importorskip("scipy")
     arrays = make_case(SUITES["smoke-csr"][0])[:3]
-    options = {**options, "preconditioner": "jacobi"}
+    options = {
+        **options,
+        "preconditioner": "jacobi",
+        "execution_mode": execution_mode,
+    }
     executor = make_executor(
         implementation, arrays, options, scope, 1, device="cuda"
     )
@@ -483,11 +534,14 @@ def test_actual_cuda_csr_pcg_shares_cpu_fixture(
     ]
 
 
+@pytest.mark.parametrize("execution_mode", ("host", "device"))
 def test_actual_cuda_collector_and_replay_preserve_input_and_schedule(
-    options, tmp_path
+    options, tmp_path, execution_mode
 ):
     _require_gpu("cuda-native")
     _require_gpu("torch-cuda-eager")
+    if execution_mode == "device":
+        options = {**options, "execution_mode": execution_mode}
     spec = {
         "device": "cuda",
         "cuda_device": 0,
@@ -574,3 +628,54 @@ def test_actual_torch_cuda_launcher_metadata_and_fresh_process_replay(
         replayed["cases"][0]["round_orders"]
         == artifact["cases"][0]["round_orders"]
     )
+
+
+def test_torch_reference_keeps_its_control_when_native_device_mode_is_selected(
+    options, monkeypatch
+):
+    from cgbench.adapters import cuda as adapters
+    from cgbench.reference import engine
+
+    supplied = {**options, "execution_mode": "device"}
+    captured = {}
+    ops = SimpleNamespace(
+        device=SimpleNamespace(index=0),
+        upload_ns=3,
+        torch=SimpleNamespace(
+            cuda=SimpleNamespace(
+                current_stream=lambda device: SimpleNamespace(cuda_stream=0)
+            )
+        ),
+    )
+
+    def initialize(self, selected_ops, selected_options, scope):
+        self.ops = selected_ops
+        captured.update(selected_options)
+
+    monkeypatch.setattr(adapters.torch_cuda, "TorchCudaOps", lambda *a: ops)
+    monkeypatch.setattr(engine.ReferenceExecutor, "__init__", initialize)
+    monkeypatch.setattr(
+        engine.ReferenceExecutor, "benchmark_metadata", lambda self: {}
+    )
+    monkeypatch.setattr(
+        adapters.TorchCudaExecutor, "synchronize", lambda self: None
+    )
+    reference = adapters.TorchCudaExecutor(None, supplied, "prepared", 1, 0)
+    assert captured == options
+    assert supplied["execution_mode"] == "device"
+    metadata = reference.benchmark_metadata()
+    assert metadata["native_execution_mode"] == "device"
+    assert metadata["native_execution_mode_applies"] is False
+
+
+def test_cpu_executor_rejects_device_control_before_constructing_any_backend(
+    options,
+):
+    with pytest.raises(ValueError, match="requires CUDA"):
+        make_executor(
+            "native",
+            None,
+            {**options, "execution_mode": "device"},
+            "prepared",
+            1,
+        )

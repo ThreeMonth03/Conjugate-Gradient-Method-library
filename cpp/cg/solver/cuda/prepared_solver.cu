@@ -82,9 +82,9 @@ std::size_t PreparedSolver::preconditioner_nbytes() const noexcept
 {
     return m_preconditioner ? size() * sizeof(double) : 0;
 }
-Workspace PreparedSolver::create_workspace(std::uintptr_t stream) const
+Workspace PreparedSolver::create_workspace(std::uintptr_t stream, ExecutionMode mode) const
 {
-    return Workspace(size(), Context(m_device, stream), m_kernel);
+    return Workspace(size(), Context(m_device, stream), m_kernel, mode);
 }
 SolveInfo PreparedSolver::solve_into(ConstVectorView b, VectorView x, Workspace &workspace, const CgOptions &options,
                                      bool fused) const

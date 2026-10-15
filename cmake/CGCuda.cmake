@@ -27,6 +27,7 @@ add_library(cg_cuda STATIC
     cpp/cg/matrix/cuda/detail/validation.cu
     cpp/cg/solver/cuda/workspace.cu
     cpp/cg/solver/cuda/conjugate_gradient.cu
+    cpp/cg/solver/cuda/device_execution.cu
     cpp/cg/solver/cuda/prepared_solver.cu
     cpp/cg/preconditioner/cuda/jacobi.cu
     cpp/cg/preconditioner/cuda/kernels.cu

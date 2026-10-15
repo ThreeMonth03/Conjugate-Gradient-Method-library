@@ -32,10 +32,29 @@ const char *dense_kernel_name(gpu::DenseKernel kernel)
     return kernel == gpu::DenseKernel::native ? "native" : "cublas";
 }
 
+gpu::ExecutionMode parse_execution_mode(const std::string &name)
+{
+    if (name == "host")
+    {
+        return gpu::ExecutionMode::host;
+    }
+    if (name == "device")
+    {
+        return gpu::ExecutionMode::device;
+    }
+    throw std::invalid_argument("execution_mode must be 'host' or 'device'");
+}
+const char *execution_mode_name(gpu::ExecutionMode mode)
+{
+    return mode == gpu::ExecutionMode::host ? "host" : "device";
+}
+
 struct CudaWorkspace
 {
-    CudaWorkspace(std::size_t size, int device, std::uintptr_t stream, const std::string &kernel_name)
-        : context(device, stream), value(size, context, parse_dense_kernel(kernel_name))
+    CudaWorkspace(std::size_t size, int device, std::uintptr_t stream, const std::string &kernel_name,
+                  const std::string &mode_name)
+        : context(device, stream),
+          value(size, context, parse_dense_kernel(kernel_name), parse_execution_mode(mode_name))
     {
     }
     gpu::Context context;
@@ -136,13 +155,16 @@ cg::SolveInfo solve(py::object matrix, py::object b, py::object x, CudaWorkspace
 void register_cuda_solver(py::module_ &m)
 {
     py::class_<CudaWorkspace>(m, "Workspace")
-        .def(py::init<std::size_t, int, std::uintptr_t, const std::string &>(), py::arg("size"), py::arg("device") = 0,
-             py::arg("stream") = 0, py::arg("dense_kernel") = "native")
+        .def(py::init<std::size_t, int, std::uintptr_t, const std::string &, const std::string &>(), py::arg("size"),
+             py::arg("device") = 0, py::arg("stream") = 0, py::arg("dense_kernel") = "native",
+             py::arg("execution_mode") = "host")
         .def_property_readonly("size", [](const CudaWorkspace &value) { return value.value.size(); })
         .def_property_readonly("device", [](const CudaWorkspace &value) { return value.context.device(); })
         .def_property_readonly("stream", [](const CudaWorkspace &value) { return value.context.stream(); })
-        .def_property_readonly("dense_kernel", [](const CudaWorkspace &value)
-                               { return dense_kernel_name(value.value.dense_kernel()); });
+        .def_property_readonly("dense_kernel",
+                               [](const CudaWorkspace &value) { return dense_kernel_name(value.value.dense_kernel()); })
+        .def_property_readonly("execution_mode", [](const CudaWorkspace &value)
+                               { return execution_mode_name(value.value.execution_mode()); });
     py::class_<gpu::PreparedSolver>(m, "PreparedSolver")
         .def(py::init(&prepare_device), py::arg("matrix"), py::arg("device") = 0, py::arg("stream") = 0,
              py::arg("dense_kernel") = "native", py::arg("preconditioner") = "none")
