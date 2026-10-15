@@ -2,7 +2,7 @@
 
 import time
 
-from .. import cuda_runtime, execution
+from .. import cuda_runtime, execution, validation
 from ..reference import engine, torch_cuda
 
 
@@ -34,6 +34,10 @@ class CudaNativeExecutor:
         self.cuda = cuda_runtime.native_cuda(device)
         self.device, self.kernel, self.scope = device, kernel, scope
         self.options = dict(options)
+        self.execution_mode = validation.validate_execution_mode(
+            self.options, "cuda"
+        )
+        self.options.pop("execution_mode", None)
         self.preconditioner = self.options.pop("preconditioner", "none")
         self.options.pop("dense_kernel", None)
         self.synchronize()
@@ -72,7 +76,9 @@ class CudaNativeExecutor:
         self.preconditioner_nbytes = plan.preconditioner_nbytes
         if scope == "prepared":
             self.plan = plan
-            self.workspace = plan.create_workspace(stream=0)
+            self.workspace = plan.create_workspace(
+                stream=0, execution_mode=self.execution_mode
+            )
             self.x = plan.create_vector(stream=0)
         self.synchronize()
         self.setup_ns = time.perf_counter_ns() - start
@@ -96,6 +102,7 @@ class CudaNativeExecutor:
                 stream=0,
                 dense_kernel=self.kernel,
                 preconditioner=self.preconditioner,
+                execution_mode=self.execution_mode,
                 **self.options,
             )
             x = info.x
@@ -117,6 +124,7 @@ class CudaNativeExecutor:
             "cuda_device": self.device,
             "stream": 0,
             "dense_kernel": self.kernel,
+            "execution_mode": self.execution_mode,
             "fused": self.options["fused"],
             "preconditioner": self.preconditioner,
             "preconditioner_setup_elapsed_ns": self.preconditioner_setup_ns,
@@ -130,7 +138,11 @@ class CudaNativeExecutor:
             "transfer_scope": "input uploads and correctness output downloads excluded",
             "reset_scope": "device x0 copy included in every invocation",
             "timing": "wall completion; stream fence before block and after last invocation",
-            "control_scope": "synchronous native solve; host dispatch and scalar checks included",
+            "control_scope": (
+                "synchronous native solve; device recurrence scalars, completed status packets and true-residual checks included"
+                if self.execution_mode == "device"
+                else "synchronous native solve; host dispatch and scalar checks included"
+            ),
             "residual_policy": self.options["algorithm"]
             + " with residual_refresh="
             + str(self.options["residual_refresh"]),
@@ -143,6 +155,14 @@ class TorchCudaExecutor(engine.ReferenceExecutor):
             raise ValueError(
                 "CUDA supports prepared/api device-resident scopes"
             )
+        self.native_execution_mode = validation.validate_execution_mode(
+            options, "cuda"
+        )
+        options = {
+            key: value
+            for key, value in options.items()
+            if key != "execution_mode"
+        }
         ops = torch_cuda.TorchCudaOps(arrays, threads, device)
         start = time.perf_counter_ns()
         super().__init__(ops, options, scope)
@@ -160,6 +180,8 @@ class TorchCudaExecutor(engine.ReferenceExecutor):
             **super().benchmark_metadata(),
             "device": "cuda",
             "cuda_device": self.ops.device.index,
+            "native_execution_mode": self.native_execution_mode,
+            "native_execution_mode_applies": False,
             "stream": int(
                 self.ops.torch.cuda.current_stream(self.ops.device).cuda_stream
             ),

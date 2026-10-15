@@ -32,3 +32,13 @@ def validate_converged_result(result):
         for name in ("iterations", "matvecs")
     ):
         raise ValueError("operation counts must be nonnegative integers")
+
+
+def validate_execution_mode(options, device):
+    """Validate a native CUDA execution choice without changing numerical policy."""
+    mode = options.get("execution_mode", "host")
+    if mode not in ("host", "device"):
+        raise ValueError("execution_mode must be 'host' or 'device'")
+    if device != "cuda" and mode != "host":
+        raise ValueError("device execution_mode requires CUDA")
+    return mode

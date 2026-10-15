@@ -18,7 +18,7 @@ CublasResources::CublasResources(const Context &context)
 }
 ExecutionResources::ExecutionResources(const Context &ctx, DenseKernel selected)
     : context(ctx), reduction(device_allocation<double>(max_blocks + 1, ctx)), partials(reduction.get()),
-      scalar(reduction.get() + max_blocks), host(pinned_scalar()), kernel(selected)
+      scalar(reduction.get() + max_blocks), kernel(selected)
 {
     if (selected != DenseKernel::native && selected != DenseKernel::cublas)
     {

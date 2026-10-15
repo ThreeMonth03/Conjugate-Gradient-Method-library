@@ -140,6 +140,56 @@ modes retain the true-residual stopping rule and failure statuses described
 in :doc:`api`. Invalid shapes, options, dtypes or layouts raise ``ValueError``;
 CUDA allocation, stream and execution failures raise ``RuntimeError``.
 
+Execution mode
+--------------
+
+The default ``execution_mode="host"`` uses host-controlled scalar reductions.
+Select ``"device"`` explicitly to keep recurrence scalars in GPU storage.
+The mode belongs to a workspace and is fixed at construction:
+
+.. code-block:: python
+
+   workspace = plan.create_workspace(execution_mode="device")
+   info = plan.solve_into(b, x, workspace=workspace)
+   # A strict cuda.solve_into call also uses workspace.execution_mode.
+   result = cuda.solve(device_A, b, execution_mode="device")
+
+``cuda.Workspace(..., execution_mode="device")`` provides the same selection.
+The readonly ``workspace.execution_mode`` reports ``"host"`` or ``"device"``.
+Preparation fixes the operator, preconditioner and dense kernel; the same
+immutable plan can serve separate host/device workspaces. There is no
+execution-mode argument on strict or prepared ``solve_into`` methods.
+Kernel selection, vector fusion, algorithm and execution mode are independent.
+Both modes support native/cuBLAS dense and native CSR, standard CG/Jacobi PCG
+and the unpreconditioned explicit formulation. Neither choice selects another
+mode automatically.
+
+Device execution still reads completed status packets and synchronizes with
+the host. An ordinary standard-CG iteration reads one packet; the explicit
+formulation reads two so alpha is validated before updating the solution or
+launching the true-residual matvec. Candidate convergence, residual refresh,
+range fallback and numerical breakdown can require additional checks.
+Matrix-vector counts describe actual executed operations; no speculative
+matvec is launched to hide an unresolved scalar decision. Both modes preserve
+the true-residual gate, failure statuses, stream completion and ownership
+contracts. Their reduction/fusion order can affect rounding and counts;
+performance must be measured under the same declared numerical policy.
+
+.. doctest:: cuda-device-execution
+   :skipif: not cuda.is_available()
+
+   >>> plan = cuda.prepare_host(np.array([[4., 1.], [1., 3.]]))
+   >>> b = cuda.Vector.from_host([1., 2.])
+   >>> x = plan.create_vector()
+   >>> workspace = plan.create_workspace(execution_mode="device")
+   >>> workspace.execution_mode
+   'device'
+   >>> plan.solve_into(b, x, workspace=workspace).converged
+   True
+   >>> np.testing.assert_allclose(x.to_host(), [1 / 11, 7 / 11])
+   >>> plan.create_workspace().execution_mode
+   'host'
+
 Streams, lifetime and interoperability
 --------------------------------------
 
@@ -162,9 +212,9 @@ before returning; exported native vectors have no pending producer work.
 
 Prepared matrix and Jacobi snapshots can be shared, but each overlapping solve
 needs its own output and workspace. The workspace owns device vectors,
-reduction buffers and pinned scalar storage. A cuBLAS workspace additionally
+reduction buffers and inline host scalar storage. A cuBLAS workspace additionally
 owns its handle and 4 MiB scratch allocation; overlapping
-reuse raises an error. It fixes the device/stream used for its solve. No API
+reuse raises an error. It fixes the device/stream and execution mode used for its solve. No API
 reinterprets a NumPy host pointer as a device pointer.
 
 Native C++ vector and matrix views are lightweight borrowing descriptors.

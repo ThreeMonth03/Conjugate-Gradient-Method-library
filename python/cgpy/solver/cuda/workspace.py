@@ -18,6 +18,10 @@ class Workspace:
     dense_kernel : {'native', 'cublas'}, default='native'
         Fixed kernel selection. Only cublas allocates a handle and its
         additional workspace; all resources are prepared at construction.
+    execution_mode : {'host', 'device'}, default='host'
+        Fixed native scalar-control engine. Host reads individual reductions;
+        device keeps recurrence scalars on the GPU and reads completed status
+        packets. Both modes finish on the workspace stream before returning.
 
     Notes
     -----
@@ -33,9 +37,10 @@ class Workspace:
         device: int = 0,
         stream: int = 0,
         dense_kernel: str = "native",
+        execution_mode: str = "host",
     ) -> None:
         self._native = cuda_runtime.load().Workspace(
-            size, device, stream, dense_kernel
+            size, device, stream, dense_kernel, execution_mode
         )
 
     @property
@@ -57,3 +62,8 @@ class Workspace:
     def dense_kernel(self) -> str:
         """str: Kernel whose resources were prepared at construction."""
         return self._native.dense_kernel
+
+    @property
+    def execution_mode(self) -> str:
+        """str: Fixed host or device scalar-control engine."""
+        return self._native.execution_mode

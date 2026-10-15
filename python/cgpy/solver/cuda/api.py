@@ -85,7 +85,8 @@ def solve_into(
     A is an owned CUDA matrix or a contiguous float64 CUDA Array Interface
     dense matrix; b/x are device float64 vectors. No host conversion or CPU
     fallback occurs. Output and workspace must be disjoint from inputs and
-    unused by overlapping calls. The workspace fixes the device and stream.
+    unused by overlapping calls. The workspace fixes the device, stream and
+    host/device scalar-control execution_mode; no second mode selector is used.
     Version-2 producers must be ready on that stream; version-3 dependencies
     are honored. Each call constructs Jacobi when selected. Use prepare to
     cache setup. Options, exceptions, synchronous completion and SolveInfo
@@ -123,6 +124,7 @@ def solve(
     residual_refresh: int = 50,
     preconditioner: str = "none",
     dense_kernel: str = "native",
+    execution_mode: str = "host",
 ) -> result.SolveResult[storage.Vector]:
     """Solve a device system with fresh output, workspace and per-call setup.
 
@@ -133,6 +135,10 @@ def solve(
     Standard/explicit CG, Jacobi, fusion, tolerance and error contracts follow
     solve_into; numerical failures are reported in the returned status.
     Native computation releases the GIL and finishes before returning.
+    execution_mode is explicitly host (default) or device, selecting the new
+    workspace's scalar-control engine independently of dense_kernel/fused.
+    Device mode retains recurrence scalars on the GPU; completed status packets
+    and true-residual checks still synchronize with the host.
 
     Returns
     -------
@@ -159,7 +165,11 @@ def solve(
         b,
         x,
         workspace=workspace_module.Workspace(
-            shape[0], device=device, stream=stream, dense_kernel=dense_kernel
+            shape[0],
+            device=device,
+            stream=stream,
+            dense_kernel=dense_kernel,
+            execution_mode=execution_mode,
         ),
         rtol=rtol,
         atol=atol,

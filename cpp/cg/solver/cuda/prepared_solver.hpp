@@ -37,7 +37,7 @@ class PreparedSolver
     }
     std::uint64_t preconditioner_setup_ns() const noexcept { return m_preconditioner_setup_ns; }
     std::size_t preconditioner_nbytes() const noexcept;
-    Workspace create_workspace(std::uintptr_t stream = 0) const;
+    Workspace create_workspace(std::uintptr_t stream = 0, ExecutionMode mode = ExecutionMode::host) const;
     SolveInfo solve_into(ConstVectorView b, VectorView x, Workspace &workspace, const CgOptions &options = {},
                          bool fused = true) const;
 

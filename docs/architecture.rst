@@ -35,7 +35,7 @@ live in ``detail/``; binding helpers stay in the source tree.
        selection.
    * - ``backend/cuda/``
      - Native/cuBLAS operations and private execution resources: reductions,
-       pinned scalar and optional cuBLAS handle/scratch.
+       inline host scalar and optional cuBLAS handle/scratch.
    * - ``preconditioner/``
      - Validate and cache the immutable Jacobi inverse.
    * - ``solver/``
@@ -160,9 +160,12 @@ arbitrary-scale arithmetic or verify SPD through factorization.
 CUDA execution
 --------------
 
-CUDA owns explicit device matrices/vectors and borrows a device stream. The
-shared solver engine invokes CUDA adapters; it preserves the same recurrence,
-true-residual policy and failure statuses. Device workspace composes solver
+CUDA owns explicit device matrices/vectors and borrows a device stream. Host
+execution uses the shared solver engine with CUDA adapters. Explicit device
+execution keeps recurrence scalars on the GPU and reads completed status
+packets; it follows the same recurrence, true-residual policy and failure
+statuses. Workspace construction fixes host/device execution independently of
+dense-kernel and vector-fusion choices. Device workspace composes solver
 vectors and private backend execution resources on one device/stream. A
 solver-local RAII guard acquires the workspace and lends those resources to
 the backend; the backend never sees solver state. Only resources prepared

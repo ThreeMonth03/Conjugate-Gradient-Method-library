@@ -111,6 +111,8 @@ assert info.converged
 print(device_x.to_host())
 ```
 
+`execution_mode="host"` is the CUDA default. Select `"device"` on `cuda.Workspace`, `prepared.create_workspace` or convenience `cuda.solve` to retain recurrence scalars on the GPU. `workspace.execution_mode` is readonly; strict/prepared `solve_into` uses that workspace setting. The immutable plan can serve either mode using separate workspaces. Both modes remain synchronous: device execution reads status packets and retains all true-residual checks. This choice is independent of native/cuBLAS, fusion and algorithm; no automatic mode selection occurs.
+
 Host transfer is explicit. `cuda.prepare` accepts a device matrix; `prepare_host` uploads and snapshots host dense or `cgpy.CsrMatrix` storage. Device `solve` returns `cuda.SolveResult` with an owned `Vector`. Device `solve_into` borrows compatible CUDA Array Interface arrays and uses supplied output/workspace. `dense_kernel="native"` uses project kernels; `"cublas"` selects dense GEMV and rejects CSR. Jacobi supports `algorithm="standard"`; vector fusion remains an independent option.
 
 Calls finish on the selected borrowed stream before returning. Keep nondefault streams alive, and use a distinct workspace/output for each overlapping solve. External arrays must be contiguous float64, writable for output, disjoint and free from conflicting mutation. CUDA Array Interface v3 producer dependencies are honored; v2 producers need caller-established readiness or explicit synchronization. No call changes PyTorch's current stream or converts host pointers to device pointers.

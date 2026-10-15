@@ -2,7 +2,7 @@
 
 #include <cg/backend/cuda/dense_kernel.hpp>
 #include <cg/backend/cuda/detail/blas_handle.hpp>
-#include <cg/storage/cuda/detail/allocation.hpp>
+#include <cg/storage/cuda/device_memory.hpp>
 
 #include <optional>
 
@@ -30,7 +30,8 @@ struct ExecutionResources
     DeviceAllocation<double> reduction;
     // Borrowed nonoverlapping spans of reduction, valid for this owner's lifetime.
     double *partials, *scalar;
-    PinnedScalar host;
+    // Scalar copies are consumed only after the workspace stream is synchronized.
+    double host = 0.0;
     std::optional<CublasResources> cublas;
     DenseKernel kernel;
 };

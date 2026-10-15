@@ -1,6 +1,6 @@
 #include <cg/preconditioner/cuda/detail/kernels.hpp>
 #include <cg/runtime/cuda/detail/launch.hpp>
-#include <cg/storage/cuda/detail/allocation.hpp>
+#include <cg/storage/cuda/device_memory.hpp>
 
 namespace cg
 {

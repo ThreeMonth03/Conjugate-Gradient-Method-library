@@ -3,6 +3,8 @@
 import dataclasses
 from typing import Protocol
 
+from . import validation
+
 CUDA_IMPLEMENTATIONS = ("cuda-native", "cuda-cublas", "torch-cuda-eager")
 
 
@@ -27,6 +29,13 @@ class Executor(Protocol):
 def make_executor(
     name, arrays, options, scope, threads, *, device="cpu", cuda_device=0
 ) -> Executor:
+    validation.validate_execution_mode(options, device)
+    if device == "cpu" and "execution_mode" in options:
+        options = {
+            key: value
+            for key, value in options.items()
+            if key != "execution_mode"
+        }
     from .adapters import native
     from .reference import engine, numpy, torch
     from .reference import scipy as scipy_ops

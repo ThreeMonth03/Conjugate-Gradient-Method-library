@@ -3,6 +3,7 @@
 #include <cg/backend/cuda/detail/reduction.cuh>
 #include <cg/backend/cuda/detail/validation.hpp>
 #include <cg/runtime/cuda/detail/launch.hpp>
+#include <cfloat>
 #include <cmath>
 #include <limits>
 
@@ -39,8 +40,16 @@ __global__ void finish_kernel(const double *partials, std::size_t count, double 
     }
 }
 
-__global__ void stable_norm_kernel(ConstVectorView x, double *result)
+__global__ void stable_norm_kernel(ConstVectorView x, const double *squared, double *result)
 {
+    if (squared != nullptr && isfinite(*squared) && *squared >= DBL_MIN)
+    {
+        if (threadIdx.x == 0)
+        {
+            *result = sqrt(*squared);
+        }
+        return;
+    }
     __shared__ double scales[detail::block_size], sums[detail::block_size];
     double scale = 0.0, sum = 1.0;
     for (std::size_t i = threadIdx.x; i < x.size(); i += blockDim.x)
@@ -105,27 +114,45 @@ __global__ void stable_norm_kernel(ConstVectorView x, double *result)
 
 } // namespace
 
-double Backend::finish_reduction(std::size_t blocks) const
+void Backend::finish_reduction_into(std::size_t blocks, double *result) const
 {
-    auto &work = m_resources;
-    finish_kernel<<<1, detail::block_size, 0, detail::stream(m_resources.context)>>>(work.partials, blocks,
-                                                                                     work.scalar);
+    detail::DeviceGuard guard(m_resources.context.device());
+    finish_kernel<<<1, detail::block_size, 0, detail::stream(m_resources.context)>>>(m_resources.partials, blocks,
+                                                                                     result);
     detail::launch_check();
-    detail::check(cudaMemcpyAsync(work.host.get(), work.scalar, sizeof(double), cudaMemcpyDeviceToHost,
-                                  detail::stream(m_resources.context)),
-                  "cudaMemcpyAsync reduction");
-    m_resources.context.synchronize();
-    return *work.host.get();
 }
 
-double Backend::dot(ConstVectorView x, ConstVectorView y) const
+double Backend::read_scalar(const double *result) const
+{
+    detail::DeviceGuard guard(m_resources.context.device());
+    auto &work = m_resources;
+    detail::check(
+        cudaMemcpyAsync(&work.host, result, sizeof(double), cudaMemcpyDeviceToHost, detail::stream(work.context)),
+        "cudaMemcpyAsync reduction");
+    work.context.synchronize();
+    return work.host;
+}
+
+double Backend::finish_reduction(std::size_t blocks) const
+{
+    finish_reduction_into(blocks, m_resources.scalar);
+    return read_scalar(m_resources.scalar);
+}
+
+void Backend::dot_into(ConstVectorView x, ConstVectorView y, double *result) const
 {
     detail::same_size(x, y, m_resources.context);
     detail::DeviceGuard guard(m_resources.context.device());
     const auto blocks = detail::blocks(x.size());
     dot_kernel<<<blocks, detail::block_size, 0, detail::stream(m_resources.context)>>>(x, y, m_resources.partials);
     detail::launch_check();
-    return finish_reduction(blocks);
+    finish_reduction_into(blocks, result);
+}
+
+double Backend::dot(ConstVectorView x, ConstVectorView y) const
+{
+    dot_into(x, y, m_resources.scalar);
+    return read_scalar(m_resources.scalar);
 }
 
 double Backend::norm(ConstVectorView x) const
@@ -142,13 +169,21 @@ double Backend::norm_from_squared(ConstVectorView x, double squared) const
     detail::validate(x, m_resources.context, false);
     detail::DeviceGuard guard(m_resources.context.device());
     auto &work = m_resources;
-    stable_norm_kernel<<<1, detail::block_size, 0, detail::stream(m_resources.context)>>>(x, work.scalar);
+    stable_norm_kernel<<<1, detail::block_size, 0, detail::stream(m_resources.context)>>>(x, nullptr, work.scalar);
     detail::launch_check();
-    detail::check(cudaMemcpyAsync(work.host.get(), work.scalar, sizeof(double), cudaMemcpyDeviceToHost,
+    detail::check(cudaMemcpyAsync(&work.host, work.scalar, sizeof(double), cudaMemcpyDeviceToHost,
                                   detail::stream(m_resources.context)),
                   "cudaMemcpyAsync stable norm");
     m_resources.context.synchronize();
-    return *work.host.get();
+    return work.host;
+}
+
+void Backend::norm_from_squared_into(ConstVectorView x, const double *squared, double *result) const
+{
+    detail::validate(x, m_resources.context, false);
+    detail::DeviceGuard guard(m_resources.context.device());
+    stable_norm_kernel<<<1, detail::block_size, 0, detail::stream(m_resources.context)>>>(x, squared, result);
+    detail::launch_check();
 }
 
 } // namespace detail

@@ -3,6 +3,7 @@
 #include <cg/preconditioner/cuda/jacobi.hpp>
 #include <cg/runtime/cuda/detail/runtime.hpp>
 #include <cg/solver/cuda/conjugate_gradient.hpp>
+#include <cg/solver/cuda/detail/device_execution.hpp>
 #include <cg/solver/cuda/detail/workspace_use_guard.hpp>
 #include <cg/solver/detail/engine.hpp>
 #include <cg/solver/detail/validation.hpp>
@@ -79,9 +80,18 @@ SolveInfo run(const Matrix &A, ConstVectorView b, VectorView x, Workspace &works
     detail::DeviceGuard guard(context.device());
     const detail::Backend backend(use.resources(), fused, kernel);
     const auto norm = [&](ConstVectorView value, double squared) { return backend.norm_from_squared(value, squared); };
-    const auto info = options.algorithm == Algorithm::explicit_residual
-                          ? cg::detail::solve_explicit(A, b, x, workspace, backend, options, norm)
-                          : cg::detail::solve_recurrence(A, b, x, workspace, backend, options, M, norm);
+    SolveInfo info;
+    if (workspace.execution_mode() == ExecutionMode::device)
+    {
+        info = detail::solve_device(A, b, x, workspace, backend, use.resources(), use.device_resources(), options,
+                                    fused, M);
+    }
+    else
+    {
+        info = options.algorithm == Algorithm::explicit_residual
+                   ? cg::detail::solve_explicit(A, b, x, workspace, backend, options, norm)
+                   : cg::detail::solve_recurrence(A, b, x, workspace, backend, options, M, norm);
+    }
     context.synchronize();
     use.complete();
     return info;
