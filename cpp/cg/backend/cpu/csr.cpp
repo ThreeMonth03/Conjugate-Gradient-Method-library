@@ -1,0 +1,130 @@
+#include <cg/backend/cpu/backend.hpp>
+#include <cg/matrix/csr_matrix.hpp>
+#include <cg/matrix/validation.hpp>
+#include <cg/storage/validation.hpp>
+
+#include <stdexcept>
+
+namespace cg
+{
+
+namespace
+{
+void validate_apply(const CsrMatrix &A, ConstVectorView x, VectorView output)
+{
+    detail::validate(x);
+    detail::validate(output);
+    if (A.cols() != x.size || A.rows() != output.size)
+    {
+        throw std::invalid_argument("CSR matrix-vector dimensions do not match");
+    }
+    if (detail::overlaps(x, output) || detail::overlaps(A, output))
+    {
+        throw std::invalid_argument("CSR output must be disjoint from inputs");
+    }
+}
+
+} // namespace
+void CpuBackend::apply(const CsrMatrix &A, ConstVectorView x, VectorView output) const
+{
+    if (dense_kernel() == DenseKernel::blas)
+    {
+        throw std::invalid_argument("BLAS dense kernels do not support CSR matrices");
+    }
+    validate_apply(A, x, output);
+    const auto *indptr = A.indptr().data();
+    const auto *indices = A.indices().data();
+    const auto *values = A.values().data();
+#ifdef _OPENMP
+#pragma omp parallel for schedule(static) num_threads(m_threads) if (m_threads > 1 && A.rows() >= 4096)
+#endif
+    for (std::size_t row = 0; row < A.rows(); ++row)
+    {
+        double sum = 0.0;
+        for (std::size_t entry = indptr[row]; entry < indptr[row + 1]; ++entry)
+        {
+            sum += values[entry] * x.data[indices[entry]];
+        }
+        output.data[row] = sum;
+    }
+}
+
+double CpuBackend::apply_dot(const CsrMatrix &A, ConstVectorView p, VectorView ap) const
+{
+    if (dense_kernel() == DenseKernel::blas)
+    {
+        throw std::invalid_argument("BLAS dense kernels do not support CSR matrices");
+    }
+    validate_apply(A, p, ap);
+    if (p.size != ap.size)
+    {
+        throw std::invalid_argument("CSR apply_dot requires a square matrix");
+    }
+    if (!m_fused)
+    {
+        apply(A, p, ap);
+        return dot(p, ap);
+    }
+    const auto *indptr = A.indptr().data();
+    const auto *indices = A.indices().data();
+    const auto *values = A.values().data();
+    double product = 0.0;
+#ifdef _OPENMP
+#pragma omp parallel for reduction(+ : product) schedule(static)                                                       \
+    num_threads(m_threads) if (m_threads > 1 && A.rows() >= 4096)
+#endif
+    for (std::size_t row = 0; row < A.rows(); ++row)
+    {
+        double sum = 0.0;
+        for (std::size_t entry = indptr[row]; entry < indptr[row + 1]; ++entry)
+        {
+            sum += values[entry] * p.data[indices[entry]];
+        }
+        ap.data[row] = sum;
+        product += p.data[row] * sum;
+    }
+    return product;
+}
+
+double CpuBackend::residual(const CsrMatrix &A, ConstVectorView b, ConstVectorView x, VectorView r,
+                            bool b_minus_ax) const
+{
+    if (dense_kernel() == DenseKernel::blas)
+    {
+        throw std::invalid_argument("BLAS dense kernels do not support CSR matrices");
+    }
+    detail::validate(b);
+    validate_apply(A, x, r);
+    if (b.size != r.size || detail::overlaps(b, r))
+    {
+        throw std::invalid_argument("CSR residual vectors must match and be disjoint");
+    }
+    if (!m_fused)
+    {
+        apply(A, x, r);
+        axpby(b_minus_ax ? 1.0 : -1.0, b, b_minus_ax ? -1.0 : 1.0, r, r);
+        return norm2(r);
+    }
+    const auto *indptr = A.indptr().data();
+    const auto *indices = A.indices().data();
+    const auto *values = A.values().data();
+    double squared_norm = 0.0;
+#ifdef _OPENMP
+#pragma omp parallel for reduction(+ : squared_norm) schedule(static)                                                  \
+    num_threads(m_threads) if (m_threads > 1 && A.rows() >= 4096)
+#endif
+    for (std::size_t row = 0; row < A.rows(); ++row)
+    {
+        double sum = 0.0;
+        for (std::size_t entry = indptr[row]; entry < indptr[row + 1]; ++entry)
+        {
+            sum += values[entry] * x.data[indices[entry]];
+        }
+        const double value = b_minus_ax ? b.data[row] - sum : sum - b.data[row];
+        r.data[row] = value;
+        squared_norm += value * value;
+    }
+    return squared_norm;
+}
+
+} // namespace cg

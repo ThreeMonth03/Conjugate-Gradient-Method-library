@@ -1,5 +1,5 @@
 """Command line entry point for the benchmark worker and launcher."""
 
-from .cli import main
+from . import cli
 
-raise SystemExit(main())
+raise SystemExit(cli.main())

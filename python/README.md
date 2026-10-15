@@ -1,6 +1,6 @@
 # Solver interfaces
 
-Import `cgpy` after installing the project into the local `.venv` as described in the [main README](../README.md). The CPU interface solves `Ax = b` for real symmetric positive-definite matrices with float64 arithmetic.
+Use CPython 3.12.x and import `cgpy` after installing the project into the local `.venv` as described in the [main README](../README.md). The CPU interface solves `Ax = b` for real symmetric positive-definite matrices with float64 arithmetic.
 
 ## Convenience solve
 
@@ -20,7 +20,7 @@ result = cgpy.solve(
 | `rtol`, `atol` | Finite, nonnegative tolerances; stopping threshold is `max(atol, rtol * ||b||2)`. |
 | `maxiter` | Maximum iterations; zero only checks the initial guess. |
 | `num_threads` | Positive integer; values greater than one require an OpenMP build. |
-| `algorithm` | `"standard"` uses the residual recurrence; `"explicit"` recomputes the residual each iteration using the legacy formulation. |
+| `algorithm` | `"standard"` uses the residual recurrence; `"explicit"` recomputes the residual each iteration as an explicit-residual reference formulation. |
 | `fused` | Select fused CPU operations or separate operations for comparison. This does not select the CG recurrence. |
 | `residual_refresh` | Standard CG periodically recomputes the true residual and restarts the direction. Zero disables periodic refresh; convergence and final residual checks remain enabled. |
 | `preconditioner` | `"none"` selects CG; `"jacobi"` selects PCG with the inverse matrix diagonal and requires `algorithm="standard"`. |
@@ -119,7 +119,7 @@ CUDA benchmark prepared/API scopes use resident inputs and exclude host upload a
 
 ## C++ core
 
-The native source interface uses the headers under `include/cg/` and the CMake `cg_core` target. Views borrow caller-owned storage; keep it alive until the synchronous solve returns. The workspace and output must be disjoint from the inputs. The example explicitly selects the recurrence because the native options retain the legacy explicit algorithm as their default.
+The native source interface uses feature headers under `cpp/cg/` and the CMake `cg_core` target. Views borrow caller-owned storage; keep it alive until the synchronous solve returns. The workspace and output must be disjoint from the inputs. The default native algorithm is the standard recurrence; the explicit-residual reference algorithm is opt-in.
 
 ```cpp
 #include <cg/cg.hpp>
@@ -143,23 +143,16 @@ int main()
 
 Omit the final preconditioner pointer for plain CG. `cg::CsrMatrix` accepts owning row-pointer, column-index, and value vectors and works with the same native solver interface. `CpuBackend` contains execution options; matrix and vector storage do not contain process-wide thread settings. Core operations include matvec, dot, vector updates, and selected fused operations. Workspace reuse avoids repeated allocation of solver vectors; the backend and runtime can still perform their own initialization.
 
-## Legacy methods
+## Feature modules
 
-The installed `utils` module and `_cgpy.Matrix` / `_cgpy.CG` bindings retain the earlier APIs, including nonlinear Fletcher-Reeves, Dai-Yuan, and Hager-Zhang methods. For example:
+`cgpy` provides the public convenience exports. Implementation follows domain
+boundaries: `cgpy.matrix` owns matrix conversion, `cgpy.storage` groups device storage
+and transfers, and `cgpy.solver` owns solve functions, workspace and result
+types.
+`cgpy._runtime` contains native loading and validation; `cgpy.cuda` is the
+explicit device facade. The private extensions are `cgpy._core` and
+`cgpy._cuda`. Internal modules import their peers rather than reaching through
+the package root.
 
-```python
-import utils
-
-x = utils.custom_linear_CG(
-    x=np.zeros_like(b), a=np.array([[4.0, 1.0], [1.0, 3.0]]),
-    b=b, epsilon=1e-10, epoch=1000, num_threads=1,
-)
-```
-
-Legacy nonlinear helpers stop when the gradient norm is below `tol`. Their Armijo search allows at most 256 backtracks, and the nonlinear solve allows at most 10,000 iterations. Non-finite values, unusable descent directions, stagnation, or exhausted limits raise `RuntimeError`. Residual and gradient stopping checks use a scaled norm to avoid false convergence when squaring tiny values underflows.
-
-Legacy `epsilon` is an absolute residual tolerance. Use the new API when comparing explicit and recurrence algorithms, fusion, workspace reuse, or Jacobi PCG under a shared stopping rule.
-
-The legacy linear wrapper raises `RuntimeError` on numerical breakdown. Reaching `epoch` still returns the current approximation for compatibility; use `cgpy` when you need an explicit convergence status.
-
-Only nonlinear helpers that request derivatives need the optional `autograd` dependency. It is included in the development locks. Install this checkout with those helpers using `.venv/bin/python -m pip install --cache-dir .cache/pip '.[legacy]'`, or append `[legacy]` to the selected local wheel's full path. These commands do not require a published package release.
+The supported interface is modern linear CG and Jacobi PCG. The earlier
+`_cgpy`, `utils`, matrix subclasses and nonlinear methods have been removed.

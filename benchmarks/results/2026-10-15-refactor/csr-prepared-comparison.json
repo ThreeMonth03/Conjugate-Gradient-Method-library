@@ -1,0 +1,254 @@
+{
+  "baseline_files": [
+    "/Users/abao/vscode/Conjugate-Gradient-Method-library/benchmarks/results/2026-10-15-refactor/csr-prepared-baseline-1.json",
+    "/Users/abao/vscode/Conjugate-Gradient-Method-library/benchmarks/results/2026-10-15-refactor/csr-prepared-baseline-2.json",
+    "/Users/abao/vscode/Conjugate-Gradient-Method-library/benchmarks/results/2026-10-15-refactor/csr-prepared-baseline-3.json",
+    "/Users/abao/vscode/Conjugate-Gradient-Method-library/benchmarks/results/2026-10-15-refactor/csr-prepared-baseline-4.json"
+  ],
+  "benchmark": {
+    "metric": "time_to_solution",
+    "spec": {
+      "cases": [
+        {
+          "condition_scale": 100.0,
+          "grid": 8,
+          "name": "poisson-8",
+          "size": 64,
+          "storage": "csr"
+        },
+        {
+          "condition_scale": 100.0,
+          "grid": 32,
+          "name": "poisson-32",
+          "size": 1024,
+          "storage": "csr"
+        },
+        {
+          "condition_scale": 100.0,
+          "grid": 64,
+          "name": "poisson-64",
+          "size": 4096,
+          "storage": "csr"
+        },
+        {
+          "condition_scale": 100.0,
+          "grid": 128,
+          "name": "poisson-128",
+          "size": 16384,
+          "storage": "csr"
+        }
+      ],
+      "comparison": "implementations",
+      "implementations": [
+        "native"
+      ],
+      "scope": "prepared",
+      "seed": 20261015,
+      "solver": {
+        "algorithm": "standard",
+        "atol": 1e-12,
+        "fused": true,
+        "maxiter": 2000,
+        "preconditioner": "none",
+        "residual_refresh": 50,
+        "rtol": 1e-08
+      },
+      "suite": "cpu-csr-f64-v1",
+      "threads": 1
+    }
+  },
+  "bootstrap": {
+    "confidence": 0.95,
+    "method": "artifact blocks, then rounds; percentile median ratio",
+    "resamples": 10000,
+    "seed": 20261015
+  },
+  "cases": [
+    {
+      "baseline": {
+        "artifact_blocks": 4,
+        "block_medians_ns_per_call": [
+          26321208.333333336,
+          26064569.333333336,
+          26224979.166666664,
+          26186264.0
+        ],
+        "median_ns_per_call": 26163229.0,
+        "rounds": 80
+      },
+      "case": {
+        "condition_scale": 100.0,
+        "grid": 128,
+        "name": "poisson-128",
+        "size": 16384,
+        "storage": "csr"
+      },
+      "current": {
+        "artifact_blocks": 4,
+        "block_medians_ns_per_call": [
+          26264375.166666664,
+          27310361.0,
+          26413743.166666668,
+          26905215.333333332
+        ],
+        "median_ns_per_call": 26759618.166666664,
+        "rounds": 80
+      },
+      "implementation": "native",
+      "input_sha256": "366658110507894737aae729348095b3103c569c950fba3bf3c69a3f05205149",
+      "iterations": 395,
+      "matvecs": 404,
+      "measured_regression_fraction": 0.022794937378206148,
+      "ratio": 1.0227949373782061,
+      "ratio_ci95": {
+        "lower": 1.0043119598867076,
+        "upper": 1.0397584694490194
+      },
+      "verdict": "supported_no_material_regression"
+    },
+    {
+      "baseline": {
+        "artifact_blocks": 4,
+        "block_medians_ns_per_call": [
+          590423.5,
+          584055.6666666666,
+          582958.3333333333,
+          592500.0
+        ],
+        "median_ns_per_call": 590340.1666666667,
+        "rounds": 80
+      },
+      "case": {
+        "condition_scale": 100.0,
+        "grid": 32,
+        "name": "poisson-32",
+        "size": 1024,
+        "storage": "csr"
+      },
+      "current": {
+        "artifact_blocks": 4,
+        "block_medians_ns_per_call": [
+          607798.5,
+          578152.6666666666,
+          562882.0,
+          600083.3333333334
+        ],
+        "median_ns_per_call": 595708.3333333333,
+        "rounds": 80
+      },
+      "implementation": "native",
+      "input_sha256": "2be39617e771847e425d64a8d997d0eea8942b930852010d2ac2c83bb3e26ab7",
+      "iterations": 129,
+      "matvecs": 133,
+      "measured_regression_fraction": 0.009093344769300904,
+      "ratio": 1.009093344769301,
+      "ratio_ci95": {
+        "lower": 0.9584714094338291,
+        "upper": 1.0315204432511746
+      },
+      "verdict": "supported_no_material_regression"
+    },
+    {
+      "baseline": {
+        "artifact_blocks": 4,
+        "block_medians_ns_per_call": [
+          5161854.166666667,
+          5051319.5,
+          5157159.666666667,
+          5317340.333333334
+        ],
+        "median_ns_per_call": 5159090.333333334,
+        "rounds": 80
+      },
+      "case": {
+        "condition_scale": 100.0,
+        "grid": 64,
+        "name": "poisson-64",
+        "size": 4096,
+        "storage": "csr"
+      },
+      "current": {
+        "artifact_blocks": 4,
+        "block_medians_ns_per_call": [
+          4968465.333333334,
+          4976416.666666667,
+          4973291.833333334,
+          5063201.5
+        ],
+        "median_ns_per_call": 4992472.166666666,
+        "rounds": 80
+      },
+      "implementation": "native",
+      "input_sha256": "366644870e9d921500fcf8ec3dc21b6daa83afdc9d3482e3846feb816df2483d",
+      "iterations": 290,
+      "matvecs": 297,
+      "measured_regression_fraction": -0.03229603590968999,
+      "ratio": 0.96770396409031,
+      "ratio_ci95": {
+        "lower": 0.9361758555505879,
+        "upper": 0.9862199636239488
+      },
+      "verdict": "supported_no_material_regression"
+    },
+    {
+      "baseline": {
+        "artifact_blocks": 4,
+        "block_medians_ns_per_call": [
+          11743.166666666668,
+          11139.0,
+          11250.0,
+          11152.833333333332
+        ],
+        "median_ns_per_call": 11250.0,
+        "rounds": 80
+      },
+      "case": {
+        "condition_scale": 100.0,
+        "grid": 8,
+        "name": "poisson-8",
+        "size": 64,
+        "storage": "csr"
+      },
+      "current": {
+        "artifact_blocks": 4,
+        "block_medians_ns_per_call": [
+          11270.833333333332,
+          11590.333333333334,
+          11340.333333333334,
+          11187.5
+        ],
+        "median_ns_per_call": 11347.166666666668,
+        "rounds": 80
+      },
+      "implementation": "native",
+      "input_sha256": "c42223d3f75a5c3b4637a56319aec5e0c74ac30f9e81647f0008ae311c362c71",
+      "iterations": 26,
+      "matvecs": 28,
+      "measured_regression_fraction": 0.00863703703703722,
+      "ratio": 1.0086370370370372,
+      "ratio_ci95": {
+        "lower": 0.9650375568348156,
+        "upper": 1.0329087523277467
+      },
+      "verdict": "supported_no_material_regression"
+    }
+  ],
+  "current_files": [
+    "/Users/abao/vscode/Conjugate-Gradient-Method-library/benchmarks/results/2026-10-15-refactor/csr-prepared-current-1.json",
+    "/Users/abao/vscode/Conjugate-Gradient-Method-library/benchmarks/results/2026-10-15-refactor/csr-prepared-current-2.json",
+    "/Users/abao/vscode/Conjugate-Gradient-Method-library/benchmarks/results/2026-10-15-refactor/csr-prepared-current-3.json",
+    "/Users/abao/vscode/Conjugate-Gradient-Method-library/benchmarks/results/2026-10-15-refactor/csr-prepared-current-4.json"
+  ],
+  "limitations": [
+    "Intervals describe the supplied artifacts on the measured host.",
+    "Few artifact blocks give limited evidence of process variance.",
+    "Rounds are resampled independently within each artifact; serial dependence may make the interval too narrow.",
+    "Run order, ABBA pairing, thermal state and background load are not recoverable from this artifact schema.",
+    "Intervals are per case; simultaneous coverage is not adjusted."
+  ],
+  "max_regression": 0.05,
+  "metric": "current_to_baseline_median_ns_per_call",
+  "ratio_limit": 1.05,
+  "schema_version": 1,
+  "verdict": "supported_no_material_regression"
+}

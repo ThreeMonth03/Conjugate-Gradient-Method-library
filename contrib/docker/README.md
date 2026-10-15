@@ -1,6 +1,6 @@
 # CPU development container
 
-Run these commands from the repository root. The build context is the whole checkout; the Dockerfile copies source files and local dependency locks explicitly, leaving host virtual environments, caches, build products, and research artifacts out of the image.
+Run these commands from the repository root. The build context is the whole checkout; the Dockerfile copies source directories and local dependency pins explicitly, leaving host virtual environments, caches, build products, and research artifacts out of the image.
 
 ```bash
 docker build -f contrib/docker/dockerfile -t cg-cpu .
@@ -10,7 +10,7 @@ docker run --rm cg-cpu make gtest PRESET=cpu-asan
 docker run --rm -it cg-cpu bash
 ```
 
-The default command is `make test`. Python tools are installed in `/workspace/cg/.venv`; downloads and build outputs stay under that container's project directory. Compiler, Git, and their package dependencies are installed inside the image. It uses no GPU runtime and mounts no host directories.
+The image uses CPython 3.12 and the default command is `make test`. Python tools are installed in `/workspace/cg/.venv`; downloads and build outputs stay under that container's project directory. Compiler, Git, and their package dependencies are installed inside the image. It uses no GPU runtime and mounts no host directories.
 
 CUDA source files are included so the source layout stays complete, but this image builds with CUDA disabled. Follow the [CUDA guide](../../docs/cuda.rst) for the separate local toolkit/runtime environment and real-device tests; the CPU container does not validate GPU execution.
 

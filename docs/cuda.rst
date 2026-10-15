@@ -21,7 +21,7 @@ Keep the GPU toolchain and comparison dependencies in a separate environment:
 
 .. code-block:: bash
 
-   python3 -m venv .venv-cuda
+   python3.12 -m venv .venv-cuda
    .venv-cuda/bin/python -m pip install --cache-dir .cache/pip \
        -r requirements/test.lock -r requirements/cuda.lock
    .venv-cuda/bin/python scripts/setup_cuda.py --prefix .deps/cuda-12.8
@@ -66,7 +66,7 @@ To build a relocatable local CUDA wheel:
 Select the actual wheel filename produced for your Python/platform. The
 ``[cuda]`` extra installs ``nvidia-cuda-runtime-cu12==12.8.90`` and
 ``nvidia-cublas-cu12==12.8.4.1``. The loader opens these public distributions
-before importing ``_cgcuda``; installed wheels have no toolkit RPATH and need
+before importing ``cgpy._cuda``; installed wheels have no toolkit RPATH and need
 no source checkout or compiler. The driver remains a host prerequisite. CUDA,
 native and BLAS wheels share the package version/tag; keep their output
 directories separate. These are local Linux platform wheels, with no
@@ -204,6 +204,10 @@ kernel events.
 API reference
 -------------
 
+CUDA solves return the shared :class:`cgpy.SolveResult` documented in
+:doc:`api`; its ``x`` owns a device ``Vector``.
+
 .. automodule:: cgpy.cuda
    :members:
    :undoc-members:
+   :exclude-members: SolveResult

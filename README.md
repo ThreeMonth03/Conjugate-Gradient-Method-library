@@ -1,132 +1,145 @@
 # Conjugate Gradient Method Library
 
-Conjugate gradient solvers for nonempty, real symmetric positive-definite systems `Ax = b`. The C++17 core supports dense and canonical CSR matrices, reusable workspace, fused operations, optional OpenMP, an optional dense BLAS kernel, and Jacobi preconditioned CG. An explicit optional CUDA backend provides device storage, native kernels and dense cuBLAS. Python exposes convenience and strict in-place APIs. Legacy linear and nonlinear methods remain available through `utils` and `_cgpy`.
+A C++17 library with Python bindings for real symmetric positive-definite
+systems `Ax = b`. The modern API provides dense and canonical CSR CG, Jacobi
+PCG, reusable workspaces and prepared solves. CPU execution supports native
+kernels, optional OpenMP and optional dense BLAS. CUDA is an explicit optional
+backend with native kernels and dense cuBLAS.
 
-## Install with pip
+## Quick start
 
-Build this checkout with an existing Python 3.10+ interpreter and C++17 compiler:
+Use **CPython 3.12.x** and a C++17 compiler. From the repository root:
 
 ```bash
-python3 -m venv .venv
+python3.12 -m venv .venv
 .venv/bin/python -m pip install --cache-dir .cache/pip .
 .venv/bin/python -c 'import cgpy; print(cgpy.build_info())'
 ```
 
-Pip installs the declared build dependencies in an isolated temporary environment. The default package uses the native CPU kernel; NumPy is its runtime dependency. A built wheel can be installed with `.venv/bin/python -m pip install --cache-dir .cache/pip dist/cgpy-*.whl` without a compiler. See [installation](docs/install.rst) for editable installs and optional legacy derivatives.
-
-## Local development
-
-Use an existing Python 3.12 interpreter and C++17 compiler. Python tools, downloaded C++ dependencies, build products, and caches stay under `.venv/`, `build/`, and `.cache/` in this checkout. These commands require no system package upgrades or shell configuration changes.
-
-```bash
-python3 -m venv .venv
-.venv/bin/python -m pip install --cache-dir .cache/pip -r requirements/test.lock
-.venv/bin/python -m pip install --cache-dir .cache/pip --no-deps --no-build-isolation -e .
-make test
-```
-
-`make pytest` runs Python tests, `make gtest` runs native GoogleTest cases, and `make lint` checks Python lint/formatting and C++ formatting. `make gtest PRESET=cpu-asan` runs the native tests under AddressSanitizer and UndefinedBehaviorSanitizer. `make wheel` builds an isolated wheel under `dist/`; `make sdist` builds a source archive, and `make test-dist` verifies an installed wheel built from that archive. `make demo` runs the examples.
-
-The default build uses one CPU thread. `make test PRESET=cpu-openmp` enables OpenMP. For an editable installation that supports `num_threads > 1`, add `--config-settings=cmake.define.CG_ENABLE_OPENMP=ON` to the editable install command. Presets build into separate directories; selecting an OpenMP preset for a Make target does not change an already installed wheel.
-
-## Python example
+Pip builds in an isolated environment. A compatible built wheel needs no
+compiler; the default CPU package requires NumPy at runtime.
 
 ```python
 import numpy as np
 import cgpy
 
-A = np.array([[4.0, 1.0], [1.0, 3.0]])
-b = np.array([1.0, 2.0])
-result = cgpy.solve(A, b, rtol=1e-10, preconditioner="jacobi")
+A = np.array([[4.0, 1.0], [1.0, 3.0]], dtype="float64")
+b = np.array([1.0, 2.0], dtype="float64")
+result = cgpy.solve(A, b, preconditioner="jacobi", rtol=1e-10)
 assert result.converged
-print(result.x, result.iterations, result.residual_norm)
+np.testing.assert_allclose(result.x, [1 / 11, 7 / 11])
 ```
 
-`solve` preserves the inputs and owns its returned solution. `prepare(A, preconditioner="jacobi")` snapshots the matrix and caches its preconditioner for repeated solves. Create a workspace with `prepared.create_workspace()`, then call `prepared.solve_into(b, x, workspace=workspace)`. The supplied `x` is both the initial guess and the output; reset it before a repeated comparison. Each concurrent solve needs a distinct workspace and output.
+`solve` preserves inputs and owns its output. `prepare(A)` snapshots the
+matrix and caches setup; `prepared.solve_into(b, x, workspace=workspace)`
+reuses caller-owned output and workspace. Each concurrent solve needs its own
+workspace and output. `cgpy.CSRMatrix` stores canonical sparse inputs without
+converting them to dense matrices.
 
-`cgpy.CSRMatrix(indptr, indices, data, shape)` is accepted by `solve`, `prepare`, and `solve_into`. CSR rows must have sorted, unique column indices. Jacobi requires a finite, strictly positive diagonal and is supported with `algorithm="standard"`.
+Convergence requires the independently recomputed true residual to satisfy
+`||b - A @ x||2 <= max(atol, rtol * ||b||2)`. Inspect `converged` or `status`
+before using a solution. Symmetry and positive definiteness are caller
+preconditions. See [interfaces and ownership](python/README.md).
 
-The stopping rule is `||b - A @ x||2 <= max(atol, rtol * ||b||2)`. Reported residuals are independently recomputed from the final solution. Check `converged` or `status` before using the answer. Symmetry and positive definiteness are caller preconditions; the solver does not perform a full matrix factorization to verify them.
-
-See [Python and C++ interfaces](python/README.md) for options, ownership, and failure statuses.
-See [architecture](docs/architecture.md) for storage, workspace, backend, and fusion boundaries.
-
-## Optional dense BLAS
-
-Build and select BLAS explicitly:
+## Develop and validate
 
 ```bash
-make test PRESET=cpu-blas
-.venv/bin/python -m pip install --cache-dir .cache/pip \
-    --config-settings=cmake.define.CG_ENABLE_BLAS=ON .
+.venv/bin/python -m pip install --cache-dir .cache/pip -r requirements/test.lock
+.venv/bin/python -m pip install --cache-dir .cache/pip --no-deps --no-build-isolation -e .
+make test
+make lint
+make gtest PRESET=cpu-asan
+make demo
 ```
 
-Then call `cgpy.solve(A, b, dense_kernel="blas", num_threads=1)` or pass the same kernel to `prepare` / `solve_into`. `cgpy.blas_enabled()` and `cgpy.build_info()['blas']` describe the imported extension. BLAS requires dense storage and one thread; CSR and unavailable BLAS builds reject that selection. `dense_kernel="native"` remains the default, and `fused` independently controls supported vector operations.
-
-The Linux build uses a pinned private sequential OpenBLAS under `build/_deps`; the wheel includes it. On x86-64, the BLAS-enabled extension requires SSE3/SSSE3 even when importing it; other architectures use the native build target. See [build details](docs/build.rst) for toolchain requirements and native/BLAS distribution checks. Preset selection affects a source build; reinstall to change an installed wheel.
-
-## Optional CUDA
-
-Use a separate project environment, an existing compatible NVIDIA driver and host compiler. The Linux x86-64 bootstrap installs a pinned CUDA 12.8 toolkit inside the checkout; the preset targets architecture 75 and uses `/usr/bin/g++-13`.
+`make test` runs native GoogleTest and Python pytest; `make gtest` and
+`make pytest` select one layer. Presets keep independent builds under
+`build/`. Use `PRESET=cpu-openmp` or `PRESET=cpu-blas` for the optional CPU
+modes. Preset selection does not alter an already installed package; inspect
+`cgpy.build_info()` in the process that will perform the solve.
 
 ```bash
-python3 -m venv .venv-cuda
+.venv/bin/python -m pip install --cache-dir .cache/pip -r requirements/docs.lock
+make docs doctest
+make test-dist
+```
+
+Sphinx imports the actual extension, treats warnings as errors and executes
+examples. `make test-dist` builds a wheel through an sdist, installs it outside
+the checkout and checks the relocated package. See [build and distribution
+checks](docs/build.rst), [dependency pin maintenance](requirements/README.md)
+and the optional [CPU Docker environment](contrib/docker/README.md).
+
+## Structure and design
+
+```text
+cpp/cg/
+  storage/          # Ownership and borrowed vector views
+  matrix/           # Dense and canonical CSR representations
+  backend/          # CPU and CUDA numerical operations
+  preconditioner/   # Jacobi setup and application
+  solver/           # Shared CG/PCG engine, status and workspace
+  python/           # Extension entry points and shared conversion boundary
+python/
+  cgpy/             # matrix, storage, solver, _runtime and cuda packages
+  cgbench/          # Accuracy gates, benchmark adapters and artifacts
+tests/
+  cpp/              # Core invariants and native numerical behavior
+  python/           # API, matrix, solver, CUDA and benchmark contracts
+examples/           # Dense, sparse and repeated-solve entry points
+```
+
+Each C++ feature keeps declarations and implementation together; its Python
+binding lives in `pymod/`. The core builds without Python or pybind11. Matrix
+storage does not choose algorithms or thread policy. CPU and CUDA adapters
+share the solver engine. The [architecture guide](docs/architecture.rst)
+describes dependency direction, ownership and numerical policy; [STYLE.md](STYLE.md)
+records the SOLVCON-inspired conventions enforced by the formatters.
+
+The supported product is linear CG/PCG. The earlier `_cgpy`, `utils`, matrix
+subclasses and nonlinear APIs are retired. `algorithm="explicit"` remains a
+modern reference path for comparison under the shared convergence contract.
+
+## Performance evidence
+
+```bash
+.venv/bin/python -m pip install --cache-dir .cache/pip -r requirements/benchmark.lock
+make pyprof PYPROF_SUITE=smoke-sparse-solvers
+make pyprof PYPROF_SUITE=cpu-dense-f64-v1
+make pyprof PYPROF_SCOPE=api
+```
+
+Candidates pass an independent true-residual gate before timing. Artifacts
+retain input hashes, solver options, raw timings, balanced schedules and
+hardware/build metadata. Prepared and API scopes separate setup reuse from
+per-call allocation. Shared CI checks correctness; performance comparisons
+require the same machine, inputs, tolerances and thread policy.
+
+[Benchmark contracts](benchmarks/README.md) explain reproduction and replay.
+Recorded [CPU](benchmarks/results.md), [BLAS](benchmarks/blas-results.md) and
+[CUDA](benchmarks/cuda-results.md) measurements retain their original artifacts
+and limitations; they are historical evidence, not measurements of every
+subsequent source revision.
+
+The [refactor validation report](docs/refactor_validation.rst) records the
+current numerical, installation and native CPU performance checks, including
+all raw measurements and the limits of the comparisons.
+
+## CUDA
+
+CUDA uses a separate environment, an existing NVIDIA driver and a compatible
+host compiler. The pinned Linux x86-64 bootstrap provides Toolkit 12.8 inside
+the checkout. The CPU wheel has no NVIDIA runtime dependency.
+
+```bash
+python3.12 -m venv .venv-cuda
 .venv-cuda/bin/python -m pip install --cache-dir .cache/pip \
     -r requirements/test.lock -r requirements/cuda.lock
 .venv-cuda/bin/python scripts/setup_cuda.py --prefix .deps/cuda-12.8
 CG_REQUIRE_CUDA=1 make test PRESET=cuda-release PYTHON="$PWD/.venv-cuda/bin/python"
-make test-dist DIST_CUDA=ON DIST_DIR=dist/cuda PYTHON="$PWD/.venv-cuda/bin/python"
 ```
 
-Import `from cgpy import cuda`, check `cuda.enabled()` / `cuda.is_available()`, then explicitly upload with `cuda.DenseMatrix.from_host(A)` and `cuda.Vector.from_host(b)`. `cuda.solve(device_A, device_b, dense_kernel="native")` returns a device-owned result; call `result.x.to_host()` for a copy. Dense `dense_kernel="cublas"` and canonical CSR `dense_kernel="native"` use the same stopping rule; Jacobi supports the standard algorithm. CUDA functions are synchronous and require separate workspace/output for overlapping calls.
-
-The default CPU wheel has no CUDA runtime dependency. A CUDA-enabled wheel requires its `[cuda]` extra, which pins public NVIDIA runtime/cuBLAS packages; it does not depend on PyTorch-private libraries or the build toolkit's RPATH. See the [CUDA guide](docs/cuda.rst) for source/wheel installation, explicit architecture/compiler overrides, borrowed streams, device interoperability and resident benchmark scope.
-
-## Documentation
-
-```bash
-.venv/bin/python -m pip install --cache-dir .cache/pip -r requirements/docs.lock
-make docs
-make doctest
-```
-
-Open `build/docs/html/index.html`. Sphinx imports the actual extension, renders NumPy-style docstrings and runs its examples; warnings fail the build. Documentation builds use local assets and require no network access once dependencies and the extension are available. The [Sphinx guide](docs/index.rst) covers API, installation, building and benchmark contracts.
-
-## Reproducible comparisons
-
-Install the separate CPU benchmark dependencies into the same local environment:
-
-```bash
-.venv/bin/python -m pip install --cache-dir .cache/pip -r requirements/benchmark.lock
-make pyprof
-make pyprof PRESET=cpu-openmp PYPROF_THREADS=4
-make pyprof PYPROF_SCOPE=api
-make pyprof PYPROF_SUITE=cpu-dense-f64-v1
-make pyprof PRESET=cpu-blas PYPROF_SUITE=cpu-dense-f64-v1 PYPROF_THREADS=1 \
-    PYPROF_ARGS='--implementations native,native-blas,numpy-out,torch-eager-out'
-make pyprof PYPROF_ARGS='--warmups 3 --seed 20261015'
-```
-
-The default sparse solver suite compares native CG and Jacobi PCG, SciPy CG and PCG, and SuperLU factorization plus solve versus factorization reuse. The dense suite compares CG implementations using NumPy and eager CPU PyTorch. Direct and iterative methods have different setup costs and iteration counts; retain each result's scope and solver labels when comparing them. Native and official SciPy iterative policies are labeled separately; matching-policy reference adapters are available through the CLI.
-
-The CLI and pytest use the same cases and validation fixtures. Candidates must satisfy an independently checked true residual before timing. Timed rounds use complete Williams cycles to balance execution order. JSON artifacts include raw timings, schedules, input hashes, solver options, and environment/build metadata. `PYPROF_OUTPUT` selects the artifact path; `PYPROF_ARGS` forwards additional CLI arguments. See [benchmark details](benchmarks/README.md) for scopes and replay.
-
-Performance depends on matrix structure, conditioning, hardware, thread count, and setup reuse. Compare on the same machine with the same tolerances and initial guesses; shared-runner CI checks correctness rather than enforcing speed thresholds.
-
-The [recorded CPU results](benchmarks/results.md) include every measured case, original timing artifacts, and commands to reproduce or replay them.
-The [dense BLAS results](benchmarks/blas-results.md) compare both explicit kernels with NumPy and PyTorch in prepared and API scopes, including complete raw timings and uncertainty limits.
-
-For GPU comparisons, install `requirements/cuda-benchmark.lock` into `.venv-cuda` and select every candidate explicitly:
-
-```bash
-.venv-cuda/bin/python -m pip install --cache-dir .cache/pip -r requirements/cuda-benchmark.lock
-make pyprof PRESET=cuda-release PYTHON="$PWD/.venv-cuda/bin/python" \
-    PYPROF_SUITE=smoke-cuda-dense \
-    PYPROF_ARGS='--device cuda --cuda-device 0 --implementations cuda-native,cuda-cublas,torch-cuda-eager'
-```
-
-CUDA prepared/API scopes use resident inputs and include completed solve wall time. Host upload and correctness download remain outside timing; these are not end-to-end host-to-host measurements. CPU benchmark defaults are unchanged.
-
-The [recorded CUDA results](benchmarks/cuda-results.md) include dense/CSR CG and Jacobi PCG in both scopes against eager PyTorch CUDA, with complete raw samples, replay commands and cases where native CUDA is slower.
-
-An optional [CPU Docker environment](contrib/docker/README.md) keeps the compiler and dependencies inside a container.
+Import `from cgpy import cuda`, explicitly upload matrices/vectors, then select
+native or cuBLAS kernels. Calls complete on the selected stream before
+returning. See the [CUDA guide](docs/cuda.rst) for runtime installation,
+architecture overrides, interoperability and resident benchmark scope.

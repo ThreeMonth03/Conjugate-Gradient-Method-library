@@ -48,10 +48,10 @@ recording the current environment:
 
 .. code-block:: bash
 
-   PYTHONPATH="$PWD/build/cpu-release/python:$PWD/python" .venv/bin/python -m cgbench replay \
+   PYTHONPATH="$PWD/build/cpu-release/python" .venv/bin/python -m cgbench replay \
        build/cpu-release/benchmarks/sparse-solvers-t1-prepared.json \
        --output build/benchmarks/replay.json
-   PYTHONPATH="$PWD/python" .venv/bin/python -m cgbench compare \
+   PYTHONPATH="$PWD/build/cpu-release/python" .venv/bin/python -m cgbench compare \
        build/benchmarks/replay.json
 
 Performance depends on matrix structure, conditioning, hardware, setup reuse,

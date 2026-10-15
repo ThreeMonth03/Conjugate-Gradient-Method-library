@@ -1,12 +1,11 @@
 Build, test and document
 ========================
 
-Run from the repository root with an existing Python interpreter and C++17
-compiler. Install the local test tools before using Make:
+Run from the repository root with CPython 3.12.x and a C++17 compiler. Install the local test tools before using Make:
 
 .. code-block:: bash
 
-   python3 -m venv .venv
+   python3.12 -m venv .venv
    .venv/bin/python -m pip install --cache-dir .cache/pip -r requirements/test.lock
    make test
    make test PRESET=cpu-openmp
@@ -16,7 +15,8 @@ compiler. Install the local test tools before using Make:
 
 ``make test`` runs GoogleTest and pytest through CTest. ``make gtest`` and
 ``make pytest`` select their respective layers. The sanitizer preset runs
-native address and undefined-behavior checks. ``make lint`` checks Python lint
+native address and undefined-behavior checks. Python tests live under
+``tests/python/``; examples live under ``examples/``. ``make lint`` checks Python lint
 and formatting plus C++ formatting. Build directories are isolated by preset
 under ``build/``. ``JOBS`` controls build parallelism; ``PYTHON``, ``BUILD_DIR``
 and ``CMAKE_ARGS`` allow local toolchain overrides.
@@ -104,7 +104,7 @@ the source-distribution path. The pip command builds an sdist with isolation.
 environment outside the source tree and checks dense/CSR APIs and native
 imports. Native and BLAS wheels have the same package version and wheel tag;
 use separate output directories to retain both artifacts. Runtime-only
-installs need NumPy; the legacy derivative dependency stays optional.
+CPU installs need NumPy; Python 3.12 is required for every package mode.
 
 CUDA builds use ``PRESET=cuda-release`` and ``DIST_CUDA=ON`` explicitly, with
 their own compatible local toolkit and runtime dependencies. See :doc:`cuda`
@@ -132,3 +132,16 @@ errors. Autodoc imports the selected real extension through the same
 docstrings. No imports are mocked. Once dependencies and the extension are
 available, Sphinx requires no network access: the configuration uses no remote
 theme assets or intersphinx inventories.
+
+Python version and dependency policy
+------------------------------------
+
+Python support is intentionally limited to CPython 3.12.x. CI varies the
+execution/build configuration rather than testing unrelated interpreter
+versions. Use a current 3.12 patch release. Native-only builds use
+``CG_BUILD_PYTHON=OFF`` and have no Python requirement.
+
+The requirement files are explicit pinned pip inputs, maintained by review;
+there is no automatic lock generator. See
+`dependency maintenance <https://github.com/ThreeMonth03/Conjugate-Gradient-Method-library/blob/main/requirements/README.md>`_
+for clean-environment installation and update checks.

@@ -93,7 +93,7 @@ For implementation comparisons, use the dense/CSR suites below or optional
 `scipy-reference-cg` / `scipy-reference-pcg` / `torch-cg` / `torch-pcg` candidates.
 The reference candidates use this project's recurrence and replacement policy;
 they are clearly separate from the official `scipy-cg` / `scipy-pcg` solvers.
-Jacobi PCG supports `--algorithm standard`; the explicit legacy algorithm and
+Jacobi PCG supports `--algorithm standard`; the explicit-residual reference algorithm and
 Jacobi combination is rejected. Normal implementation suites also accept
 `--preconditioner jacobi` when selecting their common preconditioner.
 `--no-fused` selects the native separate-operation kernel path; NumPy and
@@ -178,7 +178,7 @@ reset x0 on every invocation, including warmups and repeated timed calls.
 `standard` uses r=b-Ax, the standard CG recurrence, true-residual verification
 on candidate convergence, and residual replacement plus direction restart
 every 50 iterations. `--residual-refresh 0` disables periodic replacement.
-`explicit` preserves the original library's explicit r=Ax-b formulation, with
+`explicit` provides the explicit r=Ax-b reference formulation, with
 two matvecs per iteration. Matching-policy implementation candidates use the selected algorithm, tolerance
 `max(atol, rtol*||b||2)`, maximum iterations and replacement policy. Recorded
 matvec counts include initial and final true-residual evaluations. Official

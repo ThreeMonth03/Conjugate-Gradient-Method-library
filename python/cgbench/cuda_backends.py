@@ -2,7 +2,7 @@
 
 import time
 
-from .backends import CUDA_IMPLEMENTATIONS, Outcome, ReferenceExecutor, TorchOps
+from . import backends
 
 
 def native_cuda(device):
@@ -12,9 +12,13 @@ def native_cuda(device):
     try:
         from cgpy import cuda
     except ImportError as exc:
-        raise RuntimeError("CUDA requested but the native CUDA extension is unavailable") from exc
+        raise RuntimeError(
+            "CUDA requested but the native CUDA extension is unavailable"
+        ) from exc
     if not cuda.enabled() or not cuda.is_available(device):
-        raise RuntimeError(f"CUDA requested but native CUDA device {device} is unavailable")
+        raise RuntimeError(
+            f"CUDA requested but native CUDA device {device} is unavailable"
+        )
     return cuda
 
 
@@ -25,9 +29,13 @@ def torch_cuda(device):
     try:
         import torch
     except ImportError as exc:
-        raise RuntimeError("CUDA requested but PyTorch is unavailable") from exc
+        raise RuntimeError(
+            "CUDA requested but PyTorch is unavailable"
+        ) from exc
     if not torch.cuda.is_available() or device >= torch.cuda.device_count():
-        raise RuntimeError(f"CUDA requested but PyTorch CUDA device {device} is unavailable")
+        raise RuntimeError(
+            f"CUDA requested but PyTorch CUDA device {device} is unavailable"
+        )
     return torch
 
 
@@ -35,7 +43,9 @@ def preflight_cuda(names, device):
     """Fail before collecting or writing timings if any requested GPU is absent."""
     if device < 0:
         raise ValueError("CUDA device must be nonnegative")
-    if not names or any(name not in CUDA_IMPLEMENTATIONS for name in names):
+    if not names or any(
+        name not in backends.CUDA_IMPLEMENTATIONS for name in names
+    ):
         raise ValueError("CUDA comparison requires explicit CUDA candidates")
     if any(name in ("cuda-native", "cuda-cublas") for name in names):
         native_cuda(device)
@@ -44,7 +54,13 @@ def preflight_cuda(names, device):
 
 
 def _host_outcome(outcome, x):
-    return Outcome(x, outcome.status, outcome.iterations, outcome.matvecs, outcome.residual_norm)
+    return backends.Outcome(
+        x,
+        outcome.status,
+        outcome.iterations,
+        outcome.matvecs,
+        outcome.residual_norm,
+    )
 
 
 class CudaNativeExecutor:
@@ -57,7 +73,9 @@ class CudaNativeExecutor:
 
     def __init__(self, arrays, options, scope, device, kernel):
         if scope not in ("prepared", "api"):
-            raise ValueError("CUDA supports prepared/api device-resident scopes")
+            raise ValueError(
+                "CUDA supports prepared/api device-resident scopes"
+            )
         if kernel == "cublas" and hasattr(arrays[0], "indptr"):
             raise ValueError("cuda-cublas requires dense inputs")
         self.cuda = native_cuda(device)
@@ -71,12 +89,20 @@ class CudaNativeExecutor:
         if hasattr(matrix, "indptr"):
             import cgpy
 
-            host_matrix = cgpy.CSRMatrix(matrix.indptr, matrix.indices, matrix.data, matrix.shape)
-            self.matrix = self.cuda.CSRMatrix.from_host(host_matrix, device=device, stream=0)
+            host_matrix = cgpy.CSRMatrix(
+                matrix.indptr, matrix.indices, matrix.data, matrix.shape
+            )
+            self.matrix = self.cuda.CSRMatrix.from_host(
+                host_matrix, device=device, stream=0
+            )
         else:
-            self.matrix = self.cuda.DenseMatrix.from_host(matrix, device=device, stream=0)
+            self.matrix = self.cuda.DenseMatrix.from_host(
+                matrix, device=device, stream=0
+            )
         self.rhs = self.cuda.Vector.from_host(rhs, device=device, stream=0)
-        self.initial = self.cuda.Vector.from_host(initial, device=device, stream=0)
+        self.initial = self.cuda.Vector.from_host(
+            initial, device=device, stream=0
+        )
         self.synchronize()
         self.upload_ns = time.perf_counter_ns() - start
         start = time.perf_counter_ns()
@@ -104,7 +130,9 @@ class CudaNativeExecutor:
     def __call__(self):
         if self.scope == "prepared":
             self.x.copy_from_device(self.initial, stream=0)
-            info = self.plan.solve_into(self.rhs, self.x, workspace=self.workspace, **self.options)
+            info = self.plan.solve_into(
+                self.rhs, self.x, workspace=self.workspace, **self.options
+            )
             x = self.x
         else:
             info = self.cuda.solve(
@@ -118,7 +146,13 @@ class CudaNativeExecutor:
                 **self.options,
             )
             x = info.x
-        return Outcome(x, str(info.status), info.iterations, info.matvecs, info.residual_norm)
+        return backends.Outcome(
+            x,
+            str(info.status),
+            info.iterations,
+            info.matvecs,
+            info.residual_norm,
+        )
 
     def host_outcome(self, outcome):
         return _host_outcome(outcome, outcome.x.to_host(stream=0))
@@ -150,7 +184,7 @@ class CudaNativeExecutor:
         }
 
 
-class TorchCudaOps(TorchOps):
+class TorchCudaOps(backends.TorchOps):
     """FP64 eager operations on one explicit CUDA device and default stream."""
 
     def __init__(self, arrays, threads, device):
@@ -173,11 +207,17 @@ class TorchCudaOps(TorchOps):
             positions = []
             for row in range(matrix.shape[0]):
                 start_row, end_row = matrix.indptr[row : row + 2]
-                matches = (matrix.indices[start_row:end_row] == row).nonzero()[0]
+                matches = (matrix.indices[start_row:end_row] == row).nonzero()[
+                    0
+                ]
                 if len(matches) != 1:
-                    raise ValueError("Jacobi-compatible CSR requires one diagonal per row")
+                    raise ValueError(
+                        "Jacobi-compatible CSR requires one diagonal per row"
+                    )
                 positions.append(int(start_row + matches[0]))
-            self.diagonal_positions = torch.tensor(positions, dtype=torch.int64, device=self.device)
+            self.diagonal_positions = torch.tensor(
+                positions, dtype=torch.int64, device=self.device
+            )
         self.synchronize()
         self.upload_ns = time.perf_counter_ns() - start
 
@@ -191,10 +231,14 @@ class TorchCudaOps(TorchOps):
             if self.sparse
             else self.matrix.diagonal().clone()
         )
-        if not bool(torch.isfinite(diagonal).all()) or not bool((diagonal > 0).all()):
+        if not bool(torch.isfinite(diagonal).all()) or not bool(
+            (diagonal > 0).all()
+        ):
             raise ValueError("Jacobi requires a finite positive diagonal")
         diagonal.reciprocal_()
-        if not bool(torch.isfinite(diagonal).all()) or not bool((diagonal > 0).all()):
+        if not bool(torch.isfinite(diagonal).all()) or not bool(
+            (diagonal > 0).all()
+        ):
             raise ValueError("Jacobi reciprocal must be finite and positive")
         return diagonal
 
@@ -209,10 +253,12 @@ class TorchCudaOps(TorchOps):
         return x.detach().cpu().numpy()
 
 
-class TorchCudaExecutor(ReferenceExecutor):
+class TorchCudaExecutor(backends.ReferenceExecutor):
     def __init__(self, arrays, options, scope, threads, device):
         if scope not in ("prepared", "api"):
-            raise ValueError("CUDA supports prepared/api device-resident scopes")
+            raise ValueError(
+                "CUDA supports prepared/api device-resident scopes"
+            )
         ops = TorchCudaOps(arrays, threads, device)
         start = time.perf_counter_ns()
         super().__init__(ops, options, scope)
@@ -230,7 +276,9 @@ class TorchCudaExecutor(ReferenceExecutor):
             **super().benchmark_metadata(),
             "device": "cuda",
             "cuda_device": self.ops.device.index,
-            "stream": int(self.ops.torch.cuda.current_stream(self.ops.device).cuda_stream),
+            "stream": int(
+                self.ops.torch.cuda.current_stream(self.ops.device).cuda_stream
+            ),
             "host_upload_setup_elapsed_ns": self.ops.upload_ns,
             "resident_adapter_setup_elapsed_ns": self.setup_ns,
             "setup_probe_scope": "prepared snapshot/workspace when selected; Jacobi setup separately recorded",
