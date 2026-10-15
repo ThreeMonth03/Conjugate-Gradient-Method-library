@@ -727,4 +727,124 @@ TEST_F(Cuda, ImmutablePreparedPlanSupportsConcurrentSolvesOnIndependentStreams)
     }
 }
 
+TEST_F(Cuda, BlockDotHandlesWarpBlockAndGridStrideTails)
+{
+    gpu::detail::ExecutionResources resources(*context);
+    const gpu::detail::Backend backend(resources);
+    const std::size_t sizes[] = {0, 1, 31, 32, 33, 255, 256, 257, 65537};
+    for (const auto size : sizes)
+    {
+        SCOPED_TRACE(size);
+        std::vector<double> host_x(size), host_y(size);
+        long double expected_dot = 0.0L, expected_squared = 0.0L;
+        for (std::size_t i = 0; i < size; ++i)
+        {
+            host_x[i] = static_cast<double>(static_cast<int>(i % 17) - 8);
+            host_y[i] = static_cast<double>(static_cast<int>((i * 3) % 13) - 6);
+            expected_dot += static_cast<long double>(host_x[i]) * host_y[i];
+            expected_squared += static_cast<long double>(host_x[i]) * host_x[i];
+        }
+        gpu::Vector x(host_x, *context), y(host_y, *context);
+        // Every product and partial sum is an exactly representable integer.
+        EXPECT_DOUBLE_EQ(backend.dot(x.view(), y.view()), static_cast<double>(expected_dot));
+        EXPECT_DOUBLE_EQ(backend.dot(x.view(), x.view()), static_cast<double>(expected_squared));
+        EXPECT_DOUBLE_EQ(backend.norm(x.view()), std::sqrt(static_cast<double>(expected_squared)));
+    }
+}
+
+TEST_F(Cuda, BlockReductionPreservesNonfiniteValuesOutsideTheLeadingLane)
+{
+    constexpr std::size_t size = 257;
+    std::vector<double> host_x(size, 1.0), host_y(size, 1.0);
+    gpu::Vector x(host_x, *context), y(host_y, *context);
+    gpu::detail::ExecutionResources resources(*context);
+    const gpu::detail::Backend backend(resources);
+    const std::size_t positions[] = {1, 31, 255, 256};
+    for (const auto position : positions)
+    {
+        SCOPED_TRACE(position);
+        std::fill(host_x.begin(), host_x.end(), 1.0);
+        host_x[position] = std::numeric_limits<double>::quiet_NaN();
+        x.upload(host_x, *context);
+        EXPECT_TRUE(std::isnan(backend.dot(x.view(), y.view())));
+        EXPECT_TRUE(std::isnan(backend.norm(x.view())));
+
+        host_x[position] = std::numeric_limits<double>::infinity();
+        x.upload(host_x, *context);
+        EXPECT_EQ(backend.dot(x.view(), y.view()), std::numeric_limits<double>::infinity());
+        EXPECT_EQ(backend.norm(x.view()), std::numeric_limits<double>::infinity());
+
+        host_x[position] = -std::numeric_limits<double>::infinity();
+        x.upload(host_x, *context);
+        EXPECT_EQ(backend.dot(x.view(), y.view()), -std::numeric_limits<double>::infinity());
+        EXPECT_EQ(backend.norm(x.view()), std::numeric_limits<double>::infinity());
+    }
+    std::fill(host_x.begin(), host_x.end(), 1.0);
+    host_x[1] = std::numeric_limits<double>::infinity();
+    host_x[255] = -std::numeric_limits<double>::infinity();
+    x.upload(host_x, *context);
+    EXPECT_TRUE(std::isnan(backend.dot(x.view(), y.view())));
+    EXPECT_EQ(backend.norm(x.view()), std::numeric_limits<double>::infinity());
+}
+
+TEST_F(Cuda, BorrowedPaddedDeviceMatrixReusesBlockStorageAcrossGridStrideRows)
+{
+    constexpr std::size_t rows = 513, cols = 257, row_stride = 264;
+    std::vector<double> host_matrix(rows * row_stride, std::numeric_limits<double>::quiet_NaN());
+    std::vector<double> host_x(cols), host_b(rows), expected_product(rows), downloaded(rows);
+    long double expected_squared = 0.0L;
+    for (std::size_t column = 0; column < cols; ++column)
+    {
+        host_x[column] = static_cast<double>(static_cast<int>(column % 7) - 3);
+    }
+    for (std::size_t row = 0; row < rows; ++row)
+    {
+        host_b[row] = static_cast<double>(static_cast<int>(row % 11) - 5);
+        long double product = 0.0L;
+        for (std::size_t column = 0; column < cols; ++column)
+        {
+            const double value = static_cast<double>(static_cast<int>((row * 3 + column * 5) % 17) - 8);
+            host_matrix[row * row_stride + column] = value;
+            product += static_cast<long double>(value) * host_x[column];
+        }
+        expected_product[row] = static_cast<double>(product);
+        const long double residual = static_cast<long double>(host_b[row]) - product;
+        expected_squared += residual * residual;
+    }
+    gpu::Vector matrix_storage(host_matrix, *context), x(host_x, *context), b(host_b, *context), output(rows, *context);
+    // An owning DenseMatrix upload would pack away the padding. Borrow the
+    // device buffer directly so every kernel actually sees row_stride=264.
+    const gpu::DenseMatrixView A(matrix_storage.data(), rows, cols, row_stride, context->device());
+    for (const auto kernel : {gpu::DenseKernel::native, gpu::DenseKernel::cublas})
+    {
+        SCOPED_TRACE(kernel == gpu::DenseKernel::native ? "native" : "cublas");
+        gpu::detail::ExecutionResources resources(*context, kernel);
+        for (const bool fused : {false, true})
+        {
+            SCOPED_TRACE(fused);
+            const gpu::detail::Backend backend(resources, fused, kernel);
+            output.fill(std::numeric_limits<double>::quiet_NaN(), *context);
+            backend.apply(A, x.view(), output.view());
+            output.download(downloaded, *context);
+            for (std::size_t row = 0; row < rows; ++row)
+            {
+                EXPECT_DOUBLE_EQ(downloaded[row], expected_product[row]) << "row=" << row;
+            }
+            for (const auto sign : {cg::ResidualSign::rhs_minus_product, cg::ResidualSign::product_minus_rhs})
+            {
+                EXPECT_DOUBLE_EQ(backend.residual_squared_norm(A, b.view(), x.view(), output.view(), sign),
+                                 static_cast<double>(expected_squared));
+                output.download(downloaded, *context);
+                for (std::size_t row = 0; row < rows; ++row)
+                {
+                    const double residual = host_b[row] - expected_product[row];
+                    EXPECT_DOUBLE_EQ(downloaded[row],
+                                     sign == cg::ResidualSign::rhs_minus_product ? residual : -residual)
+                        << "row=" << row;
+                }
+            }
+        }
+    }
+}
+
 } // namespace
