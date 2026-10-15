@@ -1,6 +1,10 @@
 Cleanup baseline — 2026-10-15
 =============================
 
+The :doc:`latest performance report <execution-reuse-20261016>` covers CPU
+GEMV, CUDA resource reuse and launch changes. This page records the earlier
+cleanup baseline.
+
 Measured compiled source: ``d34036f5668559612766cb5d8872a41f3097ffdc``. These are
 the baseline measurements before the subsequent conversion/API, ownership
 and CUB evaluation changes. They are not measurements of every later checkout.

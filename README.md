@@ -48,8 +48,9 @@ make test lint docs doctest
 ```
 
 See the [build guide](https://ThreeMonth03.github.io/Conjugate-Gradient-Method-library/build.html)
-for optional backends, sanitizer and distribution checks, and
-[coding conventions](https://ThreeMonth03.github.io/Conjugate-Gradient-Method-library/style.html) for coding conventions.
+for optional backends, sanitizer and distribution checks. Follow the
+[coding conventions](https://ThreeMonth03.github.io/Conjugate-Gradient-Method-library/style.html)
+when contributing.
 
 ## Benchmarks
 
@@ -62,5 +63,5 @@ make pyprof PYPROF_SUITE=sparse-solvers
 
 The [benchmark guide](https://ThreeMonth03.github.io/Conjugate-Gradient-Method-library/benchmarks.html)
 covers local optional dependencies, CPU/CUDA modes and reproducible sampling.
-The [latest optimization report](https://ThreeMonth03.github.io/Conjugate-Gradient-Method-library/benchmarks/optimization-20261016.html)
+The [latest performance report](https://ThreeMonth03.github.io/Conjugate-Gradient-Method-library/benchmarks/execution-reuse-20261016.html)
 retains every measured case, including remaining losses and inconclusive results.

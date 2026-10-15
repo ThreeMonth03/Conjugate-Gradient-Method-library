@@ -40,21 +40,29 @@ def main():
     modes = ["native", "blas"] if expected_blas else ["native"]
     for mode in modes:
         for algorithm in ("standard", "explicit"):
-            result = cgpy.solve(
-                matrix, rhs, dense_kernel=mode, algorithm=algorithm
-            )
-            assert result.converged
-            np.testing.assert_allclose(
-                result.x, expected, rtol=1e-8, atol=1e-12
-            )
+            for fused in (False, True):
+                result = cgpy.solve(
+                    matrix,
+                    rhs,
+                    dense_kernel=mode,
+                    algorithm=algorithm,
+                    fused=fused,
+                )
+                assert result.converged
+                np.testing.assert_allclose(
+                    result.x, expected, rtol=1e-8, atol=1e-12
+                )
         plan = cgpy.prepare(matrix, dense_kernel=mode, preconditioner="jacobi")
         assert type(plan) is cgpy.PreparedSolver
         output = np.zeros(2)
-        solved = plan.solve_into(
-            rhs, output, workspace=plan.create_workspace()
-        )
-        assert solved.converged
-        np.testing.assert_allclose(output, expected)
+        workspace = plan.create_workspace()
+        for fused in (False, True):
+            output.fill(0.0)
+            solved = plan.solve_into(
+                rhs, output, workspace=workspace, fused=fused
+            )
+            assert solved.converged
+            np.testing.assert_allclose(output, expected)
     if expected_blas:
         assert info["integer_bits"] == 32
         assert info["thread_mode"] == "sequential"
