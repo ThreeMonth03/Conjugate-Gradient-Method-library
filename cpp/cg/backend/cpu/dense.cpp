@@ -27,21 +27,9 @@ void validate_apply(DenseMatrixView A, ConstVectorView x, VectorView output)
     }
 }
 
-double row_dot(ConstVectorView row, ConstVectorView x, bool optimized)
+double row_dot(ConstVectorView row, ConstVectorView x)
 {
     const auto size = row.size();
-    if (!optimized)
-    {
-        double sum = 0.0;
-#ifdef _OPENMP
-#pragma omp simd reduction(+ : sum)
-#endif
-        for (std::size_t j = 0; j < size; ++j)
-        {
-            sum += row[j] * x[j];
-        }
-        return sum;
-    }
     // Independent accumulators let ordinary optimization vectorize the row
     // without fast-math, architecture flags, or alignment stronger than double.
     double sum0 = 0.0;
@@ -108,18 +96,6 @@ void CpuBackend::apply(DenseMatrixView A, ConstVectorView x, VectorView output) 
         std::ranges::fill(output, 0.0);
         return;
     }
-    if (!m_fused)
-    {
-#ifdef _OPENMP
-#pragma omp parallel for schedule(static) num_threads(m_threads) if (m_threads > 1 && A.rows() >= 64 && A.cols() >= 128)
-#endif
-        for (std::size_t i = 0; i < A.rows(); ++i)
-        {
-            const ConstVectorView row{A.data() + i * A.row_stride(), A.cols()};
-            output[i] = row_dot(row, x, false);
-        }
-        return;
-    }
     const auto paired_rows = A.rows() - A.rows() % 2;
 #ifdef _OPENMP
 #pragma omp parallel for schedule(static) num_threads(m_threads) if (m_threads > 1 && A.rows() >= 64 && A.cols() >= 128)
@@ -135,7 +111,7 @@ void CpuBackend::apply(DenseMatrixView A, ConstVectorView x, VectorView output) 
     if (paired_rows != A.rows())
     {
         const ConstVectorView row{A.data() + paired_rows * A.row_stride(), A.cols()};
-        output[paired_rows] = row_dot(row, x, true);
+        output[paired_rows] = row_dot(row, x);
     }
 }
 
@@ -167,7 +143,7 @@ double CpuBackend::apply_and_dot(DenseMatrixView A, ConstVectorView p, VectorVie
     if (paired_rows != A.rows())
     {
         const ConstVectorView row{A.data() + paired_rows * A.row_stride(), A.cols()};
-        const double sum = row_dot(row, p, true);
+        const double sum = row_dot(row, p);
         ap[paired_rows] = sum;
         product += p[paired_rows] * sum;
     }
@@ -230,7 +206,7 @@ double CpuBackend::residual_squared_norm(DenseMatrixView A, ConstVectorView b, C
     if (paired_rows != A.rows())
     {
         const ConstVectorView row{A.data() + paired_rows * A.row_stride(), A.cols()};
-        const double sum = row_dot(row, x, true);
+        const double sum = row_dot(row, x);
         const double value = b_minus_ax ? b[paired_rows] - sum : sum - b[paired_rows];
         r[paired_rows] = value;
         squared_norm += value * value;

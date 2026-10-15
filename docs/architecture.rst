@@ -142,8 +142,11 @@ The backend exposes primitive operations and selected fused operations:
 matvec with ``p^T Ap``, solution/residual updates with residual reduction, and
 Jacobi application with ``r^T z``. Fusion changes traversal and summation order,
 not the CG recurrence. ``fused=False`` retains separate operations for testing
-and measurement. Dense fused reductions support odd tails and padded row
-strides without fast-math or host-specific compiler flags.
+and measurement. Native CPU dense matvec uses the same optimized paired-row
+kernel with either fusion setting. Separate reductions can change
+floating-point rounding and iteration counts; both policies retain
+true-residual verification. Dense fused reductions support odd tails and
+padded row strides without fast-math or host-specific compiler flags.
 
 The optional explicit ``dense_kernel="blas"`` choice delegates dense matvec
 to a private sequential LP64 OpenBLAS provider. It accepts one CPU thread,
