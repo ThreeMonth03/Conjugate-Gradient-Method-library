@@ -85,7 +85,7 @@ double Backend::multiply_and_dot(ConstVectorView factors, ConstVectorView r, Vec
     detail::DeviceGuard guard(m_resources.context.device());
     const auto blocks = detail::blocks(r.size());
     multiply_kernel<<<blocks, detail::block_size, 0, detail::stream(m_resources.context)>>>(
-        factors, r, z, m_resources.partials.get(), m_fused);
+        factors, r, z, m_resources.partials, m_fused);
     detail::launch_check();
     return m_fused ? finish_reduction(blocks) : dot(r, z);
 }
@@ -132,7 +132,7 @@ double Backend::update_x_r_squared_norm(VectorView x, VectorView r, ConstVectorV
     detail::DeviceGuard guard(m_resources.context.device());
     const auto blocks = detail::blocks(x.size());
     update_kernel<<<blocks, detail::block_size, 0, detail::stream(m_resources.context)>>>(x, r, p, ap, alpha,
-                                                                                          m_resources.partials.get());
+                                                                                          m_resources.partials);
     detail::launch_check();
     return finish_reduction(blocks);
 }

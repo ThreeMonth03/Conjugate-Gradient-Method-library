@@ -9,6 +9,7 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <future>
 #include <limits>
@@ -273,6 +274,47 @@ TEST_F(Cuda, WorkspaceKernelSelectionIsPreparedBeforeSolving)
     x.fill(0, *context);
     EXPECT_EQ(gpu::solve_into(A.view(), b.view(), x.view(), blas, *context, {}, true, gpu::DenseKernel::cublas).status,
               cg::Status::converged);
+}
+
+TEST_F(Cuda, WorkspaceRejectsCombinedElementAndByteSizeOverflow)
+{
+    constexpr auto limit = std::numeric_limits<std::size_t>::max();
+    EXPECT_THROW(gpu::Workspace(limit / 5 + 1, *context), std::invalid_argument);
+    EXPECT_THROW(gpu::Workspace(limit / (5 * sizeof(double)) + 1, *context), std::invalid_argument);
+}
+
+TEST_F(Cuda, WorkspaceBuffersRemainIndependentForEmptyAndOddSizes)
+{
+    for (const std::size_t size : {0u, 1u, 17u, 257u})
+    {
+        SCOPED_TRACE(size);
+        gpu::Workspace workspace(size, *context);
+        const std::array<gpu::VectorView, 5> buffers{workspace.residual(), workspace.direction(), workspace.product(),
+                                                     workspace.scratch(), workspace.preconditioned()};
+        std::vector<double> values(size);
+        for (std::size_t index = 0; index < buffers.size(); ++index)
+        {
+            EXPECT_EQ(buffers[index].size(), size);
+            EXPECT_EQ(buffers[index].device(), context->device());
+            if (size == 0)
+            {
+                EXPECT_EQ(buffers[index].data(), nullptr);
+                continue;
+            }
+            std::fill(values.begin(), values.end(), static_cast<double>(index + 1));
+            ASSERT_EQ(cudaMemcpy(buffers[index].data(), values.data(), size * sizeof(double), cudaMemcpyHostToDevice),
+                      cudaSuccess);
+        }
+        for (std::size_t index = 0; index < buffers.size() && size != 0; ++index)
+        {
+            ASSERT_EQ(cudaMemcpy(values.data(), buffers[index].data(), size * sizeof(double), cudaMemcpyDeviceToHost),
+                      cudaSuccess);
+            for (const double value : values)
+            {
+                EXPECT_DOUBLE_EQ(value, static_cast<double>(index + 1));
+            }
+        }
+    }
 }
 
 TEST_F(Cuda, DenseCgAndPcgVerifyTrueResidualAcrossKernelsFusionAndRefresh)
