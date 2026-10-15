@@ -3,6 +3,8 @@
 #include <cg/python/cuda_array_conversion.hpp>
 #include <cg/python/module.hpp>
 
+#include <cg/backend/cuda/detail/reduction_info.hpp>
+
 #include <iomanip>
 #include <sstream>
 
@@ -58,6 +60,13 @@ void register_cuda_runtime(py::module_ &m)
               result["build_type"] = CG_CUDA_BUILD_TYPE;
               result["flags"] = CG_CUDA_BUILD_FLAGS;
               result["scalar_dtype"] = "float64";
+              const auto reduction = gpu::detail::block_reduction_info();
+              py::dict block_reduction;
+              block_reduction["provider"] = "CUB";
+              block_reduction["version_code"] = reduction.cub_version;
+              block_reduction["algorithm"] = reduction.algorithm;
+              block_reduction["block_threads"] = reduction.block_threads;
+              result["block_reduction"] = block_reduction;
               return result;
           });
 }

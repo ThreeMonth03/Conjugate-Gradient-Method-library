@@ -1,8 +1,11 @@
 #include <cg/backend/cuda/detail/backend.hpp>
 #include <cg/backend/cuda/detail/execution_resources.hpp>
 #include <cg/backend/cuda/detail/reduction.cuh>
+#include <cg/backend/cuda/detail/reduction_info.hpp>
 #include <cg/backend/cuda/detail/validation.hpp>
 #include <cg/runtime/cuda/detail/launch.hpp>
+#include <cub/version.cuh>
+
 #include <cmath>
 #include <limits>
 
@@ -104,6 +107,11 @@ __global__ void stable_norm_kernel(ConstVectorView x, double *result)
 }
 
 } // namespace
+
+BlockReductionInfo block_reduction_info() noexcept
+{
+    return {CUB_VERSION, detail::block_size, "BLOCK_REDUCE_WARP_REDUCTIONS"};
+}
 
 double Backend::finish_reduction(std::size_t blocks) const
 {
