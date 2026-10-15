@@ -69,14 +69,12 @@ template <class Launch> void prepare_jacobi(const Context &context, int *invalid
 }
 void initialize_jacobi(DenseMatrixView A, VectorView inverse, int *invalid, const Context &context)
 {
-    prepare_jacobi(context, invalid,
-                   [&](int *flag)
+    prepare_jacobi(context, invalid, [&](int *flag)
                    { dense_jacobi_kernel<<<blocks(A.rows()), block_size, 0, stream(context)>>>(A, inverse, flag); });
 }
 void initialize_jacobi(CsrMatrixView A, VectorView inverse, int *invalid, const Context &context)
 {
-    prepare_jacobi(context, invalid,
-                   [&](int *flag)
+    prepare_jacobi(context, invalid, [&](int *flag)
                    { csr_jacobi_kernel<<<blocks(A.rows()), block_size, 0, stream(context)>>>(A, inverse, flag); });
 }
 } // namespace detail
