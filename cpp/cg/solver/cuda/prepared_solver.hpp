@@ -31,7 +31,10 @@ class PreparedSolver
     std::size_t size() const noexcept;
     int device() const noexcept { return m_device; }
     DenseKernel dense_kernel() const noexcept { return m_kernel; }
-    PreconditionerKind preconditioner() const noexcept { return m_preconditioner_kind; }
+    PreconditionerKind preconditioner() const noexcept
+    {
+        return m_preconditioner ? PreconditionerKind::jacobi : PreconditionerKind::none;
+    }
     std::uint64_t preconditioner_setup_ns() const noexcept { return m_preconditioner_setup_ns; }
     std::size_t preconditioner_nbytes() const noexcept;
     Workspace create_workspace(std::uintptr_t stream = 0) const;
@@ -39,11 +42,10 @@ class PreparedSolver
                          bool fused = true) const;
 
     private:
-    void prepare(const Context &context);
+    void prepare(const Context &context, PreconditionerKind preconditioner);
     std::variant<DenseMatrix, CsrMatrix> m_matrix;
     int m_device;
     DenseKernel m_kernel;
-    PreconditionerKind m_preconditioner_kind;
     std::optional<JacobiPreconditioner> m_preconditioner;
     std::uint64_t m_preconditioner_setup_ns = 0;
 };

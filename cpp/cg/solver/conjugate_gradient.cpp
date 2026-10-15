@@ -14,22 +14,6 @@ namespace cg
 namespace
 {
 
-std::size_t rows(DenseMatrixView A)
-{
-    return A.rows();
-}
-std::size_t rows(const CsrMatrix &A)
-{
-    return A.rows();
-}
-std::size_t cols(DenseMatrixView A)
-{
-    return A.cols();
-}
-std::size_t cols(const CsrMatrix &A)
-{
-    return A.cols();
-}
 void validate_matrix(DenseMatrixView A)
 {
     detail::validate(A);
@@ -43,18 +27,18 @@ void validate_solve(const Matrix &A, ConstVectorView b, VectorView x, Workspace 
     validate_matrix(A);
     detail::validate(b);
     detail::validate(x);
-    if (rows(A) == 0 || rows(A) != cols(A) || b.size() != rows(A) || x.size() != rows(A))
+    if (A.rows() == 0 || A.rows() != A.cols() || b.size() != A.rows() || x.size() != A.rows())
     {
         throw std::invalid_argument("CG requires a nonempty square matrix and matching vectors");
     }
-    if (workspace.size() != rows(A))
+    if (workspace.size() != A.rows())
     {
         throw std::invalid_argument("prepare the workspace for the matrix dimension before solving");
     }
     detail::validate_options(options, M != nullptr);
     if (M != nullptr)
     {
-        if (M->size() != rows(A))
+        if (M->size() != A.rows())
         {
             throw std::invalid_argument("Jacobi preconditioner dimension does not match the matrix");
         }

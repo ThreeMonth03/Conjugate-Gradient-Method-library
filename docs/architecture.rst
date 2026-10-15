@@ -21,12 +21,15 @@ live in ``detail/``; binding helpers stay in the source tree.
 
    * - Path
      - Responsibility
+   * - ``runtime/detail/``
+     - Shared overflow-checked size arithmetic, independent of CUDA.
    * - ``runtime/cuda/``
      - Device selection, borrowed stream context and low-level runtime helpers.
    * - ``storage/``
      - Standard host containers/views and CUDA allocation, vectors and fill.
    * - ``matrix/``
-     - Dense matrix ownership/views and validated canonical CSR storage.
+     - Dense matrix ownership/views, validated canonical CSR storage and
+       shared strided-storage extent checks.
    * - ``backend/cpu/``
      - CPU primitives, fused operations, local thread count and dense-kernel
        selection.
@@ -83,6 +86,10 @@ CUDA views remain trivially copyable descriptors with host/device accessors
 and no allocation or synchronization. Device pointer inspection and stream
 readiness checks remain at operation and foreign-array boundaries. Metadata
 encapsulation cannot establish the underlying allocation's extent or lifetime.
+
+CPU and CUDA allocation/layout checks share the same checked multiplication
+and strided-storage extent functions. Backend-specific pointer and device
+validation stays at its existing boundary.
 
 CPU workspace owns five vectors: residual ``r``, direction ``p``, product
 ``Ap``, true-residual scratch and preconditioned residual ``z``. Prepare its
@@ -146,6 +153,9 @@ vectors and private backend execution resources on one device/stream. A
 solver-local RAII guard acquires the workspace and lends those resources to
 the backend; the backend never sees solver state. Only resources prepared
 for the cuBLAS kernel own a handle and 4 MiB scratch allocation.
+The optional cuBLAS resource bundle is held directly in the execution state;
+its device allocations retain their own RAII owners. A prepared solver derives
+its preconditioner kind from the optional cached Jacobi state.
 
 Calls synchronize before returning and restore the caller's current device.
 CPU pointers are never treated as device pointers. External device arrays

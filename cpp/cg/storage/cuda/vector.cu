@@ -1,5 +1,6 @@
 #include <cg/runtime/cuda/detail/launch.hpp>
 #include <cg/runtime/cuda/detail/runtime.hpp>
+#include <cg/runtime/detail/checked_size.hpp>
 #include <cg/storage/cuda/detail/fill.hpp>
 #include <cg/storage/cuda/detail/validation.hpp>
 #include <cg/storage/cuda/vector.hpp>
@@ -71,7 +72,7 @@ void Vector::upload(cg::ConstVectorView host, const Context &context)
     detail::DeviceGuard guard(context.device());
     if (m_size != 0)
     {
-        detail::check(cudaMemcpyAsync(data(), host.data(), detail::checked_product(m_size, sizeof(double)),
+        detail::check(cudaMemcpyAsync(data(), host.data(), cg::detail::checked_product(m_size, sizeof(double)),
                                       cudaMemcpyHostToDevice, detail::stream(context)),
                       "cudaMemcpyAsync upload");
     }
@@ -88,7 +89,7 @@ void Vector::download(cg::VectorView host, const Context &context) const
     detail::DeviceGuard guard(context.device());
     if (m_size != 0)
     {
-        detail::check(cudaMemcpyAsync(host.data(), data(), detail::checked_product(m_size, sizeof(double)),
+        detail::check(cudaMemcpyAsync(host.data(), data(), cg::detail::checked_product(m_size, sizeof(double)),
                                       cudaMemcpyDeviceToHost, detail::stream(context)),
                       "cudaMemcpyAsync download");
     }
@@ -105,7 +106,7 @@ void Vector::copy_from_device(ConstVectorView source, const Context &context)
     detail::DeviceGuard guard(context.device());
     if (m_size != 0 && source.data() != data())
     {
-        detail::check(cudaMemcpyAsync(data(), source.data(), detail::checked_product(m_size, sizeof(double)),
+        detail::check(cudaMemcpyAsync(data(), source.data(), cg::detail::checked_product(m_size, sizeof(double)),
                                       cudaMemcpyDeviceToDevice, detail::stream(context)),
                       "cudaMemcpyAsync device copy");
     }

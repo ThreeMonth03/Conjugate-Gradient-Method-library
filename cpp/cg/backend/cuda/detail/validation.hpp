@@ -2,6 +2,8 @@
 
 #include <cg/matrix/cuda/detail/validation.hpp>
 
+#include <stdexcept>
+
 namespace cg
 {
 namespace cuda

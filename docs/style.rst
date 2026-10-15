@@ -75,6 +75,12 @@ references use a small Python protocol so array implementations can be
 substituted without depending on concrete classes. Add a virtual interface or
 plugin registry only when an actual use case needs it.
 
+Derive configuration from owned state when it already expresses the choice.
+Use ``std::optional`` for a directly held optional value when separate
+allocation is unnecessary. Call shared type interfaces directly; keep an
+adapter only when it translates a real difference. Share pure size checks
+without introducing a generic arithmetic framework.
+
 Preserve const correctness and state lifetime, aliasing and concurrency
 requirements at public boundaries. Types with coupled representation
 invariants must remain valid when copying or allocation fails. Prepare a

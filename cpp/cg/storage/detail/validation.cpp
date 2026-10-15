@@ -1,3 +1,4 @@
+#include <cg/runtime/detail/checked_size.hpp>
 #include <cg/storage/detail/validation.hpp>
 
 #include <cstdint>
@@ -9,20 +10,11 @@ namespace cg
 namespace detail
 {
 
-std::size_t checked_product(std::size_t a, std::size_t b)
-{
-    if (b != 0 && a > std::numeric_limits<std::size_t>::max() / b)
-    {
-        throw std::invalid_argument("storage size overflows size_t");
-    }
-    return a * b;
-}
-
 namespace
 {
 std::uintptr_t end_address(const double *data, std::size_t size)
 {
-    const auto bytes = checked_product(size, sizeof(double));
+    const auto bytes = cg::detail::checked_product(size, sizeof(double));
     const auto begin = reinterpret_cast<std::uintptr_t>(data);
     if (begin > std::numeric_limits<std::uintptr_t>::max() - bytes)
     {
