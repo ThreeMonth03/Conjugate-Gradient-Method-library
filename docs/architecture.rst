@@ -87,6 +87,20 @@ and no allocation or synchronization. Device pointer inspection and stream
 readiness checks remain at operation and foreign-array boundaries. Metadata
 encapsulation cannot establish the underlying allocation's extent or lifetime.
 
+CPU ``CsrMatrix`` owns its three vectors and exposes their contents through
+read-only spans: ``indptr()`` and ``indices()`` return
+``std::span<const std::size_t>``; ``values()`` returns ``ConstVectorView``
+(``std::span<const double>``). The getters borrow without allocation and reject
+calls on rvalues. Keep the backing storage alive; assignment or destruction
+can invalidate a span. Reacquire views after moving or swapping the matrix.
+Copy explicitly when an independent snapshot is needed:
+
+.. code-block:: cpp
+
+   cg::CsrMatrix matrix(2, 2, {0, 2, 4}, {0, 1, 0, 1}, {4., 1., 1., 3.});
+   auto values = matrix.values();
+   std::vector<double> snapshot(values.begin(), values.end());
+
 CPU and CUDA allocation/layout checks share the same checked multiplication
 and strided-storage extent functions. Backend-specific pointer and device
 validation stays at its existing boundary.
@@ -156,6 +170,12 @@ for the cuBLAS kernel own a handle and 4 MiB scratch allocation.
 The optional cuBLAS resource bundle is held directly in the execution state;
 its device allocations retain their own RAII owners. A prepared solver derives
 its preconditioner kind from the optional cached Jacobi state.
+
+CUDA CSR storage directly composes two RAII-owned ``int64`` index arrays and
+a CUDA ``Vector`` for values. It derives ``nnz`` and device identity from the
+values owner. The matrix is noncopyable and has nonthrowing moves; a moved-from
+matrix has zero dimensions, no storage and device ``-1``. Workspace keeps a
+private implementation to hide CUDA library execution resources.
 
 Calls synchronize before returning and restore the caller's current device.
 CPU pointers are never treated as device pointers. External device arrays

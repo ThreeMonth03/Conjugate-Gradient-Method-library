@@ -2,14 +2,40 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cmath>
 #include <limits>
+#include <span>
 #include <stdexcept>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
 namespace
 {
+
+template <typename Matrix>
+constexpr bool has_indptr = requires(Matrix &&matrix) { std::forward<Matrix>(matrix).indptr(); };
+template <typename Matrix>
+constexpr bool has_indices = requires(Matrix &&matrix) { std::forward<Matrix>(matrix).indices(); };
+template <typename Matrix>
+constexpr bool has_values = requires(Matrix &&matrix) { std::forward<Matrix>(matrix).values(); };
+
+static_assert(has_indptr<cg::CsrMatrix &> && has_indptr<const cg::CsrMatrix &>);
+static_assert(has_indices<cg::CsrMatrix &> && has_indices<const cg::CsrMatrix &>);
+static_assert(has_values<cg::CsrMatrix &> && has_values<const cg::CsrMatrix &>);
+static_assert(!has_indptr<cg::CsrMatrix> && !has_indptr<const cg::CsrMatrix>);
+static_assert(!has_indices<cg::CsrMatrix> && !has_indices<const cg::CsrMatrix>);
+static_assert(!has_values<cg::CsrMatrix> && !has_values<const cg::CsrMatrix>);
+static_assert(std::is_same_v<decltype(std::declval<cg::CsrMatrix &>().indptr()), std::span<const std::size_t>>);
+static_assert(std::is_same_v<decltype(std::declval<const cg::CsrMatrix &>().indptr()), std::span<const std::size_t>>);
+static_assert(std::is_same_v<decltype(std::declval<cg::CsrMatrix &>().indices()), std::span<const std::size_t>>);
+static_assert(std::is_same_v<decltype(std::declval<const cg::CsrMatrix &>().indices()), std::span<const std::size_t>>);
+static_assert(std::is_same_v<decltype(std::declval<cg::CsrMatrix &>().values()), cg::ConstVectorView>);
+static_assert(std::is_same_v<decltype(std::declval<const cg::CsrMatrix &>().values()), cg::ConstVectorView>);
+static_assert(noexcept(std::declval<const cg::CsrMatrix &>().indptr()));
+static_assert(noexcept(std::declval<const cg::CsrMatrix &>().indices()));
+static_assert(noexcept(std::declval<const cg::CsrMatrix &>().values()));
 
 cg::CsrMatrix poisson(std::size_t width, std::size_t height)
 {
@@ -43,6 +69,29 @@ cg::CsrMatrix poisson(std::size_t width, std::size_t height)
         indptr.push_back(indices.size());
     }
     return {size, size, std::move(indptr), std::move(indices), std::move(values)};
+}
+
+TEST(CSR, ViewsBorrowReadOnlyCanonicalStorage)
+{
+    std::vector<std::size_t> indptr{0, 1, 1, 2}, indices{0, 2};
+    std::vector<double> values{2, 3};
+    const auto *indptr_storage = indptr.data();
+    const auto *indices_storage = indices.data();
+    const auto *values_storage = values.data();
+    cg::CsrMatrix A(3, 3, std::move(indptr), std::move(indices), std::move(values));
+    EXPECT_EQ(A.indptr().data(), indptr_storage);
+    EXPECT_EQ(A.indices().data(), indices_storage);
+    EXPECT_EQ(A.values().data(), values_storage);
+    EXPECT_EQ(A.indptr().size(), A.rows() + 1);
+    EXPECT_EQ(A.indices().size(), A.nnz());
+    EXPECT_EQ(A.values().size(), A.nnz());
+    const auto &read_only = A;
+    EXPECT_EQ(read_only.indptr().data(), A.indptr().data());
+    EXPECT_EQ(read_only.indices().data(), A.indices().data());
+    EXPECT_EQ(read_only.values().data(), A.values().data());
+    EXPECT_TRUE(std::ranges::equal(A.indptr(), std::vector<std::size_t>{0, 1, 1, 2}));
+    EXPECT_TRUE(std::ranges::equal(A.indices(), std::vector<std::size_t>{0, 2}));
+    EXPECT_TRUE(std::ranges::equal(A.values(), std::vector<double>{2, 3}));
 }
 
 TEST(CSR, OwnsCanonicalArraysAndSupportsEmptyRows)
@@ -91,7 +140,7 @@ TEST(CSR, MovedFromOwnersCannotRetainAStaleShape)
     source = std::move(alias);
     EXPECT_EQ(source.rows(), 2u);
     EXPECT_EQ(source.values().data(), storage);
-    EXPECT_EQ(source.values(), (std::vector<double>{2, 3}));
+    EXPECT_TRUE(std::ranges::equal(source.values(), std::vector<double>{2, 3}));
 }
 
 TEST(CSR, RectangularApplyIsAllowedButCGAndApplyDotRequireSquare)

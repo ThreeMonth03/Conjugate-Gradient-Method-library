@@ -2,6 +2,7 @@
 
 #include <cg/storage/vector_view.hpp>
 
+#include <span>
 #include <vector>
 
 namespace cg
@@ -23,9 +24,14 @@ class CsrMatrix
     std::size_t rows() const noexcept { return m_rows; }
     std::size_t cols() const noexcept { return m_cols; }
     std::size_t nnz() const noexcept { return m_values.size(); }
-    const std::vector<std::size_t> &indptr() const noexcept { return m_indptr; }
-    const std::vector<std::size_t> &indices() const noexcept { return m_indices; }
-    const std::vector<double> &values() const noexcept { return m_values; }
+    // Read-only views borrow storage; owner replacement or destruction can invalidate them.
+    // Temporaries cannot provide views because the storage lifetime would end immediately.
+    std::span<const std::size_t> indptr() const & noexcept { return m_indptr; }
+    std::span<const std::size_t> indptr() const && = delete;
+    std::span<const std::size_t> indices() const & noexcept { return m_indices; }
+    std::span<const std::size_t> indices() const && = delete;
+    ConstVectorView values() const & noexcept { return m_values; }
+    ConstVectorView values() const && = delete;
 
     private:
     std::size_t m_rows;

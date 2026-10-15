@@ -14,6 +14,8 @@
 #include <limits>
 #include <memory>
 #include <stdexcept>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
 namespace
@@ -93,6 +95,11 @@ template <class T> struct DeviceIndices
     }
     gpu::detail::DeviceAllocation<T> storage;
 };
+
+static_assert(!std::is_copy_constructible_v<gpu::CsrMatrix>);
+static_assert(!std::is_copy_assignable_v<gpu::CsrMatrix>);
+static_assert(std::is_nothrow_move_constructible_v<gpu::CsrMatrix>);
+static_assert(std::is_nothrow_move_assignable_v<gpu::CsrMatrix>);
 
 TEST(CudaCapability, DeviceCountIsSafeWithoutAnAvailableDriver)
 {
@@ -358,6 +365,83 @@ TEST_F(Cuda, CsrCgAndPcgMatchDenseAndRejectCublas)
     EXPECT_THROW(backend.apply(A, b.view(), x.view()), std::invalid_argument);
 }
 
+TEST_F(Cuda, CsrMovesTransferStorageAndLeaveReusableEmptySources)
+{
+    gpu::CsrMatrix source(cg::CsrMatrix(2, 2, {0, 1, 2}, {0, 1}, {2, 3}), *context);
+    const auto original = source.view();
+    const auto check_empty = [](const gpu::CsrMatrix &A)
+    {
+        EXPECT_EQ(A.rows(), 0u);
+        EXPECT_EQ(A.cols(), 0u);
+        EXPECT_EQ(A.nnz(), 0u);
+        EXPECT_EQ(A.device(), -1);
+        EXPECT_EQ(A.view().indptr(), nullptr);
+        EXPECT_EQ(A.view().indices(), nullptr);
+        EXPECT_EQ(A.view().data(), nullptr);
+        EXPECT_EQ(A.view().rows(), 0u);
+        EXPECT_EQ(A.view().cols(), 0u);
+        EXPECT_EQ(A.view().nnz(), 0u);
+        EXPECT_EQ(A.view().device(), -1);
+    };
+    const auto check_storage = [&](const gpu::CsrMatrix &A)
+    {
+        EXPECT_EQ(A.rows(), 2u);
+        EXPECT_EQ(A.cols(), 2u);
+        EXPECT_EQ(A.nnz(), 2u);
+        EXPECT_EQ(A.device(), context->device());
+        EXPECT_EQ(A.view().indptr(), original.indptr());
+        EXPECT_EQ(A.view().indices(), original.indices());
+        EXPECT_EQ(A.view().data(), original.data());
+        EXPECT_EQ(A.view().index_type(), gpu::IndexType::int64);
+    };
+    gpu::CsrMatrix moved(std::move(source));
+    check_empty(source);
+    check_storage(moved);
+    auto &same = moved;
+    moved = std::move(same);
+    check_storage(moved);
+
+    gpu::CsrMatrix destination(cg::CsrMatrix(1, 1, {0, 1}, {0}, {7}), *context);
+    destination = std::move(moved);
+    check_empty(moved);
+    check_storage(destination);
+    source = std::move(destination);
+    check_empty(destination);
+    check_storage(source);
+
+    gpu::Vector b(std::vector<double>{1, 1}, *context), x(2, *context);
+    gpu::Workspace workspace(2, *context);
+    x.fill(0, *context);
+    ASSERT_EQ(gpu::solve_into(source, b.view(), x.view(), workspace, *context).status, cg::Status::converged);
+    std::vector<double> result(2);
+    x.download(result, *context);
+    EXPECT_NEAR(result[0], 0.5, 1e-14);
+    EXPECT_NEAR(result[1], 1.0 / 3.0, 1e-14);
+}
+
+TEST_F(Cuda, EmptyCsrSnapshotsRetainTheCanonicalRowPointerAndDevice)
+{
+    const gpu::CsrMatrix host_snapshot(cg::CsrMatrix(0, 0, {0}, {}, {}), *context);
+    const gpu::CsrMatrix device_snapshot(host_snapshot.view(), *context);
+    EXPECT_NE(device_snapshot.view().indptr(), host_snapshot.view().indptr());
+    for (const auto *A : {&host_snapshot, &device_snapshot})
+    {
+        EXPECT_EQ(A->rows(), 0u);
+        EXPECT_EQ(A->cols(), 0u);
+        EXPECT_EQ(A->nnz(), 0u);
+        EXPECT_EQ(A->device(), context->device());
+        EXPECT_EQ(A->view().device(), context->device());
+        EXPECT_EQ(A->view().index_type(), gpu::IndexType::int64);
+        ASSERT_NE(A->view().indptr(), nullptr);
+        EXPECT_EQ(A->view().indices(), nullptr);
+        EXPECT_EQ(A->view().data(), nullptr);
+        std::int64_t row_pointer = -1;
+        ASSERT_EQ(cudaMemcpy(&row_pointer, A->view().indptr(), sizeof(row_pointer), cudaMemcpyDeviceToHost),
+                  cudaSuccess);
+        EXPECT_EQ(row_pointer, 0);
+    }
+}
+
 TEST_F(Cuda, NativePreparedPlansCacheSetupAndReuseIndependentWorkspaces)
 {
     const auto host = system_matrix(17);
@@ -456,6 +540,10 @@ TEST_F(Cuda, CsrDeviceSnapshotsValidateCanonicalInt32AndInt64Indices)
     for (const auto view : views)
     {
         const gpu::CsrMatrix A(view, *context);
+        EXPECT_NE(A.view().indptr(), view.indptr());
+        EXPECT_NE(A.view().indices(), view.indices());
+        EXPECT_NE(A.view().data(), view.data());
+        data.fill(99, *context);
         x.fill(0, *context);
         gpu::Workspace workspace(2, *context);
         cg::CgOptions options;
@@ -465,6 +553,7 @@ TEST_F(Cuda, CsrDeviceSnapshotsValidateCanonicalInt32AndInt64Indices)
         x.download(result, *context);
         EXPECT_NEAR(result[0], 0.5, 1e-14);
         EXPECT_NEAR(result[1], 1.0 / 3.0, 1e-14);
+        data.upload(values, *context);
     }
     DeviceIndices<std::int32_t> duplicate_ptr({0, 2, 2});
     const gpu::CsrMatrixView bad{
