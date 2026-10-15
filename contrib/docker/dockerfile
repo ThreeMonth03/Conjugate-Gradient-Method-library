@@ -28,6 +28,5 @@ COPY docs/ docs/
 COPY scripts/ scripts/
 COPY tests/ tests/
 COPY examples/ examples/
-COPY benchmarks/ benchmarks/
 
 CMD ["make", "test"]

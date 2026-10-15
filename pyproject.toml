@@ -13,6 +13,10 @@ dependencies = ["numpy>=1.26"]
 [project.optional-dependencies]
 cuda = ["nvidia-cuda-runtime-cu12==12.8.90; sys_platform == 'linux'", "nvidia-cublas-cu12==12.8.4.1; sys_platform == 'linux'"]
 
+[project.urls]
+Documentation = "https://ThreeMonth03.github.io/Conjugate-Gradient-Method-library/"
+Repository = "https://github.com/ThreeMonth03/Conjugate-Gradient-Method-library"
+
 [tool.scikit-build]
 cmake.version = ">=3.24"
 build-dir = "build/wheel/{wheel_tag}"
@@ -28,8 +32,8 @@ sdist.include = [
     "/cmake/*.cmake", "/cpp/cg/**/*.hpp", "/cpp/cg/**/*.cpp", "/cpp/cg/**/*.cu",
     "/python/cgpy/**/*.py", "/python/cgbench/**/*.py", "/python/README.md",
     "/tests/python/**/*.py", "/tests/cpp/**/*.cpp", "/scripts/*.py", "/examples/*.py",
-    "/requirements/*.lock", "/requirements/README.md", "/docs/*.rst", "/docs/conf.py",
-    "/docs/_static/*.css", "/benchmarks/README.md",
+    "/requirements/*.lock", "/requirements/README.md", "/docs/**/*.rst", "/docs/conf.py",
+    "/docs/_static/*.css",
 ]
 
 [tool.scikit-build.cmake.define]

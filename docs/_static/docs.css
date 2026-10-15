@@ -1,0 +1,11 @@
+table.benchmark-results {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+table.benchmark-results th,
+table.benchmark-results td {
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}

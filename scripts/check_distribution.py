@@ -63,6 +63,13 @@ def check_sdist(path):
         "python/cgpy/cuda/__init__.py",
         "python/cgbench/cli.py",
         "docs/conf.py",
+        "docs/_static/docs.css",
+        "docs/benchmarks.rst",
+        "docs/benchmarks/methodology.rst",
+        "docs/benchmarks/cpu.rst",
+        "docs/benchmarks/sparse.rst",
+        "docs/benchmarks/cuda.rst",
+        "scripts/run_paired_performance.py",
         "scripts/check_installed.py",
         "scripts/setup_cuda.py",
         "requirements/cuda.lock",
@@ -81,13 +88,7 @@ def check_sdist(path):
     }
     if names.intersection(retired):
         raise AssertionError("retired APIs leaked into sdist")
-    research = {
-        "benchmarks/compare_direct.py",
-        "benchmarks/cg_vs_direct_results.json",
-    }
-    if names.intersection(research) or any(
-        n.startswith("benchmarks/results/") for n in names
-    ):
+    if any(n.startswith("benchmarks/") for n in names):
         raise AssertionError(
             "research or raw measurement artifacts leaked into sdist"
         )

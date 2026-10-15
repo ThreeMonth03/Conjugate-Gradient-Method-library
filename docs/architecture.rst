@@ -147,4 +147,5 @@ real device in its explicit self-hosted GPU job. A compile-only result does
 not establish GPU correctness or performance. Performance comparisons require
 the same machine, inputs and numerical policy; shared CI gates correctness
 and artifact collection rather than timing thresholds. Historical benchmark
-artifacts remain unchanged when source layout changes.
+summaries retain their measured revision and environment in :doc:`benchmarks`;
+new raw samples stay under the ignored build directory or in CI artifacts.
