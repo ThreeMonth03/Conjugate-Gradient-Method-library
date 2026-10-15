@@ -112,7 +112,7 @@ double Backend::apply_and_dot(DenseMatrixView A, ConstVectorView p, VectorView a
     detail::DeviceGuard guard(m_resources.context.device());
     const auto blocks = detail::dense_blocks(A.rows());
     dense_kernel<<<blocks, detail::block_size, 0, detail::stream(m_resources.context)>>>(A, p, {}, ap, 1, true,
-                                                                                         m_resources.partials.get());
+                                                                                         m_resources.partials);
     detail::launch_check();
     return finish_reduction(blocks);
 }
@@ -128,8 +128,8 @@ double Backend::residual_squared_norm(DenseMatrixView A, ConstVectorView b, Cons
     if (m_fused && m_kernel == DenseKernel::native)
     {
         const auto blocks = detail::dense_blocks(A.rows());
-        dense_kernel<<<blocks, detail::block_size, 0, detail::stream(m_resources.context)>>>(
-            A, x, b, r, 2, b_minus_ax, m_resources.partials.get());
+        dense_kernel<<<blocks, detail::block_size, 0, detail::stream(m_resources.context)>>>(A, x, b, r, 2, b_minus_ax,
+                                                                                             m_resources.partials);
         detail::launch_check();
         return finish_reduction(blocks);
     }
@@ -141,7 +141,7 @@ double Backend::residual_squared_norm(DenseMatrixView A, ConstVectorView b, Cons
     }
     const auto blocks = detail::blocks(r.size());
     residual_kernel<<<blocks, detail::block_size, 0, detail::stream(m_resources.context)>>>(b, r, b_minus_ax,
-                                                                                            m_resources.partials.get());
+                                                                                            m_resources.partials);
     detail::launch_check();
     return finish_reduction(blocks);
 }

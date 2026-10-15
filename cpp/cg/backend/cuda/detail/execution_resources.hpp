@@ -27,7 +27,9 @@ struct ExecutionResources
 {
     explicit ExecutionResources(const Context &context, DenseKernel kernel = DenseKernel::native);
     Context context;
-    DeviceAllocation<double> partials, scalar;
+    DeviceAllocation<double> reduction;
+    // Borrowed nonoverlapping spans of reduction, valid for this owner's lifetime.
+    double *partials, *scalar;
     PinnedScalar host;
     std::optional<CublasResources> cublas;
     DenseKernel kernel;

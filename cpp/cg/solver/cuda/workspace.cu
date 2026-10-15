@@ -29,23 +29,23 @@ DenseKernel Workspace::dense_kernel() const noexcept
 }
 VectorView Workspace::residual() noexcept
 {
-    return m_impl->r.view();
+    return m_impl->r;
 }
 VectorView Workspace::direction() noexcept
 {
-    return m_impl->p.view();
+    return m_impl->p;
 }
 VectorView Workspace::product() noexcept
 {
-    return m_impl->ap.view();
+    return m_impl->ap;
 }
 VectorView Workspace::scratch() noexcept
 {
-    return m_impl->scratch.view();
+    return m_impl->scratch;
 }
 VectorView Workspace::preconditioned() noexcept
 {
-    return m_impl->z.view();
+    return m_impl->z;
 }
 const Context &Workspace::execution_context() const noexcept
 {

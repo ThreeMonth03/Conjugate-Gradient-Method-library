@@ -17,8 +17,8 @@ CublasResources::CublasResources(const Context &context)
     check(cublasSetWorkspace(handle.get(), workspace.get(), workspace_bytes), "cublasSetWorkspace");
 }
 ExecutionResources::ExecutionResources(const Context &ctx, DenseKernel selected)
-    : context(ctx), partials(device_allocation<double>(max_blocks, ctx)), scalar(device_allocation<double>(1, ctx)),
-      host(pinned_scalar()), kernel(selected)
+    : context(ctx), reduction(device_allocation<double>(max_blocks + 1, ctx)), partials(reduction.get()),
+      scalar(reduction.get() + max_blocks), host(pinned_scalar()), kernel(selected)
 {
     if (selected != DenseKernel::native && selected != DenseKernel::cublas)
     {

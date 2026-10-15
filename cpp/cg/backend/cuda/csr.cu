@@ -76,7 +76,7 @@ double Backend::apply_and_dot(const CsrMatrix &A, ConstVectorView p, VectorView 
     detail::DeviceGuard guard(m_resources.context.device());
     const auto blocks = detail::blocks(A.rows());
     csr_kernel<<<blocks, detail::block_size, 0, detail::stream(m_resources.context)>>>(A.view(), p, {}, ap, 1, true,
-                                                                                       m_resources.partials.get());
+                                                                                       m_resources.partials);
     detail::launch_check();
     return finish_reduction(blocks);
 }
@@ -101,7 +101,7 @@ double Backend::residual_squared_norm(const CsrMatrix &A, ConstVectorView b, Con
     detail::DeviceGuard guard(m_resources.context.device());
     const auto blocks = detail::blocks(A.rows());
     csr_kernel<<<blocks, detail::block_size, 0, detail::stream(m_resources.context)>>>(A.view(), x, b, r, 2, b_minus_ax,
-                                                                                       m_resources.partials.get());
+                                                                                       m_resources.partials);
     detail::launch_check();
     return finish_reduction(blocks);
 }
