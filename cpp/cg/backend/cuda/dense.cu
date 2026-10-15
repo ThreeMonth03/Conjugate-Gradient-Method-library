@@ -87,7 +87,7 @@ void Backend::apply(DenseMatrixView A, ConstVectorView x, VectorView output) con
             return;
         }
         const double alpha = 1.0, beta = 0.0;
-        detail::check(cublasDgemv(m_resources.cublas->handle.value, CUBLAS_OP_T, static_cast<int>(A.cols()),
+        detail::check(cublasDgemv(m_resources.cublas->handle.get(), CUBLAS_OP_T, static_cast<int>(A.cols()),
                                   static_cast<int>(A.rows()), &alpha, A.data(), static_cast<int>(A.row_stride()),
                                   x.data(), 1, &beta, output.data(), 1),
                       "cublasDgemv");
