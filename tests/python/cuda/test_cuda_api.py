@@ -11,6 +11,7 @@ from cgpy import cuda
 
 
 def test_cuda_module_is_importable_and_reports_actual_capability():
+    assert cuda.Session.__name__ == "Session"
     assert cuda.CsrMatrix.__name__ == "CsrMatrix"
     assert not hasattr(cuda, "CSRMatrix")
     assert not hasattr(cuda, "PreparedCsrSolver")
@@ -22,6 +23,8 @@ def test_cuda_module_is_importable_and_reports_actual_capability():
     if not cuda.enabled():
         with pytest.raises(RuntimeError, match="CUDA"):
             cuda.Vector(2)
+        with pytest.raises(RuntimeError, match="CUDA"):
+            cuda.Session(2)
     assert not cuda.is_available(-1)
 
 
@@ -599,3 +602,105 @@ def test_execution_mode_is_fixed_per_workspace_and_never_inferred_from_the_plan(
             )
     x.fill(0)
     assert plan.solve_into(b, x, workspace=workspaces[1]).converged
+
+
+@pytest.mark.parametrize("execution_mode", ["host", "device"])
+@pytest.mark.parametrize("kernel", ["native", "cublas"])
+@pytest.mark.parametrize("fused", [False, True])
+def test_session_fresh_outputs_and_per_call_operator_setup(
+    gpu, execution_mode, kernel, fused
+):
+    A = np.array([[4.0, 1.0], [1.0, 3.0]])
+    changed = np.array([[6.0, -1.0], [-1.0, 2.0]])
+    rhs = np.array([1.0, 2.0])
+    session = gpu.Session(
+        2, dense_kernel=kernel, execution_mode=execution_mode
+    )
+    for name, expected in (
+        ("size", 2),
+        ("device", 0),
+        ("stream", 0),
+        ("dense_kernel", kernel),
+        ("execution_mode", execution_mode),
+    ):
+        assert getattr(session, name) == expected
+        with pytest.raises(AttributeError):
+            setattr(session, name, expected)
+    b = gpu.Vector.from_host(rhs)
+    initial = gpu.Vector.from_host([0.25, -0.5])
+    first = session.solve(
+        gpu.DenseMatrix.from_host(A),
+        b,
+        initial,
+        preconditioner="jacobi",
+        fused=fused,
+        rtol=1e-10,
+    )
+    second = session.solve(
+        gpu.DenseMatrix.from_host(changed),
+        b,
+        initial,
+        preconditioner="jacobi",
+        fused=fused,
+        rtol=1e-10,
+    )
+    assert first.converged and second.converged
+    assert (
+        first.x.__cuda_array_interface__["data"][0]
+        != second.x.__cuda_array_interface__["data"][0]
+    )
+    np.testing.assert_allclose(first.x.to_host(), [1 / 11, 7 / 11])
+    np.testing.assert_allclose(second.x.to_host(), [4 / 11, 13 / 11])
+    np.testing.assert_array_equal(initial.to_host(), [0.25, -0.5])
+    np.testing.assert_array_equal(b.to_host(), rhs)
+    invalid_diagonal = gpu.DenseMatrix.from_host(np.diag([0.0, 3.0]))
+    with pytest.raises(ValueError, match="diagonal"):
+        session.solve(invalid_diagonal, b, preconditioner="jacobi")
+    assert session.solve(gpu.DenseMatrix.from_host(A), b).converged
+    del session
+    np.testing.assert_allclose(first.x.to_host(), [1 / 11, 7 / 11])
+    np.testing.assert_allclose(second.x.to_host(), [4 / 11, 13 / 11])
+
+
+@pytest.mark.parametrize("execution_mode", ["host", "device"])
+def test_session_csr_and_reuse_after_invalid_call(gpu, execution_mode):
+    matrix = cgpy.CsrMatrix(
+        [0, 2, 4], [0, 1, 0, 1], [4.0, 1.0, 1.0, 3.0], (2, 2)
+    )
+    A = gpu.CsrMatrix.from_host(matrix)
+    b = gpu.Vector.from_host([1.0, 2.0])
+    session = gpu.Session(2, execution_mode=execution_mode)
+    with pytest.raises(ValueError):
+        session.solve(A, gpu.Vector.from_host([1.0, 2.0, 3.0]))
+    answer = session.solve(A, b, preconditioner="jacobi", rtol=1e-10)
+    assert answer.converged
+    host = answer.x.to_host()
+    assert math.hypot(
+        *(np.array([1.0, 2.0]) - np.array([[4.0, 1.0], [1.0, 3.0]]) @ host)
+    ) <= 1e-10 * math.sqrt(5)
+    with pytest.raises(ValueError, match="CSR"):
+        gpu.Session(2, dense_kernel="cublas").solve(A, b)
+
+
+def test_session_rejects_reentry_before_allocation_and_recovers(gpu):
+    session = gpu.Session(2)
+    A = gpu.DenseMatrix.from_host(np.eye(2))
+    b = gpu.Vector.from_host(np.ones(2))
+
+    class ReentrantCount(IndexCount):
+        def __index__(self):
+            with pytest.raises(ValueError, match="session is already in use"):
+                session.solve(A, b)
+            return super().__index__()
+
+    count = ReentrantCount(2)
+    assert session.solve(A, b, maxiter=count).converged
+    assert count.calls == 1
+
+    class ProtocolFailure:
+        def __index__(self):
+            raise RuntimeError("index protocol failure")
+
+    with pytest.raises(RuntimeError, match="index protocol failure"):
+        session.solve(A, b, maxiter=ProtocolFailure())
+    assert session.solve(A, b).converged

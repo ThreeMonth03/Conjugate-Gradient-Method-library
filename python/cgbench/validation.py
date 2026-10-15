@@ -42,3 +42,12 @@ def validate_execution_mode(options, device):
     if device != "cuda" and mode != "host":
         raise ValueError("device execution_mode requires CUDA")
     return mode
+
+
+def validate_scope(scope, device):
+    """Require an explicit allocation/setup contract; session is CUDA-only."""
+    if scope not in ("api", "prepared", "session"):
+        raise ValueError("scope must be api, prepared or session")
+    if scope == "session" and device != "cuda":
+        raise ValueError("session scope requires CUDA")
+    return scope

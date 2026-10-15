@@ -140,6 +140,37 @@ modes retain the true-residual stopping rule and failure statuses described
 in :doc:`api`. Invalid shapes, options, dtypes or layouts raise ``ValueError``;
 CUDA allocation, stream and execution failures raise ``RuntimeError``.
 
+Execution-resource reuse
+------------------------
+
+``cuda.solve`` remains a fresh call: it allocates output/workspace and sets up
+Jacobi on each invocation. ``cuda.Session`` reuses one existing workspace and
+its execution resources while still returning a fresh owning output and
+recomputing Jacobi each time. It borrows the matrix for that call and retains
+no matrix or preconditioner cache. Use ``prepare`` when an immutable matrix
+snapshot and cached Jacobi are desired instead.
+
+Size, device, borrowed stream, dense kernel and execution mode are readonly
+session properties. The stream must outlive the session. One session permits
+one active call, including input validation, initialization and setup;
+overlapping or reentrant calls raise ``ValueError``. Distinct sessions own
+independent resources. Results remain valid after another call or session
+release. Each call completes on its selected stream before returning.
+
+.. doctest:: cuda-session
+   :skipif: not cuda.is_available()
+
+   >>> matrix = cuda.DenseMatrix.from_host([[4., 1.], [1., 3.]])
+   >>> rhs = cuda.Vector.from_host([1., 2.])
+   >>> session = cuda.Session(2, dense_kernel="cublas", execution_mode="device")
+   >>> first = session.solve(matrix, rhs, preconditioner="jacobi")
+   >>> second = session.solve(matrix, rhs, preconditioner="jacobi")
+   >>> first.converged and second.converged and first.x is not second.x
+   True
+   >>> del session
+   >>> np.testing.assert_allclose(first.x.to_host(), [1 / 11, 7 / 11])
+   >>> np.testing.assert_allclose(second.x.to_host(), [1 / 11, 7 / 11])
+
 Execution mode
 --------------
 
@@ -255,9 +286,9 @@ To document the imported CUDA build with executable examples:
    .venv-cuda/bin/python -m pip install --cache-dir .cache/pip -r requirements/docs.lock
    make docs doctest PRESET=cuda-release PYTHON="$PWD/.venv-cuda/bin/python"
 
-See :doc:`benchmarks` for explicit resident-GPU comparison commands. Prepared
-and API scopes exclude host upload and correctness-gate download. Reported
-upload/setup metadata is separate from solve latency; neither scope measures
+See :doc:`benchmarks` for explicit resident-GPU comparison commands. Prepared,
+API and session scopes exclude host upload and correctness-gate download. Reported
+upload/setup metadata is separate from solve latency; none of these scopes measures
 host-to-host end-to-end performance. Timings include host dispatch,
 iteration scalar synchronization and final completion, rather than only GPU
 kernel events.

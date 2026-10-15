@@ -15,6 +15,7 @@ from .._runtime.cuda import (
 from ..matrix.cuda import CsrMatrix, DenseMatrix
 from ..solver.cuda import (
     PreparedSolver,
+    Session,
     Workspace,
     prepare,
     prepare_host,
@@ -28,6 +29,7 @@ __all__ = [
     "CsrMatrix",
     "DenseMatrix",
     "PreparedSolver",
+    "Session",
     "SolveResult",
     "Vector",
     "Workspace",

@@ -68,7 +68,7 @@ def configure_benchmark_arguments(result, *, default_implementations=None):
         ),
     )
     result.add_argument(
-        "--scope", choices=("api", "prepared"), default="prepared"
+        "--scope", choices=("api", "prepared", "session"), default="prepared"
     )
     result.add_argument("--device", choices=("cpu", "cuda"), default="cpu")
     result.add_argument("--cuda-device", type=_nonnegative, default=0)
@@ -221,6 +221,7 @@ def benchmark_spec(arguments):
     from . import cases as case_module
 
     try:
+        validation.validate_scope(arguments.scope, arguments.device)
         validation.validate_execution_mode(
             {"execution_mode": arguments.cuda_execution_mode}, arguments.device
         )

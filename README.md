@@ -5,6 +5,7 @@ positive-definite systems using CG and Jacobi PCG.
 
 - Dense and canonical CSR matrices with float64 arithmetic.
 - Prepared solves and reusable workspaces for repeated systems.
+- Explicit CUDA sessions reuse execution resources with fresh outputs and per-call setup.
 - Native CPU kernels, optional OpenMP and dense BLAS.
 - Optional CUDA backend with native kernels, dense cuBLAS and explicit host/device scalar control.
 

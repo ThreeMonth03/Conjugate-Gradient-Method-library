@@ -4,14 +4,14 @@ Use CPython 3.12.x and import `cgpy` after installing the project into the local
 
 ## Convenience solve
 
-```python
+``python
 result = cgpy.solve(
     A, b, x0=None,
     rtol=1e-8, atol=0.0, maxiter=1000,
     num_threads=1, algorithm="standard", fused=True,
     residual_refresh=50, preconditioner="none", dense_kernel="native",
 )
-```
+``
 
 `A` is a nonempty square dense array or `cgpy.CsrMatrix`. `b` and `x0` are one-dimensional vectors matching its size. Dense array-like inputs are normalized to aligned C-contiguous float64 arrays. Compatible inputs can be borrowed for this synchronous call, so do not modify them concurrently. The output owns its storage; `A`, `b`, and `x0` are preserved. An omitted `x0` selects a zero initial guess.
 
@@ -41,7 +41,7 @@ Invalid dimensions, layouts, options, or preconditioner setup raise an exception
 
 ## Repeated and in-place solves
 
-```python
+``python
 import numpy as np
 import cgpy
 
@@ -55,13 +55,13 @@ assert info.converged
 
 x.fill(0.0)  # Restore the initial guess before the next solve.
 info = prepared.solve_into(b, x, workspace=workspace, rtol=1e-10)
-```
+``
 
 `prepare` owns a snapshot of the matrix and caches the selected preconditioner. Changes to the original matrix do not change the prepared solver. Its thread count, preconditioner and `dense_kernel` are selected at preparation time; each call independently selects `fused`. The workspace owns the solver's reusable vectors and must match the system size.
 
 For an existing dense array or CSR operator, the strict function is:
 
-```python
+``python
 workspace = cgpy.Workspace(b.size)
 info = cgpy.solve_into(
     A, b, x, workspace=workspace,
@@ -69,7 +69,7 @@ info = cgpy.solve_into(
     algorithm="standard", fused=True, residual_refresh=50,
     preconditioner="none", dense_kernel="native",
 )
-```
+``
 
 This function treats `x` as both initial guess and output and returns `SolveInfo`. Dense `A`, `b`, and `x` must already be aligned C-contiguous float64 NumPy arrays; `x` must be writable. It performs no implicit dtype or layout conversion. Keep `x` disjoint from the matrix and `b`. Inputs and output must remain alive and free from conflicting mutation until the synchronous call returns. A workspace cannot serve overlapping calls; concurrent solves require separate workspaces and output arrays. Long native computation releases the Python GIL.
 
@@ -79,7 +79,7 @@ BLAS delegates dense matrix-vector multiplication and retains the chosen CPU vec
 
 ## Sparse matrices
 
-```python
+``python
 A = cgpy.CsrMatrix(
     indptr=np.array([0, 2, 4], dtype=np.int64),
     indices=np.array([0, 1, 0, 1], dtype=np.int64),
@@ -88,7 +88,7 @@ A = cgpy.CsrMatrix(
 )
 result = cgpy.solve(A, b, preconditioner="jacobi", rtol=1e-10)
 assert result.converged
-```
+``
 
 CSR stores row pointers, column indices, and values without converting the operator to dense storage. Row pointers start at zero, are monotone, and end at the number of values. Column indices must be in range, sorted within each row, and unique. Canonicalize a SciPy CSR matrix with `sum_duplicates()` and `sort_indices()` before wrapping its arrays if needed.
 
@@ -96,7 +96,7 @@ CSR stores row pointers, column indices, and values without converting the opera
 
 `from cgpy import cuda` works with CPU-only wheels. `cuda.enabled()` checks whether the optional extension/runtime loads; `cuda.is_available(device=0)` checks whether the requested GPU is visible. Executing kernels also requires a compatible compiled architecture. Both CPU and CUDA interfaces require explicit backend selection. See the [CUDA guide](../docs/cuda.rst) for a project-local toolkit, separate `.venv-cuda`, source/wheel installs and architecture settings.
 
-```python
+``python
 from cgpy import cuda
 
 device_b = cuda.Vector.from_host(b, device=0)
@@ -109,7 +109,7 @@ device_x = prepared.create_vector()
 info = prepared.solve_into(device_b, device_x, workspace=workspace, rtol=1e-10)
 assert info.converged
 print(device_x.to_host())
-```
+``
 
 `execution_mode="host"` is the CUDA default. Select `"device"` on `cuda.Workspace`, `prepared.create_workspace` or convenience `cuda.solve` to retain recurrence scalars on the GPU. `workspace.execution_mode` is readonly; strict/prepared `solve_into` uses that workspace setting. The immutable plan can serve either mode using separate workspaces. Both modes remain synchronous: device execution reads status packets and retains all true-residual checks. This choice is independent of native/cuBLAS, fusion and algorithm; no automatic mode selection occurs.
 
@@ -123,7 +123,7 @@ CUDA benchmark prepared/API scopes use resident inputs and exclude host upload a
 
 The native source interface uses feature headers under `cpp/cg/` and the CMake `cg_core` target. Views borrow caller-owned storage; keep it alive until the synchronous solve returns. The workspace and output must be disjoint from the inputs. The default native algorithm is the standard recurrence; the explicit-residual reference algorithm is opt-in.
 
-```cpp
+``cpp
 #include <cg/cg.hpp>
 #include <utility>
 #include <vector>
@@ -140,7 +140,7 @@ int main()
     auto info = plan.solve_into(b, x, workspace, options);
     return info.status == cg::Status::converged ? 0 : 1;
 }
-```
+``
 
 Select `cg::PreconditionerKind::none` for plain CG. `cg::CsrMatrix` accepts owning row-pointer, column-index, and value vectors and constructs the same `cg::PreparedSolver` type. Prepared ownership and Jacobi setup live in the C++ core. `cg::solve_into` also accepts borrowed operators for one-shot solves. `CpuBackend` contains execution options; matrix and vector storage do not contain process-wide thread settings. Workspace reuse avoids repeated allocation of solver vectors; the backend and runtime can still perform their own initialization.
 
@@ -171,3 +171,18 @@ calls previously raised `TypeError` for these conversion failures, so update
 exception handlers accordingly. User-defined `__index__` exceptions other
 than invalid-conversion `TypeError` remain visible. Solver arithmetic and
 stopping rules are unchanged.
+
+## CUDA execution sessions
+
+`cgpy.cuda.Session(size, dense_kernel="cublas", execution_mode="device")`
+reuses an existing workspace. Its `solve(A, b, x0=None, ...)` returns a fresh
+GPU vector and recomputes optional Jacobi from the current borrowed matrix.
+It retains no matrix/M cache. `cuda.solve` remains fresh output/workspace/M;
+`cuda.prepare` snapshots and caches setup. Size/device/stream/kernel/mode
+are fixed, calls are synchronous, and one session rejects overlapping calls.
+Keep its borrowed stream alive until the session is released.
+
+The CUDA-only benchmark `PYPROF_SCOPE=session` applies the same fresh-output
+and per-call-Jacobi policy to eager Torch while reusing iterative workvectors.
+Historical api/prepared artifacts retain their existing contracts. See the
+CUDA guide and benchmark methodology for complete timing boundaries.

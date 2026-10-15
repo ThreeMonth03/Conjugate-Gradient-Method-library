@@ -274,7 +274,11 @@ def main():
         "profiler_runtime": runtime,
         "command": sys.argv,
         "scope": {
-            "solve": "existing executor; x0 reset every call; api includes output/workspace/M allocation",
+            "solve": (
+                "session executor; fresh output/reset and per-call M; iteration workspace reused"
+                if args.scope == "session"
+                else "existing executor; x0 reset every call; api includes output/workspace/M allocation"
+            ),
             "workspace": "public Workspace construction AND destruction; selected CUDA kernel resources",
             "prepare": "public prepare construction AND destruction; operator snapshot AND optional Jacobi",
         }[args.probe],

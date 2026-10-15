@@ -29,6 +29,7 @@ class Executor(Protocol):
 def make_executor(
     name, arrays, options, scope, threads, *, device="cpu", cuda_device=0
 ) -> Executor:
+    validation.validate_scope(scope, device)
     validation.validate_execution_mode(options, device)
     if device == "cpu" and "execution_mode" in options:
         options = {

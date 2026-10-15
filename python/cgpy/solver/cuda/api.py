@@ -148,24 +148,13 @@ def solve(
     maxiter, residual_refresh = _core._validate_iteration_limits(
         maxiter, residual_refresh
     )
-    if not hasattr(b, "__cuda_array_interface__"):
-        raise ValueError(
-            "b must be a device vector with __cuda_array_interface__"
-        )
-    shape = tuple(b.__cuda_array_interface__["shape"])
-    if len(shape) != 1:
-        raise ValueError("b must be a one-dimensional device vector")
-    x = storage.Vector._empty(shape[0], device, stream)
-    if x0 is None:
-        x.fill(0.0, stream=stream)
-    else:
-        x.copy_from_device(x0, stream=stream)
+    x, size = _initial_output(b, x0, device, stream)
     info = solve_into(
         A,
         b,
         x,
         workspace=workspace_module.Workspace(
-            shape[0],
+            size,
             device=device,
             stream=stream,
             dense_kernel=dense_kernel,
@@ -181,3 +170,20 @@ def solve(
         dense_kernel=dense_kernel,
     )
     return result.SolveResult(x, info)
+
+
+def _initial_output(b, x0, device, stream):
+    """Allocate/reset fresh output without retaining caller inputs."""
+    if not hasattr(b, "__cuda_array_interface__"):
+        raise ValueError(
+            "b must be a device vector with __cuda_array_interface__"
+        )
+    shape = tuple(b.__cuda_array_interface__["shape"])
+    if len(shape) != 1:
+        raise ValueError("b must be a one-dimensional device vector")
+    x = storage.Vector._empty(shape[0], device, stream)
+    if x0 is None:
+        x.fill(0.0, stream=stream)
+    else:
+        x.copy_from_device(x0, stream=stream)
+    return x, shape[0]

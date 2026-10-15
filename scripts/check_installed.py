@@ -155,6 +155,25 @@ def main():
                             gpu_rhs, output, workspace=workspace
                         )
                         check_device_answer(output, solved)
+                    session = cuda.Session(
+                        rhs.size,
+                        dense_kernel=mode,
+                        execution_mode=execution_mode,
+                    )
+                    assert session.execution_mode == execution_mode
+                    first = session.solve(
+                        gpu_matrix, gpu_rhs, preconditioner="jacobi"
+                    )
+                    second = session.solve(
+                        gpu_matrix, gpu_rhs, preconditioner="jacobi"
+                    )
+                    assert (
+                        first.x.__cuda_array_interface__["data"][0]
+                        != second.x.__cuda_array_interface__["data"][0]
+                    )
+                    del session
+                    check_device_answer(first.x, first)
+                    check_device_answer(second.x, second)
                 answer = cuda.solve(
                     gpu_csr,
                     gpu_rhs,
@@ -162,8 +181,12 @@ def main():
                     execution_mode=execution_mode,
                 )
                 check_device_answer(answer.x, answer)
+                session_answer = cuda.Session(
+                    rhs.size, execution_mode=execution_mode
+                ).solve(gpu_csr, gpu_rhs, preconditioner="jacobi")
+                check_device_answer(session_answer.x, session_answer)
             print(
-                "Installed CUDA wheel: host/device native/cuBLAS/CSR/Jacobi and true-residual checks passed."
+                "Installed CUDA wheel: host/device native/cuBLAS/CSR/Jacobi, fresh-output Session reuse and true-residual checks passed."
             )
         else:
             print(
@@ -172,6 +195,7 @@ def main():
     else:
         assert importlib.util.find_spec("cgpy._cuda") is None
         assert not cuda.is_available()
+        assert cuda.Session.__name__ == "Session"
         assert importlib.util.find_spec("nvidia") is None
     if sys.platform == "linux":
         for module in modules:

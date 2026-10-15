@@ -46,8 +46,7 @@ def _read_artifact(path: pathlib.Path) -> Artifact:
     if data.get("schema_version") != 1:
         raise ValueError(f"{path}: unsupported cgbench schema")
     spec = data["spec"]
-    if spec.get("scope") not in ("api", "prepared"):
-        raise ValueError(f"{path}: missing explicit timing scope")
+    validation.validate_scope(spec.get("scope"), spec.get("device", "cpu"))
     # Sampling may differ between files; every round carries its own divisor.
     signature = {
         "metric": data["metric"],

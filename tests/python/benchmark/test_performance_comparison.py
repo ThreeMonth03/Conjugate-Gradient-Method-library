@@ -169,3 +169,27 @@ def test_bootstrap_keeps_the_original_inclusive_percentile_bounds():
     )
     # Recorded before replacing the manual inclusive interpolation helper.
     assert interval == pytest.approx((0.9577464788732394, 1.0954773869346734))
+
+
+def test_cuda_session_comparison_accepts_matching_scope_and_rejects_cross_scope(
+    tmp_path,
+):
+    data = artifact([100] * 4)
+    data["spec"].update(device="cuda", cuda_device=0, scope="session")
+    data["spec"]["implementations"] = ["cuda-native"]
+    data["cases"][0]["results"][0]["name"] = "cuda-native"
+    old = save_blocks(tmp_path, "session-old", [data] * 2)
+    new = save_blocks(tmp_path, "session-new", [data] * 2)
+    report = compare_performance.compare(old, new, resamples=100)
+    assert report["verdict"] == "supported_no_material_regression"
+    api = copy.deepcopy(data)
+    api["spec"]["scope"] = "api"
+    api_paths = save_blocks(tmp_path, "fresh-api", [api] * 2)
+    with pytest.raises(ValueError, match="spec/options differ"):
+        compare_performance.compare(old, api_paths, resamples=100)
+    cpu = copy.deepcopy(data)
+    cpu["spec"]["device"] = "cpu"
+    cpu_paths = save_blocks(tmp_path, "cpu-session", [cpu] * 2)
+    cpu_new = save_blocks(tmp_path, "cpu-session-new", [cpu] * 2)
+    with pytest.raises(ValueError, match="session scope requires CUDA"):
+        compare_performance.compare(cpu_paths, cpu_new, resamples=100)

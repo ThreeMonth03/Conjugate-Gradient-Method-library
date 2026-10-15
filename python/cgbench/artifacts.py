@@ -159,6 +159,8 @@ def validate_artifact(data):
     if device not in ("cpu", "cuda"):
         raise ValueError("artifact device must be cpu or cuda")
     validation.validate_execution_mode(spec.get("solver", {}), device)
+    if device == "cuda" or "scope" in spec:
+        validation.validate_scope(spec.get("scope"), device)
     if device == "cuda":
         from . import execution
 
@@ -172,10 +174,6 @@ def validate_artifact(data):
             for name in spec.get("implementations", [])
         ):
             raise ValueError("CUDA artifact cannot contain CPU candidates")
-        if spec.get("scope") not in ("api", "prepared"):
-            raise ValueError(
-                "CUDA artifact must use an explicit resident scope"
-            )
     for case in data["cases"]:
         sampling = case["sampling"]
         rounds, repetitions = sampling["rounds"], sampling["repetitions"]
