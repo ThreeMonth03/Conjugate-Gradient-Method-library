@@ -111,11 +111,11 @@ double Backend::finish_reduction(std::size_t blocks) const
     finish_kernel<<<1, detail::block_size, 0, detail::stream(m_resources.context)>>>(work.partials, blocks,
                                                                                      work.scalar);
     detail::launch_check();
-    detail::check(cudaMemcpyAsync(work.host.get(), work.scalar, sizeof(double), cudaMemcpyDeviceToHost,
+    detail::check(cudaMemcpyAsync(&work.host, work.scalar, sizeof(double), cudaMemcpyDeviceToHost,
                                   detail::stream(m_resources.context)),
                   "cudaMemcpyAsync reduction");
     m_resources.context.synchronize();
-    return *work.host.get();
+    return work.host;
 }
 
 double Backend::dot(ConstVectorView x, ConstVectorView y) const
@@ -144,11 +144,11 @@ double Backend::norm_from_squared(ConstVectorView x, double squared) const
     auto &work = m_resources;
     stable_norm_kernel<<<1, detail::block_size, 0, detail::stream(m_resources.context)>>>(x, work.scalar);
     detail::launch_check();
-    detail::check(cudaMemcpyAsync(work.host.get(), work.scalar, sizeof(double), cudaMemcpyDeviceToHost,
+    detail::check(cudaMemcpyAsync(&work.host, work.scalar, sizeof(double), cudaMemcpyDeviceToHost,
                                   detail::stream(m_resources.context)),
                   "cudaMemcpyAsync stable norm");
     m_resources.context.synchronize();
-    return *work.host.get();
+    return work.host;
 }
 
 } // namespace detail
