@@ -18,7 +18,7 @@ double CpuBackend::dot(ConstVectorView x, ConstVectorView y) const
 #endif
     for (std::size_t i = 0; i < x.size(); ++i)
     {
-        sum += x.data()[i] * y.data()[i];
+        sum += x[i] * y[i];
     }
     return sum;
 }
@@ -48,7 +48,7 @@ double norm_from_squared(ConstVectorView x, double squared_norm)
     double sum = 1.0;
     for (std::size_t i = 0; i < x.size(); ++i)
     {
-        const double magnitude = std::abs(x.data()[i]);
+        const double magnitude = std::abs(x[i]);
         if (!std::isfinite(magnitude))
         {
             return magnitude;

@@ -16,7 +16,7 @@ namespace
 
 std::size_t rows(DenseMatrixView A)
 {
-    return A.rows;
+    return A.rows();
 }
 std::size_t rows(const CsrMatrix &A)
 {
@@ -24,7 +24,7 @@ std::size_t rows(const CsrMatrix &A)
 }
 std::size_t cols(DenseMatrixView A)
 {
-    return A.cols;
+    return A.cols();
 }
 std::size_t cols(const CsrMatrix &A)
 {

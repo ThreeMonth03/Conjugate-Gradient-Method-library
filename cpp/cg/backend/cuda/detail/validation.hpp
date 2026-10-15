@@ -13,7 +13,7 @@ inline void same_size(ConstVectorView a, ConstVectorView b, const Context &conte
 {
     detail::validate(a, context, false);
     detail::validate(b, context, false);
-    if (a.size != b.size)
+    if (a.size() != b.size())
     {
         throw std::invalid_argument("CUDA vector dimensions do not match");
     }
@@ -29,7 +29,7 @@ inline void no_overlap(ConstVectorView a, ConstVectorView b)
 
 inline void exact_or_disjoint(ConstVectorView a, ConstVectorView b)
 {
-    if (a.data != b.data)
+    if (a.data() != b.data())
     {
         no_overlap(a, b);
     }
@@ -40,7 +40,7 @@ inline void validate_apply(DenseMatrixView A, ConstVectorView x, VectorView outp
     detail::validate(A, context, false);
     detail::validate(x, context, false);
     detail::validate(output, context, false);
-    if (A.cols != x.size || A.rows != output.size)
+    if (A.cols() != x.size() || A.rows() != output.size())
     {
         throw std::invalid_argument("CUDA matrix-vector dimensions do not match");
     }
@@ -55,7 +55,7 @@ inline void validate_apply(const CsrMatrix &A, ConstVectorView x, VectorView out
 {
     detail::validate(x, context, false);
     detail::validate(output, context, false);
-    if (A.device() != context.device() || A.cols() != x.size || A.rows() != output.size)
+    if (A.device() != context.device() || A.cols() != x.size() || A.rows() != output.size())
     {
         throw std::invalid_argument("CUDA CSR dimensions or device do not match");
     }

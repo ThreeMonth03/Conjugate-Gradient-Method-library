@@ -43,18 +43,18 @@ void validate_pointer(const void *data, std::size_t bytes, std::size_t alignment
 }
 void validate(ConstVectorView view, const Context &context, bool inspect_pointer)
 {
-    validate_pointer(view.data, checked_product(view.size, sizeof(double)), alignof(double), view.device, context,
+    validate_pointer(view.data(), checked_product(view.size(), sizeof(double)), alignof(double), view.device(), context,
                      inspect_pointer);
 }
 bool overlaps(ConstVectorView a, ConstVectorView b)
 {
-    if (a.size == 0 || b.size == 0 || a.device != b.device)
+    if (a.size() == 0 || b.size() == 0 || a.device() != b.device())
     {
         return false;
     }
-    const auto abegin = reinterpret_cast<std::uintptr_t>(a.data);
-    const auto bbegin = reinterpret_cast<std::uintptr_t>(b.data);
-    const auto abytes = checked_product(a.size, sizeof(double)), bbytes = checked_product(b.size, sizeof(double));
+    const auto abegin = reinterpret_cast<std::uintptr_t>(a.data());
+    const auto bbegin = reinterpret_cast<std::uintptr_t>(b.data());
+    const auto abytes = checked_product(a.size(), sizeof(double)), bbytes = checked_product(b.size(), sizeof(double));
     if (abegin > std::numeric_limits<std::uintptr_t>::max() - abytes ||
         bbegin > std::numeric_limits<std::uintptr_t>::max() - bbytes)
     {

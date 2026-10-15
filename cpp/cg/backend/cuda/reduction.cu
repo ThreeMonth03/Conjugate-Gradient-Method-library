@@ -17,10 +17,10 @@ namespace
 __global__ void dot_kernel(ConstVectorView x, ConstVectorView y, double *partials)
 {
     double sum = 0.0;
-    for (std::size_t i = blockIdx.x * blockDim.x + threadIdx.x; i < x.size;
+    for (std::size_t i = blockIdx.x * blockDim.x + threadIdx.x; i < x.size();
          i += static_cast<std::size_t>(gridDim.x) * blockDim.x)
     {
-        sum += x.data[i] * y.data[i];
+        sum += x.data()[i] * y.data()[i];
     }
     const double total = detail::block_sum(sum);
     if (threadIdx.x == 0)
@@ -42,9 +42,9 @@ __global__ void stable_norm_kernel(ConstVectorView x, double *result)
 {
     __shared__ double scales[detail::block_size], sums[detail::block_size];
     double scale = 0.0, sum = 1.0;
-    for (std::size_t i = threadIdx.x; i < x.size; i += blockDim.x)
+    for (std::size_t i = threadIdx.x; i < x.size(); i += blockDim.x)
     {
-        const double magnitude = fabs(x.data[i]);
+        const double magnitude = fabs(x.data()[i]);
         if (!isfinite(magnitude))
         {
             scale = magnitude;
@@ -121,7 +121,7 @@ double Backend::dot(ConstVectorView x, ConstVectorView y) const
 {
     detail::same_size(x, y, m_resources.context);
     detail::DeviceGuard guard(m_resources.context.device());
-    const auto blocks = detail::blocks(x.size);
+    const auto blocks = detail::blocks(x.size());
     dot_kernel<<<blocks, detail::block_size, 0, detail::stream(m_resources.context)>>>(x, y,
                                                                                        m_resources.partials.get());
     detail::launch_check();

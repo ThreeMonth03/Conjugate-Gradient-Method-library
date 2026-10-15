@@ -45,12 +45,12 @@ cg::DenseMatrix diagonal_spd(std::size_t size)
 double independent_residual(cg::DenseMatrixView A, cg::ConstVectorView b, cg::ConstVectorView x)
 {
     double norm = 0.0;
-    for (std::size_t row = 0; row < A.rows; ++row)
+    for (std::size_t row = 0; row < A.rows(); ++row)
     {
         long double product = 0.0L;
-        for (std::size_t column = 0; column < A.cols; ++column)
+        for (std::size_t column = 0; column < A.cols(); ++column)
         {
-            product += static_cast<long double>(A.data[row * A.row_stride + column]) *
+            product += static_cast<long double>(A.data()[row * A.row_stride() + column]) *
                        static_cast<long double>(x.data()[column]);
         }
         norm = std::hypot(norm, static_cast<double>(static_cast<long double>(b.data()[row]) - product));

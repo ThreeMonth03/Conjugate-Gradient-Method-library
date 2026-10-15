@@ -14,20 +14,20 @@ namespace detail
 
 inline std::size_t storage_extent(DenseMatrixView A)
 {
-    if (A.row_stride < A.cols)
+    if (A.row_stride() < A.cols())
     {
         throw std::invalid_argument("CUDA row stride is smaller than its columns");
     }
-    if (A.rows == 0 || A.cols == 0)
+    if (A.rows() == 0 || A.cols() == 0)
     {
         return 0;
     }
-    const auto preceding = checked_product(A.rows - 1, A.row_stride);
-    if (preceding > std::numeric_limits<std::size_t>::max() - A.cols)
+    const auto preceding = checked_product(A.rows() - 1, A.row_stride());
+    if (preceding > std::numeric_limits<std::size_t>::max() - A.cols())
     {
         throw std::invalid_argument("CUDA matrix span overflows size_t");
     }
-    return preceding + A.cols;
+    return preceding + A.cols();
 }
 void validate(DenseMatrixView view, const Context &context, bool inspect_pointer = true);
 bool overlaps(DenseMatrixView A, ConstVectorView b);

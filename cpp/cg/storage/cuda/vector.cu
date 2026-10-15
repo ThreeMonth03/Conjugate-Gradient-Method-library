@@ -16,10 +16,10 @@ namespace
 
 __global__ void fill_kernel(VectorView output, double value)
 {
-    for (std::size_t i = blockIdx.x * blockDim.x + threadIdx.x; i < output.size;
+    for (std::size_t i = blockIdx.x * blockDim.x + threadIdx.x; i < output.size();
          i += static_cast<std::size_t>(gridDim.x) * blockDim.x)
     {
-        output.data[i] = value;
+        output.data()[i] = value;
     }
 }
 
@@ -31,7 +31,7 @@ namespace detail
 void fill(VectorView output, double value, const Context &context)
 {
     DeviceGuard guard(context.device());
-    fill_kernel<<<blocks(output.size), block_size, 0, stream(context)>>>(output, value);
+    fill_kernel<<<blocks(output.size()), block_size, 0, stream(context)>>>(output, value);
     detail::launch_check();
 }
 
@@ -98,14 +98,14 @@ void Vector::copy_from_device(ConstVectorView source, const Context &context)
 {
     detail::validate(source, context);
     detail::validate(view(), context);
-    if (source.size != m_size || (source.data != data() && detail::overlaps(source, view())))
+    if (source.size() != m_size || (source.data() != data() && detail::overlaps(source, view())))
     {
         throw std::invalid_argument("CUDA device copy dimensions or storage overlap");
     }
     detail::DeviceGuard guard(context.device());
-    if (m_size != 0 && source.data != data())
+    if (m_size != 0 && source.data() != data())
     {
-        detail::check(cudaMemcpyAsync(data(), source.data, detail::checked_product(m_size, sizeof(double)),
+        detail::check(cudaMemcpyAsync(data(), source.data(), detail::checked_product(m_size, sizeof(double)),
                                       cudaMemcpyDeviceToDevice, detail::stream(context)),
                       "cudaMemcpyAsync device copy");
     }

@@ -163,6 +163,14 @@ owns its handle and 4 MiB scratch allocation; overlapping
 reuse raises an error. It fixes the device/stream used for its solve. No API
 reinterprets a NumPy host pointer as a device pointer.
 
+Native C++ vector and matrix views are lightweight borrowing descriptors.
+Their pointer, extent, index type and device metadata are private, accessed
+through methods such as ``data()``, ``size()`` and ``device()``. They neither
+allocate nor extend storage lifetime. Accessors are callable from host/device
+code; host access to ``data()`` does not make a device pointer dereferenceable
+on the CPU. Boundary validation still checks device identity and pointer
+metadata before operations.
+
 Validation and benchmarks
 -------------------------
 

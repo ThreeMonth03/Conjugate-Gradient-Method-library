@@ -142,6 +142,11 @@ int main()
 
 Select `cg::PreconditionerKind::none` for plain CG. `cg::CsrMatrix` accepts owning row-pointer, column-index, and value vectors and constructs the same `cg::PreparedSolver` type. Prepared ownership and Jacobi setup live in the C++ core. `cg::solve_into` also accepts borrowed operators for one-shot solves. `CpuBackend` contains execution options; matrix and vector storage do not contain process-wide thread settings. Workspace reuse avoids repeated allocation of solver vectors; the backend and runtime can still perform their own initialization.
 
+CPU vector views use `std::span`. Dense and CUDA views expose metadata through
+read-only accessors such as `data()`, `rows()`, `size()` and `device()`.
+Views borrow storage and never extend its lifetime; CUDA views remain small
+trivially copyable descriptors that can be passed to kernels.
+
 ## Feature modules
 
 `cgpy` provides the public convenience exports. Implementation follows domain

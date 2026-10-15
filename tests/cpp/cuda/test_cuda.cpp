@@ -52,11 +52,11 @@ cg::CsrMatrix as_csr(cg::DenseMatrixView A)
 {
     std::vector<std::size_t> indptr{0}, indices;
     std::vector<double> values;
-    for (std::size_t row = 0; row < A.rows; ++row)
+    for (std::size_t row = 0; row < A.rows(); ++row)
     {
-        for (std::size_t column = 0; column < A.cols; ++column)
+        for (std::size_t column = 0; column < A.cols(); ++column)
         {
-            const double value = A.data[row * A.row_stride + column];
+            const double value = A.data()[row * A.row_stride() + column];
             if (value != 0)
             {
                 indices.push_back(column);
@@ -65,34 +65,33 @@ cg::CsrMatrix as_csr(cg::DenseMatrixView A)
         }
         indptr.push_back(indices.size());
     }
-    return {A.rows, A.cols, std::move(indptr), std::move(indices), std::move(values)};
+    return {A.rows(), A.cols(), std::move(indptr), std::move(indices), std::move(values)};
 }
 double true_norm(cg::DenseMatrixView A, cg::ConstVectorView b, cg::ConstVectorView x)
 {
     double norm = 0.0;
-    for (std::size_t row = 0; row < A.rows; ++row)
+    for (std::size_t row = 0; row < A.rows(); ++row)
     {
         long double sum = 0;
-        for (std::size_t column = 0; column < A.cols; ++column)
+        for (std::size_t column = 0; column < A.cols(); ++column)
         {
-            sum += static_cast<long double>(A.data[row * A.row_stride + column]) * x.data()[column];
+            sum += static_cast<long double>(A.data()[row * A.row_stride() + column]) * x[column];
         }
-        norm = std::hypot(norm, static_cast<double>(static_cast<long double>(b.data()[row]) - sum));
+        norm = std::hypot(norm, static_cast<double>(static_cast<long double>(b[row]) - sum));
     }
     return norm;
 }
 template <class T> struct DeviceIndices
 {
     explicit DeviceIndices(const std::vector<T> &host)
-        : storage(gpu::detail::device_allocation<T>(host.size(), gpu::Context{})), data(storage.get())
+        : storage(gpu::detail::device_allocation<T>(host.size(), gpu::Context{}))
     {
-        if (cudaMemcpy(data, host.data(), host.size() * sizeof(T), cudaMemcpyHostToDevice) != cudaSuccess)
+        if (cudaMemcpy(storage.get(), host.data(), host.size() * sizeof(T), cudaMemcpyHostToDevice) != cudaSuccess)
         {
             throw std::runtime_error("test cudaMemcpy failed");
         }
     }
     gpu::detail::DeviceAllocation<T> storage;
-    T *data = nullptr;
 };
 
 TEST(CudaCapability, DeviceCountIsSafeWithoutAnAvailableDriver)
@@ -118,16 +117,16 @@ TEST_F(Cuda, OwnsUploadsAndDeviceSnapshotsAndSupportsDeviceOnlyReset)
 {
     std::vector<double> host({1, 2, 3}), downloaded(3);
     gpu::Vector source(host, *context), output(3, *context);
-    host.data()[0] = 99;
+    host[0] = 99;
     output.copy_from_device(source.view(), *context);
     output.download(downloaded, *context);
-    EXPECT_DOUBLE_EQ(downloaded.data()[0], 1);
+    EXPECT_DOUBLE_EQ(downloaded[0], 1);
     output.fill(-2, *context);
     output.download(downloaded, *context);
-    EXPECT_DOUBLE_EQ(downloaded.data()[2], -2);
+    EXPECT_DOUBLE_EQ(downloaded[2], -2);
     output.copy_from_device(source.view(), *context);
     output.download(downloaded, *context);
-    EXPECT_DOUBLE_EQ(downloaded.data()[2], 3);
+    EXPECT_DOUBLE_EQ(downloaded[2], 3);
     gpu::Vector moved(std::move(output));
     EXPECT_EQ(output.size(), 0u);
     EXPECT_EQ(output.data(), nullptr);
@@ -165,16 +164,16 @@ TEST_F(Cuda, DenseProductsHandlePaddingOddTailsAndBothResidualSigns)
             output.fill(NAN, *context);
             EXPECT_DOUBLE_EQ(backend.apply_and_dot(A.view(), p.view(), output.view()), 50);
             output.download(host_output, *context);
-            EXPECT_DOUBLE_EQ(host_output.data()[0], 7);
-            EXPECT_DOUBLE_EQ(host_output.data()[1], -6);
+            EXPECT_DOUBLE_EQ(host_output[0], 7);
+            EXPECT_DOUBLE_EQ(host_output[1], -6);
             EXPECT_DOUBLE_EQ(backend.residual_squared_norm(A.view(), b.view(), p.view(), output.view()), 18);
             output.download(host_output, *context);
-            EXPECT_DOUBLE_EQ(host_output.data()[1], 4);
+            EXPECT_DOUBLE_EQ(host_output[1], 4);
             EXPECT_DOUBLE_EQ(backend.residual_squared_norm(A.view(), b.view(), p.view(), output.view(),
                                                            cg::ResidualSign::product_minus_rhs),
                              18);
             output.download(host_output, *context);
-            EXPECT_DOUBLE_EQ(host_output.data()[1], -4);
+            EXPECT_DOUBLE_EQ(host_output[1], -4);
         }
     }
     const std::vector<double> raw_host({4, 1, 1, 3}), two_host({1, 2});
@@ -186,8 +185,8 @@ TEST_F(Cuda, DenseProductsHandlePaddingOddTailsAndBothResidualSigns)
     backend.apply(snapshot.view(), two.view(), out.view());
     std::vector<double> downloaded(2);
     out.download(downloaded, *context);
-    EXPECT_DOUBLE_EQ(downloaded.data()[0], 6);
-    EXPECT_DOUBLE_EQ(downloaded.data()[1], 7);
+    EXPECT_DOUBLE_EQ(downloaded[0], 6);
+    EXPECT_DOUBLE_EQ(downloaded[1], 7);
 }
 
 TEST_F(Cuda, RectangularAndEmptyProductsAvoidInvalidDeviceAccess)
@@ -205,12 +204,12 @@ TEST_F(Cuda, RectangularAndEmptyProductsAvoidInvalidDeviceAccess)
         const gpu::detail::Backend backend(resources, true, kernel);
         backend.apply(A.view(), x.view(), out.view());
         out.download(result, *context);
-        EXPECT_DOUBLE_EQ(result.data()[0], 20);
-        EXPECT_DOUBLE_EQ(result.data()[1], 2);
+        EXPECT_DOUBLE_EQ(result[0], 20);
+        EXPECT_DOUBLE_EQ(result[1], 2);
         const gpu::DenseMatrixView empty_columns{nullptr, 2, 0, 0, 0};
         backend.apply(empty_columns, {}, out.view());
         out.download(result, *context);
-        EXPECT_DOUBLE_EQ(result.data()[0], 0);
+        EXPECT_DOUBLE_EQ(result[0], 0);
         EXPECT_DOUBLE_EQ(backend.residual_squared_norm(empty_columns, b.view(), {}, out.view()), 5);
         EXPECT_NO_THROW(backend.apply({nullptr, 0, 3, 3, 0}, x.view(), {}));
         EXPECT_DOUBLE_EQ(backend.apply_and_dot({nullptr, 0, 0, 0, 0}, {}, {}), 0);
@@ -282,7 +281,7 @@ TEST_F(Cuda, DenseCgAndPcgVerifyTrueResidualAcrossKernelsFusionAndRefresh)
         for (const auto kernel : {gpu::DenseKernel::native, gpu::DenseKernel::cublas})
         {
             gpu::Workspace selected_workspace(size, *context, kernel);
-            const auto *allocation = selected_workspace.residual().data;
+            const auto *allocation = selected_workspace.residual().data();
 
             for (const bool fused : {false, true})
             {
@@ -307,7 +306,7 @@ TEST_F(Cuda, DenseCgAndPcgVerifyTrueResidualAcrossKernelsFusionAndRefresh)
                         x.download(result, *context);
                         EXPECT_LE(true_norm(host.view(), hb, result),
                                   options.rtol * std::sqrt(static_cast<double>(size)));
-                        EXPECT_EQ(selected_workspace.residual().data, allocation);
+                        EXPECT_EQ(selected_workspace.residual().data(), allocation);
                         const auto repeated =
                             gpu::solve_into(A.view(), b.view(), x.view(), selected_workspace, *context, options, fused,
                                             kernel, preconditioned ? &M : nullptr);
@@ -378,7 +377,7 @@ TEST_F(Cuda, NativePreparedPlansCacheSetupAndReuseIndependentWorkspaces)
         auto workspace = plan.create_workspace();
         auto independent = plan.create_workspace();
         EXPECT_EQ(workspace.dense_kernel(), plan.dense_kernel());
-        EXPECT_NE(workspace.residual().data, independent.residual().data);
+        EXPECT_NE(workspace.residual().data(), independent.residual().data());
         gpu::Vector x(17, *context);
         x.fill(0, *context);
         cg::CgOptions options;
@@ -443,8 +442,9 @@ TEST_F(Cuda, CsrDeviceSnapshotsValidateCanonicalInt32AndInt64Indices)
     gpu::Vector data(values, *context), b(hb, *context), x(2, *context);
     DeviceIndices<std::int32_t> ptr32({0, 1, 2}), idx32({0, 1}), bad32({0, 0});
     DeviceIndices<std::int64_t> ptr64({0, 1, 2}), idx64({0, 1});
-    const gpu::CsrMatrixView views[] = {{ptr32.data, idx32.data, data.data(), 2, 2, 2, gpu::IndexType::int32, 0},
-                                        {ptr64.data, idx64.data, data.data(), 2, 2, 2, gpu::IndexType::int64, 0}};
+    const gpu::CsrMatrixView views[] = {
+        {ptr32.storage.get(), idx32.storage.get(), data.data(), 2, 2, 2, gpu::IndexType::int32, 0},
+        {ptr64.storage.get(), idx64.storage.get(), data.data(), 2, 2, 2, gpu::IndexType::int64, 0}};
     for (const auto view : views)
     {
         const gpu::CsrMatrix A(view, *context);
@@ -455,18 +455,19 @@ TEST_F(Cuda, CsrDeviceSnapshotsValidateCanonicalInt32AndInt64Indices)
         ASSERT_EQ(gpu::solve_into(A, b.view(), x.view(), workspace, *context, options).status, cg::Status::converged);
         std::vector<double> result(2);
         x.download(result, *context);
-        EXPECT_NEAR(result.data()[0], 0.5, 1e-14);
-        EXPECT_NEAR(result.data()[1], 1.0 / 3.0, 1e-14);
+        EXPECT_NEAR(result[0], 0.5, 1e-14);
+        EXPECT_NEAR(result[1], 1.0 / 3.0, 1e-14);
     }
     DeviceIndices<std::int32_t> duplicate_ptr({0, 2, 2});
-    const gpu::CsrMatrixView bad{duplicate_ptr.data, bad32.data, data.data(), 2, 2, 2, gpu::IndexType::int32, 0};
+    const gpu::CsrMatrixView bad{
+        duplicate_ptr.storage.get(), bad32.storage.get(), data.data(), 2, 2, 2, gpu::IndexType::int32, 0};
     EXPECT_THROW(gpu::CsrMatrix(bad, *context), std::invalid_argument);
     DeviceIndices<std::int32_t> negative32({0, -1}), out_of_range32({0, 2});
     DeviceIndices<std::int64_t> negative64({0, -1});
     const gpu::CsrMatrixView invalid[] = {
-        {ptr32.data, negative32.data, data.data(), 2, 2, 2, gpu::IndexType::int32, 0},
-        {ptr64.data, negative64.data, data.data(), 2, 2, 2, gpu::IndexType::int64, 0},
-        {ptr32.data, out_of_range32.data, data.data(), 2, 2, 2, gpu::IndexType::int32, 0},
+        {ptr32.storage.get(), negative32.storage.get(), data.data(), 2, 2, 2, gpu::IndexType::int32, 0},
+        {ptr64.storage.get(), negative64.storage.get(), data.data(), 2, 2, 2, gpu::IndexType::int64, 0},
+        {ptr32.storage.get(), out_of_range32.storage.get(), data.data(), 2, 2, 2, gpu::IndexType::int32, 0},
     };
     for (const auto view : invalid)
     {

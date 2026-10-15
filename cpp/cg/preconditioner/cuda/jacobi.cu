@@ -8,10 +8,10 @@ namespace cg
 namespace cuda
 {
 
-JacobiPreconditioner::JacobiPreconditioner(DenseMatrixView A, const Context &context) : m_inverse(A.rows, context)
+JacobiPreconditioner::JacobiPreconditioner(DenseMatrixView A, const Context &context) : m_inverse(A.rows(), context)
 {
     detail::validate(A, context);
-    if (A.rows == 0 || A.rows != A.cols)
+    if (A.rows() == 0 || A.rows() != A.cols())
     {
         throw std::invalid_argument("CUDA Jacobi requires a nonempty square matrix");
     }

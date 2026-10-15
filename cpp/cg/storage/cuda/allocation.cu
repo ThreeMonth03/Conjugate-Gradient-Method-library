@@ -27,9 +27,9 @@ void DeviceDeleter::operator()(void *pointer) const noexcept
 }
 PinnedScalar pinned_scalar()
 {
-    double *pointer = nullptr;
-    check(cudaMallocHost(reinterpret_cast<void **>(&pointer), sizeof(double)), "cudaMallocHost");
-    return PinnedScalar(pointer);
+    void *pointer = nullptr;
+    check(cudaMallocHost(&pointer, sizeof(double)), "cudaMallocHost");
+    return PinnedScalar(static_cast<double *>(pointer));
 }
 void PinnedDeleter::operator()(double *pointer) const noexcept
 {

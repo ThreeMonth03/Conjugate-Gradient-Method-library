@@ -43,21 +43,21 @@ void blas_apply(DenseMatrixView A, ConstVectorView x, VectorView output)
     static_assert(std::numeric_limits<int>::digits == 31 && std::numeric_limits<blasint>::digits == 31,
                   "the BLAS provider must use the signed int32 LP64 interface");
     const auto limit = static_cast<std::size_t>(std::numeric_limits<int>::max());
-    if (A.rows > limit || A.cols > limit || A.row_stride > limit)
+    if (A.rows() > limit || A.cols() > limit || A.row_stride() > limit)
     {
         throw std::invalid_argument("dense matrix dimensions or row stride exceed BLAS int32 range");
     }
-    if (A.rows == 0)
+    if (A.rows() == 0)
     {
         return;
     }
-    if (A.cols == 0)
+    if (A.cols() == 0)
     {
         std::fill_n(output.data(), output.size(), 0.0);
         return;
     }
-    cblas_dgemv(CblasRowMajor, CblasNoTrans, static_cast<int>(A.rows), static_cast<int>(A.cols), 1.0, A.data,
-                static_cast<int>(A.row_stride), x.data(), 1, 0.0, output.data(), 1);
+    cblas_dgemv(CblasRowMajor, CblasNoTrans, static_cast<int>(A.rows()), static_cast<int>(A.cols()), 1.0, A.data(),
+                static_cast<int>(A.row_stride()), x.data(), 1, 0.0, output.data(), 1);
 #else
     (void)A;
     (void)x;

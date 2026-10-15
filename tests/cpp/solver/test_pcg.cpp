@@ -34,11 +34,11 @@ cg::CsrMatrix as_csr(cg::DenseMatrixView A)
 {
     std::vector<std::size_t> indptr{0}, indices;
     std::vector<double> values;
-    for (std::size_t row = 0; row < A.rows; ++row)
+    for (std::size_t row = 0; row < A.rows(); ++row)
     {
-        for (std::size_t column = 0; column < A.cols; ++column)
+        for (std::size_t column = 0; column < A.cols(); ++column)
         {
-            const auto value = A.data[row * A.row_stride + column];
+            const auto value = A.data()[row * A.row_stride() + column];
             if (value != 0)
             {
                 indices.push_back(column);
@@ -47,7 +47,7 @@ cg::CsrMatrix as_csr(cg::DenseMatrixView A)
         }
         indptr.push_back(indices.size());
     }
-    return {A.rows, A.cols, std::move(indptr), std::move(indices), std::move(values)};
+    return {A.rows(), A.cols(), std::move(indptr), std::move(indices), std::move(values)};
 }
 
 TEST(Jacobi, OwnsItsInverseDiagonalSnapshot)
