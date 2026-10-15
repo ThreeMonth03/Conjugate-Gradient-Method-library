@@ -65,6 +65,8 @@ def check_sdist(path):
         "cpp/cg/storage/cuda/vector.cu",
         "cpp/cg/matrix/cuda/csr_matrix.cu",
         "cpp/cg/solver/cuda/conjugate_gradient.cu",
+        "cpp/cg/solver/cuda/device_execution.cu",
+        "cpp/cg/solver/cuda/detail/device_execution.hpp",
         "cpp/cg/solver/cuda/prepared_solver.cu",
         "cpp/cg/solver/cuda/detail/workspace_use_guard.hpp",
         "cpp/cg/solver/prepared_solver.cpp",

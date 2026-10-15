@@ -158,6 +158,7 @@ def validate_artifact(data):
     device = spec.get("device", "cpu")
     if device not in ("cpu", "cuda"):
         raise ValueError("artifact device must be cpu or cuda")
+    validation.validate_execution_mode(spec.get("solver", {}), device)
     if device == "cuda":
         from . import execution
 

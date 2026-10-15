@@ -7,7 +7,7 @@ import pathlib
 import subprocess
 import sys
 
-from . import execution
+from . import execution, validation
 
 IMPLEMENTATIONS = (
     "native",
@@ -72,6 +72,12 @@ def configure_benchmark_arguments(result, *, default_implementations=None):
     )
     result.add_argument("--device", choices=("cpu", "cuda"), default="cpu")
     result.add_argument("--cuda-device", type=_nonnegative, default=0)
+    result.add_argument(
+        "--cuda-execution-mode",
+        choices=("host", "device"),
+        default="host",
+        help="native CUDA scalar-control engine; eager Torch keeps its own control",
+    )
     result.add_argument("--threads", type=_positive, default=1)
     result.add_argument("--seed", type=_nonnegative, default=20261015)
     result.add_argument(
@@ -214,6 +220,12 @@ def benchmark_spec(arguments):
 
     from . import cases as case_module
 
+    try:
+        validation.validate_execution_mode(
+            {"execution_mode": arguments.cuda_execution_mode}, arguments.device
+        )
+    except ValueError as error:
+        raise SystemExit(str(error)) from error
     default_reference = (
         "scipy-out"
         if case_module.SUITES[arguments.suite][0].storage == "csr"
@@ -310,6 +322,9 @@ def benchmark_spec(arguments):
     }
     if arguments.device == "cuda":
         spec.update(device="cuda", cuda_device=arguments.cuda_device)
+        # Keep the default host spec identical to historical/replay artifacts.
+        if arguments.cuda_execution_mode != "host":
+            spec["solver"]["execution_mode"] = arguments.cuda_execution_mode
     return spec
 
 

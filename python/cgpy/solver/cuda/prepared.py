@@ -55,14 +55,20 @@ class PreparedSolver:
         return self._native.preconditioner_nbytes
 
     def create_workspace(
-        self, *, stream: int = 0
+        self, *, stream: int = 0, execution_mode: str = "host"
     ) -> workspace_module.Workspace:
-        """Allocate reusable solver storage on the selected borrowed stream."""
+        """Allocate storage with an explicit stream and scalar-control engine.
+
+        execution_mode selects host (default) or device and is fixed for this
+        workspace. The immutable plan can serve either mode with distinct
+        workspaces; solves have no redundant execution-mode argument.
+        """
         return workspace_module.Workspace(
             self.size,
             device=self.device,
             stream=stream,
             dense_kernel=self.dense_kernel,
+            execution_mode=execution_mode,
         )
 
     def create_vector(self, *, stream: int = 0) -> storage.Vector:
@@ -92,6 +98,7 @@ class PreparedSolver:
         workspace : Workspace
             Matching size/device, unused by overlapping calls. Its stream
             determines execution and the version-2 producer readiness contract.
+            Its execution_mode selects the native host/device scalar engine.
         rtol, atol : float
             Finite nonnegative true-residual tolerances.
         maxiter : int

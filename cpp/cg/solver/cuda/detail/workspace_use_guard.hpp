@@ -10,6 +10,7 @@ namespace detail
 {
 
 struct ExecutionResources;
+struct DeviceExecutionResources;
 
 class WorkspaceUseGuard
 {
@@ -19,6 +20,7 @@ class WorkspaceUseGuard
     WorkspaceUseGuard(const WorkspaceUseGuard &) = delete;
     WorkspaceUseGuard &operator=(const WorkspaceUseGuard &) = delete;
     ExecutionResources &resources() noexcept;
+    DeviceExecutionResources &device_resources();
     void complete() noexcept { m_completed = true; }
 
     private:

@@ -243,8 +243,9 @@ def cpu_csr(matrix):
     "algorithm,preconditioner",
     [("standard", "none"), ("standard", "jacobi"), ("explicit", "none")],
 )
+@pytest.mark.parametrize("execution_mode", ["host", "device"])
 def test_device_modes_solve_to_true_residual_and_preserve_inputs(
-    gpu, system, kind, kernel, fused, algorithm, preconditioner
+    gpu, system, kind, kernel, fused, algorithm, preconditioner, execution_mode
 ):
     matrix, rhs, truth = system
     operator = (
@@ -259,6 +260,7 @@ def test_device_modes_solve_to_true_residual_and_preserve_inputs(
         b,
         initial,
         dense_kernel=kernel,
+        execution_mode=execution_mode,
         fused=fused,
         algorithm=algorithm,
         preconditioner=preconditioner,
@@ -276,7 +278,10 @@ def test_device_modes_solve_to_true_residual_and_preserve_inputs(
 
 
 @pytest.mark.parametrize("kernel", ["native", "cublas"])
-def test_prepared_snapshot_and_workspace_reuse(gpu, system, kernel):
+@pytest.mark.parametrize("execution_mode", ["host", "device"])
+def test_prepared_snapshot_and_workspace_reuse(
+    gpu, system, kernel, execution_mode
+):
     matrix, rhs, truth = system
     plan = gpu.prepare_host(
         matrix, dense_kernel=kernel, preconditioner="jacobi"
@@ -284,7 +289,12 @@ def test_prepared_snapshot_and_workspace_reuse(gpu, system, kernel):
     matrix.fill(np.nan)
     b = gpu.Vector.from_host(rhs)
     x = plan.create_vector()
-    workspace = plan.create_workspace()
+    workspace = plan.create_workspace(execution_mode=execution_mode)
+    assert workspace.execution_mode == execution_mode
+    with pytest.raises(AttributeError):
+        workspace.execution_mode = (
+            "device" if execution_mode == "host" else "host"
+        )
     assert plan.dense_kernel == kernel
     assert workspace.dense_kernel == kernel
     assert plan.preconditioner == "jacobi"
@@ -362,18 +372,23 @@ def test_unsupported_modes_layouts_aliases_and_workspaces_reject_before_writes(
 
 
 @pytest.mark.parametrize("kernel", ["native", "cublas"])
-def test_true_norm_and_numerical_failure_statuses(gpu, kernel):
+@pytest.mark.parametrize("execution_mode", ["host", "device"])
+def test_true_norm_and_numerical_failure_statuses(gpu, kernel, execution_mode):
     A = gpu.DenseMatrix.from_host(np.eye(2))
     for magnitude in (1e-200, 1e200):
         b = gpu.Vector.from_host(np.array([magnitude, -magnitude]))
-        limited = gpu.solve(A, b, dense_kernel=kernel, maxiter=0)
+        limited = gpu.solve(
+            A, b, dense_kernel=kernel, execution_mode=execution_mode, maxiter=0
+        )
         assert limited.status == "max_iterations"
         assert math.isclose(
             limited.residual_norm,
             math.hypot(magnitude, magnitude),
             rel_tol=1e-14,
         )
-        failed = gpu.solve(A, b, dense_kernel=kernel)
+        failed = gpu.solve(
+            A, b, dense_kernel=kernel, execution_mode=execution_mode
+        )
         assert failed.status == "non_finite"
         assert math.isclose(
             failed.residual_norm,
@@ -382,14 +397,19 @@ def test_true_norm_and_numerical_failure_statuses(gpu, kernel):
         )
     for magnitude in (1e-150, 1e150):
         b = gpu.Vector.from_host(np.array([magnitude, -magnitude]))
-        result = gpu.solve(A, b, dense_kernel=kernel)
+        result = gpu.solve(
+            A, b, dense_kernel=kernel, execution_mode=execution_mode
+        )
         assert result.converged
         np.testing.assert_array_equal(result.x.to_host(), b.to_host())
     for bad in (np.nan, np.inf):
         invalid = gpu.DenseMatrix.from_host(np.array([[bad, 0.0], [0.0, 1.0]]))
         b = gpu.Vector.from_host([1.0, 1.0])
         assert (
-            gpu.solve(invalid, b, dense_kernel=kernel).status == "non_finite"
+            gpu.solve(
+                invalid, b, dense_kernel=kernel, execution_mode=execution_mode
+            ).status
+            == "non_finite"
         )
 
 
@@ -432,8 +452,9 @@ def test_cuda_interface_rejects_host_pointers_and_ambiguous_producer_stream(
     assert plan.solve_into(device_rhs, output, workspace=workspace).converged
 
 
+@pytest.mark.parametrize("execution_mode", ["host", "device"])
 def test_torch_zero_copy_strict_layout_and_borrowed_nondefault_stream(
-    gpu, system
+    gpu, system, execution_mode
 ):
     torch = torch_gpu()
     matrix, rhs, truth = system
@@ -443,7 +464,9 @@ def test_torch_zero_copy_strict_layout_and_borrowed_nondefault_stream(
         b = torch.tensor(rhs, dtype=torch.float64, device="cuda")
         output = torch.zeros_like(b)
         plan = gpu.prepare(A, stream=stream.cuda_stream)
-        workspace = plan.create_workspace(stream=stream.cuda_stream)
+        workspace = plan.create_workspace(
+            stream=stream.cuda_stream, execution_mode=execution_mode
+        )
         current = torch.cuda.current_stream().cuda_stream
         info = plan.solve_into(b, output, workspace=workspace, rtol=1e-10)
         assert info.converged
@@ -523,8 +546,9 @@ def test_device_csr_snapshot_validates_canonical_indices(gpu, dtype):
 
 
 @pytest.mark.parametrize("kernel", ["native", "cublas"])
+@pytest.mark.parametrize("execution_mode", ["host", "device"])
 def test_shared_immutable_plan_with_independent_concurrent_workspaces(
-    gpu, system, kernel
+    gpu, system, kernel, execution_mode
 ):
     torch = torch_gpu()
     matrix, rhs, truth = system
@@ -536,7 +560,9 @@ def test_shared_immutable_plan_with_independent_concurrent_workspaces(
 
     def run(index):
         stream = streams[index]
-        workspace = plan.create_workspace(stream=stream.cuda_stream)
+        workspace = plan.create_workspace(
+            stream=stream.cuda_stream, execution_mode=execution_mode
+        )
         x = plan.create_vector(stream=stream.cuda_stream)
         assert plan.solve_into(b, x, workspace=workspace, rtol=1e-10).converged
         np.testing.assert_allclose(
@@ -545,3 +571,31 @@ def test_shared_immutable_plan_with_independent_concurrent_workspaces(
 
     with ThreadPoolExecutor(max_workers=2) as pool:
         list(pool.map(run, range(2)))
+
+
+def test_execution_mode_is_fixed_per_workspace_and_never_inferred_from_the_plan(
+    gpu,
+):
+    plan = gpu.prepare_host(np.eye(2))
+    assert gpu.Workspace(2).execution_mode == "host"
+    assert plan.create_workspace().execution_mode == "host"
+    b, x = gpu.Vector.from_host([1.0, 2.0]), plan.create_vector()
+    workspaces = [
+        plan.create_workspace(execution_mode=mode)
+        for mode in ("host", "device")
+    ]
+    for workspace in workspaces * 2:
+        x.fill(0)
+        assert plan.solve_into(b, x, workspace=workspace).converged
+        np.testing.assert_array_equal(x.to_host(), [1.0, 2.0])
+    for invalid in ("auto", "", "unknown"):
+        with pytest.raises(ValueError, match="execution_mode"):
+            gpu.Workspace(2, execution_mode=invalid)
+        with pytest.raises(ValueError, match="execution_mode"):
+            plan.create_workspace(execution_mode=invalid)
+        with pytest.raises(ValueError, match="execution_mode"):
+            gpu.solve(
+                gpu.DenseMatrix.from_host(np.eye(2)), b, execution_mode=invalid
+            )
+    x.fill(0)
+    assert plan.solve_into(b, x, workspace=workspaces[1]).converged

@@ -102,23 +102,37 @@ void Backend::apply(DenseMatrixView A, ConstVectorView x, VectorView output) con
 
 double Backend::apply_and_dot(DenseMatrixView A, ConstVectorView p, VectorView ap) const
 {
+    apply_and_dot_into(A, p, ap, m_resources.scalar);
+    return read_scalar(m_resources.scalar);
+}
+
+void Backend::apply_and_dot_into(DenseMatrixView A, ConstVectorView p, VectorView ap, double *result) const
+{
     detail::same_size(p, ap, m_resources.context);
     detail::validate_apply(A, p, ap, m_resources.context);
     if (!m_fused || m_kernel == DenseKernel::cublas)
     {
         apply(A, p, ap);
-        return dot(p, ap);
+        dot_into(p, ap, result);
+        return;
     }
     detail::DeviceGuard guard(m_resources.context.device());
     const auto blocks = detail::dense_blocks(A.rows());
     dense_kernel<<<blocks, detail::block_size, 0, detail::stream(m_resources.context)>>>(A, p, {}, ap, 1, true,
                                                                                          m_resources.partials);
     detail::launch_check();
-    return finish_reduction(blocks);
+    finish_reduction_into(blocks, result);
 }
 
 double Backend::residual_squared_norm(DenseMatrixView A, ConstVectorView b, ConstVectorView x, VectorView r,
                                       ResidualSign sign) const
+{
+    residual_squared_norm_into(A, b, x, r, m_resources.scalar, sign);
+    return read_scalar(m_resources.scalar);
+}
+
+void Backend::residual_squared_norm_into(DenseMatrixView A, ConstVectorView b, ConstVectorView x, VectorView r,
+                                         double *result, ResidualSign sign) const
 {
     const bool b_minus_ax = sign == ResidualSign::rhs_minus_product;
     detail::same_size(b, r, m_resources.context);
@@ -131,19 +145,21 @@ double Backend::residual_squared_norm(DenseMatrixView A, ConstVectorView b, Cons
         dense_kernel<<<blocks, detail::block_size, 0, detail::stream(m_resources.context)>>>(A, x, b, r, 2, b_minus_ax,
                                                                                              m_resources.partials);
         detail::launch_check();
-        return finish_reduction(blocks);
+        finish_reduction_into(blocks, result);
+        return;
     }
     apply(A, x, r);
     if (!m_fused)
     {
         axpby(b_minus_ax ? 1.0 : -1.0, b, b_minus_ax ? -1.0 : 1.0, r, r);
-        return dot(r, r);
+        dot_into(r, r, result);
+        return;
     }
     const auto blocks = detail::blocks(r.size());
     residual_kernel<<<blocks, detail::block_size, 0, detail::stream(m_resources.context)>>>(b, r, b_minus_ax,
                                                                                             m_resources.partials);
     detail::launch_check();
-    return finish_reduction(blocks);
+    finish_reduction_into(blocks, result);
 }
 
 } // namespace detail

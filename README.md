@@ -6,7 +6,7 @@ positive-definite systems using CG and Jacobi PCG.
 - Dense and canonical CSR matrices with float64 arithmetic.
 - Prepared solves and reusable workspaces for repeated systems.
 - Native CPU kernels, optional OpenMP and dense BLAS.
-- Optional CUDA backend with native kernels and dense cuBLAS.
+- Optional CUDA backend with native kernels, dense cuBLAS and explicit host/device scalar control.
 
 [Documentation](https://ThreeMonth03.github.io/Conjugate-Gradient-Method-library/)
 · [Architecture](https://ThreeMonth03.github.io/Conjugate-Gradient-Method-library/architecture.html)

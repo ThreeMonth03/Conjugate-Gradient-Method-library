@@ -78,6 +78,12 @@ void Backend::copy(ConstVectorView source, VectorView destination) const
 
 double Backend::multiply_and_dot(ConstVectorView factors, ConstVectorView r, VectorView z) const
 {
+    multiply_and_dot_into(factors, r, z, m_resources.scalar);
+    return read_scalar(m_resources.scalar);
+}
+
+void Backend::multiply_and_dot_into(ConstVectorView factors, ConstVectorView r, VectorView z, double *result) const
+{
     detail::same_size(factors, r, m_resources.context);
     detail::same_size(r, z, m_resources.context);
     detail::no_overlap(factors, z);
@@ -87,7 +93,14 @@ double Backend::multiply_and_dot(ConstVectorView factors, ConstVectorView r, Vec
     multiply_kernel<<<blocks, detail::block_size, 0, detail::stream(m_resources.context)>>>(
         factors, r, z, m_resources.partials, m_fused);
     detail::launch_check();
-    return m_fused ? finish_reduction(blocks) : dot(r, z);
+    if (m_fused)
+    {
+        finish_reduction_into(blocks, result);
+    }
+    else
+    {
+        dot_into(r, z, result);
+    }
 }
 
 void Backend::axpy(double alpha, ConstVectorView x, VectorView y) const

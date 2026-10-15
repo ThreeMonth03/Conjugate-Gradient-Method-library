@@ -163,3 +163,26 @@ New JSON contains input hashes, device/build identity, actual scheduling
 and raw samples under ``build/``. :doc:`methodology` shows local summary and
 replay commands. A smoke replay checks this plumbing; it is kept separate
 from formal performance statistics.
+
+
+Explicit execution-mode measurements
+------------------------------------
+
+The historical tables above use host scalar control. To collect new resident
+samples for both native execution modes, use a separate output for each mode:
+
+.. code-block:: bash
+
+   for mode in host device; do
+       make pyprof PRESET=cuda-release PYTHON="$PWD/.venv-cuda/bin/python" \
+           PYPROF_SUITE=smoke-cuda-dense PYPROF_THREADS=1 PYPROF_SCOPE=prepared \
+           PYPROF_OUTPUT="build/benchmarks/cuda-$mode-smoke.json" \
+           PYPROF_ARGS="--device cuda --cuda-execution-mode $mode --implementations cuda-native,cuda-cublas,torch-cuda-eager"
+   done
+
+This smoke command verifies the selected mode and comparison plumbing; it
+does not establish a performance ranking. Select ``cuda-dense-f64-v1`` or
+``cuda-csr-f64-v1`` for the full fixtures. CSR candidates are
+``cuda-native,torch-cuda-eager``. Torch keeps its eager reference control in
+both runs; only the native candidate changes execution mode. See
+:doc:`methodology` for timing, accuracy and independent-run requirements.
