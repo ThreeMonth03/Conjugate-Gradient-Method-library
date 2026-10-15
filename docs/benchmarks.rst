@@ -16,6 +16,7 @@ correctness checks and sampling.
 .. toctree::
    :maxdepth: 1
 
+   benchmarks/current
    benchmarks/methodology
    benchmarks/cpu
    benchmarks/sparse
