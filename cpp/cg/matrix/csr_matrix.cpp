@@ -86,7 +86,7 @@ void validate_csr_structure(std::size_t rows, std::size_t cols, std::span<const 
 
 bool overlaps(const CsrMatrix &A, ConstVectorView x)
 {
-    return overlaps(ConstVectorView{A.values().data(), A.nnz()}, x);
+    return overlaps(A.values(), x);
 }
 
 } // namespace detail

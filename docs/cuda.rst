@@ -95,6 +95,10 @@ Device data and prepared solves
 Host transfers use explicitly named methods. Dense input is copied to
 row-major float64 device storage. CSR upload accepts the same owning canonical
 host ``cgpy.CsrMatrix`` used by CPU functions, without dense conversion.
+Device CSR snapshots own their index arrays and values. External ``int32``
+and ``int64`` indices are validated and stored as ``int64``; ordering and
+duplicates are never silently repaired. Uploads complete before temporary
+host conversion buffers are released.
 
 .. doctest:: cuda-device
    :skipif: not cuda.is_available()

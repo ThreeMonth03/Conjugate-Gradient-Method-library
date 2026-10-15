@@ -43,9 +43,9 @@ void CpuBackend::apply(const CsrMatrix &A, ConstVectorView x, VectorView output)
         throw std::invalid_argument("BLAS dense kernels do not support CSR matrices");
     }
     validate_apply(A, x, output);
-    const std::span<const std::size_t> indptr = A.indptr();
-    const std::span<const std::size_t> indices = A.indices();
-    const ConstVectorView values = A.values();
+    const auto indptr = A.indptr();
+    const auto indices = A.indices();
+    const auto values = A.values();
 #ifdef _OPENMP
 #pragma omp parallel for schedule(static) num_threads(m_threads) if (m_threads > 1 && A.rows() >= 4096)
 #endif
@@ -72,9 +72,9 @@ double CpuBackend::apply_and_dot(const CsrMatrix &A, ConstVectorView p, VectorVi
         apply(A, p, ap);
         return dot(p, ap);
     }
-    const std::span<const std::size_t> indptr = A.indptr();
-    const std::span<const std::size_t> indices = A.indices();
-    const ConstVectorView values = A.values();
+    const auto indptr = A.indptr();
+    const auto indices = A.indices();
+    const auto values = A.values();
     double product = 0.0;
 #ifdef _OPENMP
 #pragma omp parallel for reduction(+ : product) schedule(static)                                                       \
@@ -109,9 +109,9 @@ double CpuBackend::residual_squared_norm(const CsrMatrix &A, ConstVectorView b, 
         axpby(b_minus_ax ? 1.0 : -1.0, b, b_minus_ax ? -1.0 : 1.0, r, r);
         return squared_norm(r);
     }
-    const std::span<const std::size_t> indptr = A.indptr();
-    const std::span<const std::size_t> indices = A.indices();
-    const ConstVectorView values = A.values();
+    const auto indptr = A.indptr();
+    const auto indices = A.indices();
+    const auto values = A.values();
     double squared_norm = 0.0;
 #ifdef _OPENMP
 #pragma omp parallel for reduction(+ : squared_norm) schedule(static)                                                  \

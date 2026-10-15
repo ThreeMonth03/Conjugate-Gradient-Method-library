@@ -59,6 +59,11 @@ ownership and ``std::span`` for borrowing. Validate foreign pointers before
 constructing a span. Device storage uses a standard owner with CUDA-aware
 cleanup; host containers cannot own device allocations.
 
+Return borrowed contiguous ranges as spans by value, with ``const`` element
+types for read-only access. Reject borrowing from temporary owners and document
+invalidation. An ``auto`` copy of a span still borrows; use an owning container
+for an independent snapshot.
+
 Carry borrowed ranges through host kernels as spans and index the span
 directly. Keep strided matrix and device views lightweight, with private
 metadata and read-only accessors. Views do not share ownership; smart pointers
@@ -67,11 +72,12 @@ boundaries and device kernels. Keep casts and allocation calls localized to
 those boundaries. CUDA view accessors must work on host and device without
 pulling CUDA SDK headers into public interfaces.
 
-Use value types for options/results and composition for owned state. A
-prepared solver holds a matrix variant and optional Jacobi state; it does
-not need a subclass for each storage/preconditioner combination. The shared
-numerical engine accepts the operations it needs through templates. Benchmark
-references use a small Python protocol so array implementations can be
+Use value types for options/results and composition for owned state. Compose
+storage from existing RAII owners; use Pimpl for a concrete dependency or ABI
+boundary. A prepared solver holds a matrix variant and optional Jacobi state;
+it does not need a subclass for each storage/preconditioner combination. The
+shared numerical engine accepts the operations it needs through templates.
+Benchmark references use a small Python protocol so array implementations can be
 substituted without depending on concrete classes. Add a virtual interface or
 plugin registry only when an actual use case needs it.
 

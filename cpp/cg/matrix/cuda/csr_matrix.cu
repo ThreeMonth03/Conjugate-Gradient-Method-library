@@ -1,10 +1,12 @@
 #include <cg/matrix/cuda/csr_matrix.hpp>
 #include <cg/matrix/cuda/detail/validation.hpp>
 #include <cg/matrix/detail/csr_validation.hpp>
+#include <cg/runtime/cuda/detail/runtime.hpp>
 #include <cg/runtime/detail/checked_size.hpp>
-#include <cg/storage/cuda/detail/allocation.hpp>
-#include <cg/storage/cuda/vector.hpp>
 
+#include <limits>
+#include <span>
+#include <stdexcept>
 #include <utility>
 #include <vector>
 
@@ -12,20 +14,6 @@ namespace cg
 {
 namespace cuda
 {
-
-struct CsrMatrix::Impl
-{
-    Impl(std::size_t r, std::size_t c, std::size_t n, const Context &context)
-        : rows(r), cols(c), nnz(n), device(context.device()),
-          indptr(detail::device_allocation<std::int64_t>(r + 1, context)),
-          indices(detail::device_allocation<std::int64_t>(n, context)), values(n, context)
-    {
-    }
-    std::size_t rows, cols, nnz;
-    int device;
-    detail::DeviceAllocation<std::int64_t> indptr, indices;
-    Vector values;
-};
 
 namespace
 {
@@ -64,7 +52,7 @@ std::vector<std::size_t> download_indices(const void *source, std::size_t size, 
     }
     return result;
 }
-void upload_indices(std::int64_t *destination, const std::vector<std::size_t> &source, const Context &context)
+void upload_indices(std::int64_t *destination, std::span<const std::size_t> source, const Context &context)
 {
     const std::vector<std::int64_t> values(source.begin(), source.end());
     if (!values.empty())
@@ -80,11 +68,15 @@ void upload_indices(std::int64_t *destination, const std::vector<std::size_t> &s
 CsrMatrix::CsrMatrix(const cg::CsrMatrix &host, const Context &context)
 {
     csr_dimensions(host.rows(), host.cols(), host.nnz());
-    m_impl = std::make_unique<Impl>(host.rows(), host.cols(), host.nnz(), context);
+    m_rows = host.rows();
+    m_cols = host.cols();
+    m_indptr = detail::device_allocation<std::int64_t>(host.rows() + 1, context);
+    m_indices = detail::device_allocation<std::int64_t>(host.nnz(), context);
+    m_values = Vector(host.nnz(), context);
     detail::DeviceGuard guard(context.device());
-    upload_indices(m_impl->indptr.get(), host.indptr(), context);
-    upload_indices(m_impl->indices.get(), host.indices(), context);
-    m_impl->values.upload(host.values(), context);
+    upload_indices(m_indptr.get(), host.indptr(), context);
+    upload_indices(m_indices.get(), host.indices(), context);
+    m_values.upload(host.values(), context);
 }
 CsrMatrix::CsrMatrix(CsrMatrixView source, const Context &context)
 {
@@ -107,38 +99,51 @@ CsrMatrix::CsrMatrix(CsrMatrixView source, const Context &context)
                              ? download_indices<std::int32_t>(source.indices(), source.nnz(), context)
                              : download_indices<std::int64_t>(source.indices(), source.nnz(), context);
     cg::detail::validate_csr_structure(source.rows(), source.cols(), rowptr, columns, source.nnz());
-    m_impl = std::make_unique<Impl>(source.rows(), source.cols(), source.nnz(), context);
-    upload_indices(m_impl->indptr.get(), rowptr, context);
-    upload_indices(m_impl->indices.get(), columns, context);
-    m_impl->values.copy_from_device({source.data(), source.nnz(), source.device()}, context);
+    m_rows = source.rows();
+    m_cols = source.cols();
+    m_indptr = detail::device_allocation<std::int64_t>(source.rows() + 1, context);
+    m_indices = detail::device_allocation<std::int64_t>(source.nnz(), context);
+    m_values = Vector(source.nnz(), context);
+    upload_indices(m_indptr.get(), rowptr, context);
+    upload_indices(m_indices.get(), columns, context);
+    m_values.copy_from_device({source.data(), source.nnz(), source.device()}, context);
 }
-CsrMatrix::~CsrMatrix() = default;
-CsrMatrix::CsrMatrix(CsrMatrix &&) noexcept = default;
-CsrMatrix &CsrMatrix::operator=(CsrMatrix &&) noexcept = default;
+CsrMatrix::CsrMatrix(CsrMatrix &&other) noexcept
+    : m_rows(std::exchange(other.m_rows, 0)), m_cols(std::exchange(other.m_cols, 0)),
+      m_indptr(std::move(other.m_indptr)), m_indices(std::move(other.m_indices)), m_values(std::move(other.m_values))
+{
+}
+CsrMatrix &CsrMatrix::operator=(CsrMatrix &&other) noexcept
+{
+    if (this != &other)
+    {
+        m_rows = std::exchange(other.m_rows, 0);
+        m_cols = std::exchange(other.m_cols, 0);
+        m_indptr = std::move(other.m_indptr);
+        m_indices = std::move(other.m_indices);
+        m_values = std::move(other.m_values);
+    }
+    return *this;
+}
 std::size_t CsrMatrix::rows() const noexcept
 {
-    return m_impl ? m_impl->rows : 0;
+    return m_rows;
 }
 std::size_t CsrMatrix::cols() const noexcept
 {
-    return m_impl ? m_impl->cols : 0;
+    return m_cols;
 }
 std::size_t CsrMatrix::nnz() const noexcept
 {
-    return m_impl ? m_impl->nnz : 0;
+    return m_values.size();
 }
 int CsrMatrix::device() const noexcept
 {
-    return m_impl ? m_impl->device : -1;
+    return m_values.device();
 }
 CsrMatrixView CsrMatrix::view() const noexcept
 {
-    if (!m_impl)
-    {
-        return {};
-    }
-    return {m_impl->indptr.get(), m_impl->indices.get(), m_impl->values.data(), m_impl->rows,
-            m_impl->cols,         m_impl->nnz,           IndexType::int64,      m_impl->device};
+    return {m_indptr.get(), m_indices.get(), m_values.data(), m_rows, m_cols, nnz(), IndexType::int64, device()};
 }
 
 } // namespace cuda

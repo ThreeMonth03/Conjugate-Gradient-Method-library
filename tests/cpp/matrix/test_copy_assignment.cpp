@@ -3,6 +3,7 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <new>
 #include <utility>
 #include <vector>
@@ -73,17 +74,17 @@ TEST(MatrixAssignment, CsrFailureAtEveryCopiedArrayPreservesCanonicalStorage)
         EXPECT_EQ(target.indptr().data(), indptr);
         EXPECT_EQ(target.indices().data(), indices);
         EXPECT_EQ(target.values().data(), values);
-        EXPECT_EQ(target.indptr(), (std::vector<std::size_t>{0, 1}));
-        EXPECT_EQ(target.indices(), (std::vector<std::size_t>{0}));
-        EXPECT_EQ(target.values(), (std::vector<double>{7}));
+        EXPECT_TRUE(std::ranges::equal(target.indptr(), std::vector<std::size_t>{0, 1}));
+        EXPECT_TRUE(std::ranges::equal(target.indices(), std::vector<std::size_t>{0}));
+        EXPECT_TRUE(std::ranges::equal(target.values(), std::vector<double>{7}));
         std::vector<double> input{2}, output(1);
         cg::CpuBackend().apply(target, input, output);
         EXPECT_DOUBLE_EQ(output[0], 14);
         target = source;
         EXPECT_EQ(target.rows(), 2u);
-        EXPECT_EQ(target.indptr(), source.indptr());
-        EXPECT_EQ(target.indices(), source.indices());
-        EXPECT_EQ(target.values(), source.values());
+        EXPECT_TRUE(std::ranges::equal(target.indptr(), source.indptr()));
+        EXPECT_TRUE(std::ranges::equal(target.indices(), source.indices()));
+        EXPECT_TRUE(std::ranges::equal(target.values(), source.values()));
         EXPECT_NE(target.values().data(), source.values().data());
     }
 }
@@ -107,9 +108,9 @@ TEST(MatrixAssignment, SelfCopyDoesNotAllocateAndSwapPreservesCompleteValues)
     EXPECT_EQ(other_dense.rows(), 1u);
     EXPECT_DOUBLE_EQ(other_dense.data()[0], 7);
     EXPECT_EQ(sparse.rows(), 2u);
-    EXPECT_EQ(sparse.values(), (std::vector<double>{4, 3}));
+    EXPECT_TRUE(std::ranges::equal(sparse.values(), std::vector<double>{4, 3}));
     EXPECT_EQ(other_sparse.rows(), 1u);
-    EXPECT_EQ(other_sparse.values(), (std::vector<double>{7}));
+    EXPECT_TRUE(std::ranges::equal(other_sparse.values(), std::vector<double>{7}));
 }
 
 } // namespace

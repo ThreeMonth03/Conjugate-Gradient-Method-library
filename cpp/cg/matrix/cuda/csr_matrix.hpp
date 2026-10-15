@@ -3,8 +3,10 @@
 #include <cg/matrix/csr_matrix.hpp>
 #include <cg/matrix/cuda/csr_matrix_view.hpp>
 #include <cg/runtime/cuda/context.hpp>
+#include <cg/storage/cuda/device_memory.hpp>
+#include <cg/storage/cuda/vector.hpp>
 
-#include <memory>
+#include <cstdint>
 
 namespace cg
 {
@@ -18,7 +20,7 @@ class CsrMatrix
     public:
     CsrMatrix(const cg::CsrMatrix &host, const Context &context);
     CsrMatrix(CsrMatrixView source, const Context &context);
-    ~CsrMatrix();
+    ~CsrMatrix() = default;
     CsrMatrix(const CsrMatrix &) = delete;
     CsrMatrix &operator=(const CsrMatrix &) = delete;
     CsrMatrix(CsrMatrix &&) noexcept;
@@ -30,8 +32,11 @@ class CsrMatrix
     CsrMatrixView view() const noexcept;
 
     private:
-    struct Impl;
-    std::unique_ptr<Impl> m_impl;
+    std::size_t m_rows = 0;
+    std::size_t m_cols = 0;
+    detail::DeviceAllocation<std::int64_t> m_indptr;
+    detail::DeviceAllocation<std::int64_t> m_indices;
+    Vector m_values;
 };
 
 } // namespace cuda
