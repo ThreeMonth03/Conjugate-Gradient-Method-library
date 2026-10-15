@@ -660,6 +660,134 @@ TEST(DenseRows, OptimizationPreservesNonfiniteMultiplicationBehavior)
     }
 }
 
+TEST(DenseRows, PairBoundariesPreserveExactProductsAndBothResidualSigns)
+{
+    // Fully populated integer products stay exactly representable in double.
+    // The odd size exercises a leftover row after parallel pairs; the even
+    // size exercises the all-pair path. NaN padding detects stride overreads.
+    for (const std::size_t size : {129u, 130u})
+    {
+        SCOPED_TRACE(size);
+        const auto stride = size + 5;
+        std::vector<double> storage(size * stride, std::numeric_limits<double>::quiet_NaN());
+        std::vector<double> p(size), b(size), output(size), expected_product(size);
+        for (std::size_t i = 0; i < size; ++i)
+        {
+            p[i] = static_cast<double>(static_cast<int>(i % 5) - 2);
+            b[i] = static_cast<double>(static_cast<int>(i % 7) - 3);
+            for (std::size_t j = 0; j < size; ++j)
+            {
+                storage[i * stride + j] = static_cast<double>(static_cast<int>((i + 3 * j) % 7) - 3);
+            }
+        }
+        long double expected_dot = 0;
+        for (std::size_t i = 0; i < size; ++i)
+        {
+            long double sum = 0;
+            for (std::size_t j = 0; j < size; ++j)
+            {
+                sum += static_cast<long double>(storage[i * stride + j]) * static_cast<long double>(p[j]);
+            }
+            expected_product[i] = static_cast<double>(sum);
+            expected_dot += static_cast<long double>(p[i]) * sum;
+        }
+        const cg::DenseMatrixView A(storage.data(), size, size, stride);
+        for (const int threads : {1, 2})
+        {
+            if (threads > 1 && !cg::CpuBackend::openmp_enabled())
+            {
+                continue;
+            }
+            SCOPED_TRACE(threads);
+            for (const bool fused : {false, true})
+            {
+                SCOPED_TRACE(fused);
+                const cg::CpuBackend backend(threads, fused);
+                backend.apply(A, p, output);
+                for (std::size_t i = 0; i < size; ++i)
+                {
+                    EXPECT_DOUBLE_EQ(output[i], expected_product[i]);
+                }
+                EXPECT_DOUBLE_EQ(backend.apply_and_dot(A, p, output), static_cast<double>(expected_dot));
+                for (std::size_t i = 0; i < size; ++i)
+                {
+                    EXPECT_DOUBLE_EQ(output[i], expected_product[i]);
+                }
+                for (const auto sign : {cg::ResidualSign::rhs_minus_product, cg::ResidualSign::product_minus_rhs})
+                {
+                    const double actual_norm = backend.residual_squared_norm(A, b, p, output, sign);
+                    long double expected_norm = 0;
+                    for (std::size_t i = 0; i < size; ++i)
+                    {
+                        const long double expected = sign == cg::ResidualSign::rhs_minus_product
+                                                         ? static_cast<long double>(b[i]) - expected_product[i]
+                                                         : expected_product[i] - static_cast<long double>(b[i]);
+                        EXPECT_DOUBLE_EQ(output[i], static_cast<double>(expected));
+                        expected_norm += expected * expected;
+                    }
+                    EXPECT_DOUBLE_EQ(actual_norm, static_cast<double>(expected_norm));
+                }
+            }
+        }
+    }
+}
+
+TEST(DenseRows, NonfiniteValuesStayInTheAffectedPairOrLeftoverRow)
+{
+    constexpr std::size_t size = 129;
+    constexpr std::size_t stride = size + 5;
+    for (const std::size_t affected_row : {1u, 128u})
+    {
+        SCOPED_TRACE(affected_row);
+        for (const std::size_t affected_column : {3u, 128u})
+        {
+            SCOPED_TRACE(affected_column);
+            for (const double bad_value :
+                 {std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::infinity(),
+                  -std::numeric_limits<double>::infinity()})
+            {
+                std::vector<double> storage(size * stride, std::numeric_limits<double>::quiet_NaN());
+                std::vector<double> zero(size), output(size);
+                for (std::size_t i = 0; i < size; ++i)
+                {
+                    for (std::size_t j = 0; j < size; ++j)
+                    {
+                        storage[i * stride + j] = i == j ? 1.0 : 0.0;
+                    }
+                }
+                storage[affected_row * stride + affected_column] = bad_value;
+                const cg::DenseMatrixView A(storage.data(), size, size, stride);
+                for (const int threads : {1, 2})
+                {
+                    if (threads > 1 && !cg::CpuBackend::openmp_enabled())
+                    {
+                        continue;
+                    }
+                    for (const bool fused : {false, true})
+                    {
+                        const cg::CpuBackend backend(threads, fused);
+                        backend.apply(A, zero, output);
+                        for (std::size_t i = 0; i < size; ++i)
+                        {
+                            if (i == affected_row)
+                            {
+                                EXPECT_TRUE(std::isnan(output[i]));
+                            }
+                            else
+                            {
+                                EXPECT_DOUBLE_EQ(output[i], 0.0);
+                            }
+                        }
+                        EXPECT_TRUE(std::isnan(backend.apply_and_dot(A, zero, output)));
+                        EXPECT_TRUE(std::isnan(backend.residual_squared_norm(A, zero, zero, output)));
+                        EXPECT_TRUE(std::isnan(output[affected_row]));
+                    }
+                }
+            }
+        }
+    }
+}
+
 TEST(CGRecurrence, SolvesAndVerifiesTrueResidualWithBothKernelPolicies)
 {
     const auto A = tridiagonal(31);
