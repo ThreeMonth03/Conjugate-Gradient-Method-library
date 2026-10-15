@@ -654,6 +654,7 @@ def test_torch_reference_keeps_its_control_when_native_device_mode_is_selected(
 
     def initialize(self, selected_ops, selected_options, scope):
         self.ops = selected_ops
+        self.scope = scope
         captured.update(selected_options)
 
     monkeypatch.setattr(adapters.torch_cuda, "TorchCudaOps", lambda *a: ops)
