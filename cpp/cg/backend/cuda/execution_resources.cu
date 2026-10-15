@@ -26,7 +26,7 @@ ExecutionResources::ExecutionResources(const Context &ctx, DenseKernel selected)
     }
     if (selected == DenseKernel::cublas)
     {
-        cublas = std::make_unique<CublasResources>(ctx);
+        cublas.emplace(ctx);
     }
 }
 

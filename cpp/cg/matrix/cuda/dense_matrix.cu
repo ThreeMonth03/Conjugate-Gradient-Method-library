@@ -1,6 +1,8 @@
 #include <cg/matrix/cuda/dense_matrix.hpp>
 #include <cg/matrix/cuda/detail/validation.hpp>
 #include <cg/matrix/detail/validation.hpp>
+#include <cg/runtime/cuda/detail/runtime.hpp>
+#include <cg/runtime/detail/checked_size.hpp>
 
 #include <utility>
 
@@ -10,7 +12,7 @@ namespace cuda
 {
 
 DenseMatrix::DenseMatrix(cg::DenseMatrixView host, const Context &context)
-    : m_rows(host.rows()), m_cols(host.cols()), m_values(detail::checked_product(host.rows(), host.cols()), context)
+    : m_rows(host.rows()), m_cols(host.cols()), m_values(cg::detail::checked_product(host.rows(), host.cols()), context)
 {
     cg::detail::validate(host);
     detail::DeviceGuard guard(context.device());
@@ -25,7 +27,7 @@ DenseMatrix::DenseMatrix(cg::DenseMatrixView host, const Context &context)
 }
 DenseMatrix::DenseMatrix(DenseMatrixView source, const Context &context)
     : m_rows(source.rows()), m_cols(source.cols()),
-      m_values(detail::checked_product(source.rows(), source.cols()), context)
+      m_values(cg::detail::checked_product(source.rows(), source.cols()), context)
 {
     detail::validate(source, context);
     detail::DeviceGuard guard(context.device());

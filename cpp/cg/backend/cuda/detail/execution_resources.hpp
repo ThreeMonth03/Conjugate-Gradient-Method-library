@@ -4,7 +4,7 @@
 #include <cg/backend/cuda/detail/blas_handle.hpp>
 #include <cg/storage/cuda/detail/allocation.hpp>
 
-#include <memory>
+#include <optional>
 
 namespace cg
 {
@@ -29,7 +29,7 @@ struct ExecutionResources
     Context context;
     DeviceAllocation<double> partials, scalar;
     PinnedScalar host;
-    std::unique_ptr<CublasResources> cublas;
+    std::optional<CublasResources> cublas;
     DenseKernel kernel;
 };
 

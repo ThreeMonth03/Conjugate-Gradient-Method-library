@@ -112,6 +112,7 @@ if(BUILD_TESTING)
     FetchContent_MakeAvailable(googletest)
     add_executable(cg_gtests
         tests/cpp/storage/test_cuda_views.cpp
+        tests/cpp/storage/test_sizes.cpp
         tests/cpp/solver/test_core.cpp
         tests/cpp/matrix/test_csr.cpp
         tests/cpp/solver/test_pcg.cpp

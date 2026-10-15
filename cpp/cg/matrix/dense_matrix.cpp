@@ -1,7 +1,8 @@
 #include <cg/matrix/dense_matrix.hpp>
+#include <cg/matrix/detail/storage_extent.hpp>
 #include <cg/matrix/detail/validation.hpp>
+#include <cg/runtime/detail/checked_size.hpp>
 
-#include <limits>
 #include <stdexcept>
 #include <utility>
 
@@ -15,14 +16,14 @@ DenseMatrixView::DenseMatrixView(const double *data, std::size_t rows, std::size
 }
 
 DenseMatrix::DenseMatrix(std::size_t rows, std::size_t cols)
-    : m_rows(rows), m_cols(cols), m_values(detail::checked_product(rows, cols))
+    : m_rows(rows), m_cols(cols), m_values(cg::detail::checked_product(rows, cols))
 {
 }
 
 DenseMatrix::DenseMatrix(std::size_t rows, std::size_t cols, std::vector<double> values)
     : m_rows(rows), m_cols(cols), m_values(std::move(values))
 {
-    if (m_values.size() != detail::checked_product(rows, cols))
+    if (m_values.size() != cg::detail::checked_product(rows, cols))
     {
         throw std::invalid_argument("matrix shape does not match storage size");
     }
@@ -64,36 +65,15 @@ DenseMatrix &DenseMatrix::operator=(DenseMatrix &&other) noexcept
 
 namespace detail
 {
-namespace
-{
-std::size_t matrix_span(DenseMatrixView view)
-{
-    if (view.rows() == 0 || view.cols() == 0)
-    {
-        return 0;
-    }
-    const auto preceding = checked_product(view.rows() - 1, view.row_stride());
-    if (preceding > std::numeric_limits<std::size_t>::max() - view.cols())
-    {
-        throw std::invalid_argument("matrix span overflows size_t");
-    }
-    return preceding + view.cols();
-}
-
-} // namespace
 void validate(DenseMatrixView view)
 {
-    if (view.row_stride() < view.cols())
-    {
-        throw std::invalid_argument("matrix row stride is smaller than its columns");
-    }
-    validate_raw_vector(view.data(), matrix_span(view));
+    validate_raw_vector(view.data(), cg::detail::storage_extent(view.rows(), view.cols(), view.row_stride()));
 }
 
 bool overlaps(DenseMatrixView a, ConstVectorView b)
 {
     validate(a);
-    return overlaps_raw(a.data(), matrix_span(a), b.data(), b.size());
+    return overlaps_raw(a.data(), cg::detail::storage_extent(a.rows(), a.cols(), a.row_stride()), b.data(), b.size());
 }
 
 } // namespace detail

@@ -396,14 +396,22 @@ TEST_F(Cuda, NativePreparedPlansCacheSetupAndReuseIndependentWorkspaces)
     {
         for (const auto kernel : {gpu::DenseKernel::native, gpu::DenseKernel::cublas})
         {
-            const gpu::PreparedSolver plan(gpu::DenseMatrix(host.view(), *context), *context, kernel, kind);
-            check(plan, kind);
+            gpu::PreparedSolver plan(gpu::DenseMatrix(host.view(), *context), *context, kernel, kind);
+            const auto moved = std::move(plan);
+            check(moved, kind);
         }
         const gpu::PreparedSolver sparse(gpu::CsrMatrix(as_csr(host.view()), *context), *context,
                                          gpu::DenseKernel::native, kind);
         check(sparse, kind);
     }
     EXPECT_THROW(gpu::PreparedSolver(gpu::CsrMatrix(as_csr(host.view()), *context), *context, gpu::DenseKernel::cublas),
+                 std::invalid_argument);
+    const auto invalid_kind = static_cast<cg::PreconditionerKind>(-1);
+    EXPECT_THROW(
+        gpu::PreparedSolver(gpu::DenseMatrix(host.view(), *context), *context, gpu::DenseKernel::native, invalid_kind),
+        std::invalid_argument);
+    EXPECT_THROW(gpu::PreparedSolver(gpu::CsrMatrix(as_csr(host.view()), *context), *context, gpu::DenseKernel::native,
+                                     invalid_kind),
                  std::invalid_argument);
 }
 

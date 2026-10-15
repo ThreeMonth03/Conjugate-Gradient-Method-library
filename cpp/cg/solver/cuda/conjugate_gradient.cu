@@ -1,6 +1,7 @@
 #include <cg/backend/cuda/detail/backend.hpp>
 #include <cg/matrix/cuda/detail/validation.hpp>
 #include <cg/preconditioner/cuda/jacobi.hpp>
+#include <cg/runtime/cuda/detail/runtime.hpp>
 #include <cg/solver/cuda/conjugate_gradient.hpp>
 #include <cg/solver/cuda/detail/workspace_use_guard.hpp>
 #include <cg/solver/detail/engine.hpp>
@@ -13,22 +14,6 @@ namespace cuda
 namespace
 {
 
-std::size_t rows(DenseMatrixView A)
-{
-    return A.rows();
-}
-std::size_t rows(const CsrMatrix &A)
-{
-    return A.rows();
-}
-std::size_t cols(DenseMatrixView A)
-{
-    return A.cols();
-}
-std::size_t cols(const CsrMatrix &A)
-{
-    return A.cols();
-}
 void validate_matrix(DenseMatrixView A, const Context &context)
 {
     detail::validate(A, context);
@@ -48,18 +33,19 @@ void validate_solve(const Matrix &A, ConstVectorView b, VectorView x, Workspace 
     validate_matrix(A, context);
     detail::validate(b, context);
     detail::validate(x, context);
-    if (rows(A) == 0 || rows(A) != cols(A) || b.size() != rows(A) || x.size() != rows(A))
+    if (A.rows() == 0 || A.rows() != A.cols() || b.size() != A.rows() || x.size() != A.rows())
     {
         throw std::invalid_argument("CUDA CG requires a nonempty square matrix and matching vectors");
     }
-    if (workspace.size() != rows(A) || workspace.device() != context.device() || workspace.stream() != context.stream())
+    if (workspace.size() != A.rows() || workspace.device() != context.device() ||
+        workspace.stream() != context.stream())
     {
         throw std::invalid_argument("CUDA workspace must match the system size, device and stream");
     }
     cg::detail::validate_options(options, M != nullptr);
     if (M != nullptr)
     {
-        if (M->size() != rows(A) || M->device() != context.device())
+        if (M->size() != A.rows() || M->device() != context.device())
         {
             throw std::invalid_argument("CUDA Jacobi dimension or device does not match");
         }

@@ -1,4 +1,5 @@
 #include <cg/matrix/cuda/detail/validation.hpp>
+#include <cg/matrix/detail/storage_extent.hpp>
 
 namespace cg
 {
@@ -9,12 +10,15 @@ namespace detail
 
 void validate(DenseMatrixView view, const Context &context, bool inspect_pointer)
 {
-    validate(ConstVectorView{view.data(), storage_extent(view), view.device()}, context, inspect_pointer);
+    validate(ConstVectorView{view.data(), cg::detail::storage_extent(view.rows(), view.cols(), view.row_stride()),
+                             view.device()},
+             context, inspect_pointer);
 }
 
 bool overlaps(DenseMatrixView A, ConstVectorView b)
 {
-    return overlaps(ConstVectorView{A.data(), storage_extent(A), A.device()}, b);
+    return overlaps(
+        ConstVectorView{A.data(), cg::detail::storage_extent(A.rows(), A.cols(), A.row_stride()), A.device()}, b);
 }
 
 bool overlaps(const CsrMatrix &A, ConstVectorView b)

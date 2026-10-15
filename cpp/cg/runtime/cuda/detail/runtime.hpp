@@ -4,7 +4,6 @@
 
 #include <cuda_runtime.h>
 
-#include <limits>
 #include <stdexcept>
 #include <string>
 
@@ -55,15 +54,6 @@ template <class Cleanup> void on_device_noexcept(int device, Cleanup cleanup) no
         (void)cudaSetDevice(previous);
     }
 }
-inline std::size_t checked_product(std::size_t a, std::size_t b)
-{
-    if (b != 0 && a > std::numeric_limits<std::size_t>::max() / b)
-    {
-        throw std::invalid_argument("CUDA storage size overflows size_t");
-    }
-    return a * b;
-}
-
 } // namespace detail
 } // namespace cuda
 } // namespace cg

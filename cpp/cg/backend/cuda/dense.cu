@@ -4,6 +4,7 @@
 #include <cg/backend/cuda/detail/validation.hpp>
 #include <cg/runtime/cuda/detail/launch.hpp>
 #include <cg/storage/cuda/detail/fill.hpp>
+#include <limits>
 
 namespace cg
 {

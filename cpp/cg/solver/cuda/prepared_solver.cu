@@ -25,23 +25,23 @@ const CsrMatrix &operator_view(const CsrMatrix &matrix)
 
 PreparedSolver::PreparedSolver(DenseMatrix matrix, const Context &context, DenseKernel kernel,
                                PreconditionerKind preconditioner)
-    : m_matrix(std::move(matrix)), m_device(context.device()), m_kernel(kernel), m_preconditioner_kind(preconditioner)
+    : m_matrix(std::move(matrix)), m_device(context.device()), m_kernel(kernel)
 {
-    prepare(context);
+    prepare(context, preconditioner);
 }
 PreparedSolver::PreparedSolver(CsrMatrix matrix, const Context &context, DenseKernel kernel,
                                PreconditionerKind preconditioner)
-    : m_matrix(std::move(matrix)), m_device(context.device()), m_kernel(kernel), m_preconditioner_kind(preconditioner)
+    : m_matrix(std::move(matrix)), m_device(context.device()), m_kernel(kernel)
 {
-    prepare(context);
+    prepare(context, preconditioner);
 }
-void PreparedSolver::prepare(const Context &context)
+void PreparedSolver::prepare(const Context &context, PreconditionerKind preconditioner)
 {
     if (m_kernel != DenseKernel::native && m_kernel != DenseKernel::cublas)
     {
         throw std::invalid_argument("unsupported CUDA dense kernel");
     }
-    if (m_preconditioner_kind != PreconditionerKind::none && m_preconditioner_kind != PreconditionerKind::jacobi)
+    if (preconditioner != PreconditionerKind::none && preconditioner != PreconditionerKind::jacobi)
     {
         throw std::invalid_argument("unsupported preconditioner kind");
     }
@@ -63,7 +63,7 @@ void PreparedSolver::prepare(const Context &context)
                     throw std::invalid_argument("CUDA CSR requires dense_kernel='native'");
                 }
             }
-            if (m_preconditioner_kind == PreconditionerKind::jacobi)
+            if (preconditioner == PreconditionerKind::jacobi)
             {
                 const auto start = std::chrono::steady_clock::now();
                 m_preconditioner.emplace(operator_view(matrix), context);
