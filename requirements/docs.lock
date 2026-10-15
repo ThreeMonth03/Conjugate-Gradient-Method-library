@@ -1,4 +1,4 @@
-# Sphinx and its dependencies support Python 3.10 and 3.12.
+# Documentation dependencies for CPython 3.12.
 # Install into .venv with --cache-dir .cache/pip.
 -r dev.lock
 Sphinx==8.1.3

@@ -16,6 +16,7 @@ definiteness are caller preconditions.
    cuda
    architecture
    benchmarks
+   refactor_validation
 
 First solve
 -----------

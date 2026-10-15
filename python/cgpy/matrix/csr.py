@@ -1,0 +1,78 @@
+"""Canonical owning compressed sparse row matrices."""
+
+import numpy as np
+import numpy.typing as npt
+
+from .. import _core
+from .._runtime import validation
+
+
+class CSRMatrix:
+    """Own a validated canonical compressed sparse row matrix.
+
+    Parameters
+    ----------
+    indptr : array_like of int
+        One-dimensional row pointers of length ``shape[0] + 1``. They must
+        start at zero, be nondecreasing, and end at the number of values.
+    indices : array_like of int
+        One-dimensional nonnegative column indices, sorted and unique within
+        each row. Each entry must be smaller than ``shape[1]``.
+    data : array_like of float
+        One-dimensional real values matching ``indices``. Values are copied
+        into float64 storage.
+    shape : tuple of int
+        Nonnegative row and column counts. Solving additionally requires a
+        nonempty square matrix.
+
+    Raises
+    ------
+    ValueError
+        Index arrays, dimensions, canonical ordering or data shape are invalid.
+    TypeError
+        Native dimensions or indices cannot be represented by ``size_t``.
+
+    Notes
+    -----
+    Construction snapshots the arrays. Later changes to them do not alter the
+    operator. Canonicalize SciPy CSR with ``sum_duplicates()`` and
+    ``sort_indices()`` before wrapping arrays that need those operations.
+
+    Examples
+    --------
+    >>> import cgpy
+    >>> A = cgpy.CSRMatrix([0, 2, 4], [0, 1, 0, 1], [4., 1., 1., 3.], (2, 2))
+    >>> A.shape, A.nnz
+    ((2, 2), 4)
+    """
+
+    def __init__(
+        self,
+        indptr: npt.ArrayLike,
+        indices: npt.ArrayLike,
+        data: npt.ArrayLike,
+        shape: tuple[int, int],
+    ) -> None:
+        rowptr, columns = np.asarray(indptr), np.asarray(indices)
+        if rowptr.ndim != 1 or columns.ndim != 1:
+            raise ValueError("CSR index arrays must be one-dimensional")
+        if rowptr.dtype.kind not in "iu" or (
+            columns.size and columns.dtype.kind not in "iu"
+        ):
+            raise ValueError("CSR index arrays must contain integers")
+        if np.any(rowptr < 0) or np.any(columns < 0):
+            raise ValueError("CSR indices must be nonnegative")
+        values = validation.real_array(data, "data")
+        if values.ndim != 1:
+            raise ValueError("CSR data must be one-dimensional")
+        self._native = _core.CSRMatrix(rowptr, columns, values, shape)
+
+    @property
+    def shape(self) -> tuple[int, ...]:
+        """tuple of int: Matrix dimensions ``(rows, columns)``."""
+        return self._native.shape
+
+    @property
+    def nnz(self) -> int:
+        """int: Number of stored entries, including explicitly stored zeros."""
+        return self._native.nnz

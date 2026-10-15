@@ -1,11 +1,11 @@
 """Deterministic inputs shared by numerical tests and performance runs."""
 
+import dataclasses
 import hashlib
 import json
-from dataclasses import asdict, dataclass
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class CaseSpec:
     """Describe a dense SPD system or a CSR Dirichlet Poisson grid."""
 
@@ -18,7 +18,7 @@ class CaseSpec:
     diagonal_scale: float = 1.0
 
     def to_dict(self):
-        data = asdict(self)
+        data = dataclasses.asdict(self)
         # Preserve existing dense artifact hashes when adding sparse cases.
         if self.storage == "dense":
             data.pop("storage")
@@ -33,7 +33,9 @@ class CaseSpec:
 
 SUITES = {
     "smoke": (CaseSpec("dense-16", 16),),
-    "cpu": tuple(CaseSpec(f"dense-{size}", size) for size in (64, 256, 1024, 2048)),
+    "cpu": tuple(
+        CaseSpec(f"dense-{size}", size) for size in (64, 256, 1024, 2048)
+    ),
     "smoke-csr": (CaseSpec("poisson-4", 16, storage="csr", grid=4),),
     "cpu-csr-f64-v1": tuple(
         CaseSpec(f"poisson-{grid}", grid * grid, storage="csr", grid=grid)
@@ -68,8 +70,12 @@ SUITES["smoke-sparse-solvers"] = tuple(
     )
     for dimensions, grid in ((2, 4), (3, 3))
 )
-SUITES["sparse-solvers"] += (CaseSpec("poisson-2d-16-neutral", 256, storage="csr", grid=16),)
-SUITES["smoke-sparse-solvers"] += (CaseSpec("poisson-2d-4-neutral", 16, storage="csr", grid=4),)
+SUITES["sparse-solvers"] += (
+    CaseSpec("poisson-2d-16-neutral", 256, storage="csr", grid=16),
+)
+SUITES["smoke-sparse-solvers"] += (
+    CaseSpec("poisson-2d-4-neutral", 16, storage="csr", grid=4),
+)
 SUITES["sparse-solvers-large"] = tuple(
     CaseSpec(
         f"poisson-{dimensions}d-{grid}-large",
@@ -103,9 +109,15 @@ def make_case(spec, seed=20261015):
             or spec.dimensions not in (2, 3)
             or spec.grid**spec.dimensions != spec.size
         ):
-            raise ValueError("CSR Poisson size must equal grid to dimensions (2 or 3)")
+            raise ValueError(
+                "CSR Poisson size must equal grid to dimensions (2 or 3)"
+            )
         line = sparse.diags(
-            (-np.ones(spec.grid - 1), 2.0 * np.ones(spec.grid), -np.ones(spec.grid - 1)),
+            (
+                -np.ones(spec.grid - 1),
+                2.0 * np.ones(spec.grid),
+                -np.ones(spec.grid - 1),
+            ),
             (-1, 0, 1),
             shape=(spec.grid, spec.grid),
             format="csr",
@@ -117,7 +129,10 @@ def make_case(spec, seed=20261015):
             raise ValueError("diagonal_scale must be finite and at least one")
         if spec.diagonal_scale != 1.0:
             weights = np.geomspace(1.0, spec.diagonal_scale, spec.size)
-            matrix.data *= np.repeat(weights, np.diff(matrix.indptr)) * weights[matrix.indices]
+            matrix.data *= (
+                np.repeat(weights, np.diff(matrix.indptr))
+                * weights[matrix.indices]
+            )
         matrix.sum_duplicates()
         matrix.eliminate_zeros()
         matrix.sort_indices()
@@ -138,7 +153,9 @@ def make_case(spec, seed=20261015):
 
 def input_hash(spec, arrays):
     """Hash the specification and exact logical bytes, including dtype/shape."""
-    digest = hashlib.sha256(json.dumps(spec.to_dict(), sort_keys=True).encode())
+    digest = hashlib.sha256(
+        json.dumps(spec.to_dict(), sort_keys=True).encode()
+    )
     for array in arrays:
         digest.update(array.dtype.str.encode())
         digest.update(json.dumps(array.shape).encode())

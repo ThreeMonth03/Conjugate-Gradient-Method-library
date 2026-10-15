@@ -20,26 +20,14 @@ RUN if [ "$CG_WITH_BENCHMARKS" = "1" ]; then \
         .venv/bin/python -m pip install -r requirements/benchmark.lock; \
     fi
 
-COPY CMakeLists.txt CMakePresets.json Makefile pyproject.toml README.md .clang-format .clang-tidy ./
-COPY cpp/matrix/*.cpp cpp/matrix/*.hpp cpp/matrix/
-COPY cpp/cg_method/*.cpp cpp/cg_method/*.hpp cpp/cg_method/
-COPY cpp/pybind/*.cpp cpp/pybind/
-COPY include/cg/*.hpp include/cg/
-COPY include/cg/detail/*.hpp include/cg/detail/
-COPY cmake/*.cmake cmake/
-COPY src/*.cpp src/*.cu src/
-COPY bindings/*.cpp bindings/
-COPY python/*.py python/
-COPY python/cgpy/*.py python/cgpy/
-COPY python/cgbench/*.py python/cgbench/
-COPY python/README.md python/
-COPY docs/*.md docs/
-COPY docs/*.rst docs/conf.py docs/
-COPY scripts/*.py scripts/
-COPY tests/*.py tests/
-COPY tests/cpp/*.cpp tests/cpp/
-COPY demo/*.py demo/
-COPY benchmarks/*.md benchmarks/
-COPY benchmarks/results/ benchmarks/results/
+COPY CMakeLists.txt CMakePresets.json Makefile pyproject.toml README.md STYLE.md .clang-format .clang-tidy .python-version ./
+COPY cpp/ cpp/
+COPY cmake/ cmake/
+COPY python/ python/
+COPY docs/ docs/
+COPY scripts/ scripts/
+COPY tests/ tests/
+COPY examples/ examples/
+COPY benchmarks/ benchmarks/
 
 CMD ["make", "test"]

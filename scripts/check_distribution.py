@@ -2,13 +2,13 @@
 
 import argparse
 import os
+import pathlib
 import shutil
 import subprocess
 import sys
 import tarfile
 import tempfile
 import venv
-from pathlib import Path
 
 
 def check_sdist(path):
@@ -28,11 +28,17 @@ def check_sdist(path):
         ".git",
     }
     for member in members:
-        parts = Path(member.name).parts
-        if not parts or Path(member.name).is_absolute() or ".." in parts:
+        parts = pathlib.Path(member.name).parts
+        if (
+            not parts
+            or pathlib.Path(member.name).is_absolute()
+            or ".." in parts
+        ):
             raise AssertionError(f"unsafe sdist path: {member.name}")
         if forbidden.intersection(parts):
-            raise AssertionError(f"local build/dependency included: {member.name}")
+            raise AssertionError(
+                f"local build/dependency included: {member.name}"
+            )
         if member.issym() or member.islnk():
             raise AssertionError(f"unexpected sdist symlink: {member.name}")
         names.add("/".join(parts[1:]))
@@ -44,47 +50,66 @@ def check_sdist(path):
         ".clang-tidy",
         "cmake/CGOpenBLAS.cmake",
         "cmake/NamespaceOpenBLAS.cmake",
-        "src/blas.cpp",
-        "src/cuda_storage.cu",
-        "src/cuda_backend.cu",
-        "src/cuda_solver.cu",
-        "include/cg/detail/blas.hpp",
-        "include/cg/detail/solver_engine.hpp",
-        "include/cg/cuda.hpp",
-        "include/cg/detail/cuda.hpp",
-        "bindings/cuda.cpp",
+        "cpp/cg/backend/cpu/blas.cpp",
+        "cpp/cg/backend/cuda/backend.cu",
+        "cpp/cg/storage/cuda/vector.cu",
+        "cpp/cg/matrix/cuda/csr_matrix.cu",
+        "cpp/cg/solver/cuda/conjugate_gradient.cu",
+        "cpp/cg/solver/detail/engine.hpp",
+        "cpp/cg/cuda.hpp",
+        "cpp/cg/backend/cuda/detail/runtime.hpp",
+        "cpp/cg/solver/pymod/cuda.cpp",
         "python/cgpy/__init__.py",
-        "python/cgpy/cuda.py",
+        "python/cgpy/cuda/__init__.py",
         "python/cgbench/cli.py",
         "docs/conf.py",
         "scripts/check_installed.py",
         "scripts/setup_cuda.py",
         "requirements/cuda.lock",
         "requirements/cuda-benchmark.lock",
-        "tests/cpp/test_blas.cpp",
-        "tests/cpp/test_cuda.cpp",
+        "tests/cpp/backend/test_blas.cpp",
+        "tests/cpp/cuda/test_cuda.cpp",
     }
     if not required <= names:
-        raise AssertionError(f"sdist missing sources: {sorted(required - names)}")
-    research = {"benchmarks/compare_direct.py", "benchmarks/cg_vs_direct_results.json"}
-    if names.intersection(research) or any(n.startswith("benchmarks/results/") for n in names):
-        raise AssertionError("research or raw measurement artifacts leaked into sdist")
-    print(f"Checked {len(names)} sdist paths; no local dependencies or research files.", flush=True)
+        raise AssertionError(
+            f"sdist missing sources: {sorted(required - names)}"
+        )
+    retired = {
+        "python/utils.py",
+        "cpp/matrix/_matrix.cpp",
+        "cpp/pybind/_pybind.cpp",
+    }
+    if names.intersection(retired):
+        raise AssertionError("retired APIs leaked into sdist")
+    research = {
+        "benchmarks/compare_direct.py",
+        "benchmarks/cg_vs_direct_results.json",
+    }
+    if names.intersection(research) or any(
+        n.startswith("benchmarks/results/") for n in names
+    ):
+        raise AssertionError(
+            "research or raw measurement artifacts leaked into sdist"
+        )
+    print(
+        f"Checked {len(names)} sdist paths; no local dependencies or research files.",
+        flush=True,
+    )
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--sdist", type=Path, required=True)
+    parser.add_argument("--sdist", type=pathlib.Path, required=True)
     parser.add_argument("--blas", choices=("OFF", "ON"), default="OFF")
     parser.add_argument("--cuda", choices=("OFF", "ON"), default="OFF")
-    parser.add_argument("--cuda-root", type=Path)
+    parser.add_argument("--cuda-root", type=pathlib.Path)
     parser.add_argument("--cuda-host-compiler", default="/usr/bin/g++-13")
     parser.add_argument("--cuda-architectures", default="75")
     parser.add_argument("--jobs", type=int, default=2)
     options = parser.parse_args()
     if options.jobs < 1:
         parser.error("--jobs must be positive")
-    root = Path(__file__).resolve().parents[1]
+    root = pathlib.Path(__file__).resolve().parents[1]
     sdist = options.sdist.resolve()
     check_sdist(sdist)
     environment = dict(os.environ)
@@ -102,7 +127,7 @@ def main():
     # Only the download cache remains project-local; the temporary venv is
     # removed on success or failure and never installs into the host Python.
     with tempfile.TemporaryDirectory(prefix="cgpy-distribution-") as temporary:
-        work = Path(temporary)
+        work = pathlib.Path(temporary)
         moved_sdist = work / sdist.name
         shutil.copyfile(sdist, moved_sdist)
         wheels = work / "wheels"
@@ -159,7 +184,8 @@ def main():
                 "install",
                 "--constraint",
                 str(root / "requirements/packaging.lock"),
-                str(wheel_files[0]) + ("[cuda]" if options.cuda == "ON" else ""),
+                str(wheel_files[0])
+                + ("[cuda]" if options.cuda == "ON" else ""),
             ],
             cwd=work,
             env=environment,
@@ -168,13 +194,21 @@ def main():
         check = work / "check_installed.py"
         shutil.copyfile(root / "scripts/check_installed.py", check)
         subprocess.run(
-            [str(python), "-I", str(check), "--blas", options.blas, "--cuda", options.cuda],
+            [
+                str(python),
+                "-I",
+                str(check),
+                "--blas",
+                options.blas,
+                "--cuda",
+                options.cuda,
+            ],
             cwd=work,
             env=environment,
             check=True,
         )
     print(
-        f"Relocated sdist → isolated wheel → installed smoke passed (BLAS={options.blas}, CUDA={options.cuda})."
+        f"Relocated sdist -> isolated wheel -> installed smoke passed (BLAS={options.blas}, CUDA={options.cuda})."
     )
 
 

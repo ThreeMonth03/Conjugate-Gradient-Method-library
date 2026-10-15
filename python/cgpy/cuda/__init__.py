@@ -1,0 +1,43 @@
+"""Explicit CUDA CG/PCG with device-owned solutions and synchronous calls.
+
+Importing this module works with CPU-only builds. CUDA operations require an
+optional extension, its NVIDIA runtime dependencies and a compatible GPU.
+Uploads use explicitly named ``from_host`` / ``prepare_host`` methods.
+"""
+
+from .._runtime.cuda import (
+    build_info,
+    enabled,
+    is_available,
+    runtime_info,
+    synchronize,
+)
+from ..matrix.cuda import CSRMatrix, DenseMatrix
+from ..solver.cuda import (
+    PreparedSolver,
+    prepare,
+    prepare_host,
+    solve,
+    solve_into,
+)
+from ..solver.cuda_workspace import Workspace
+from ..solver.result import SolveResult
+from ..storage.cuda import Vector
+
+__all__ = [
+    "CSRMatrix",
+    "DenseMatrix",
+    "PreparedSolver",
+    "SolveResult",
+    "Vector",
+    "Workspace",
+    "build_info",
+    "enabled",
+    "is_available",
+    "prepare",
+    "prepare_host",
+    "runtime_info",
+    "solve",
+    "solve_into",
+    "synchronize",
+]

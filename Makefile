@@ -6,7 +6,9 @@ BUILD_DIR ?= $(CURDIR)/build/$(PRESET)
 JOBS ?= 2
 RUFF := $(dir $(PYTHON))ruff
 CLANG_FORMAT := $(dir $(PYTHON))clang-format
-CPP_FILES := $(wildcard cpp/*/*.cpp cpp/*/*.hpp include/cg/*.hpp include/cg/detail/*.hpp src/*.cpp src/*.cu bindings/*.cpp tests/cpp/*.cpp)
+recursive_files = $(foreach path,$(wildcard $1/*),$(call recursive_files,$(path),$2) $(filter $2,$(path)))
+CPP_FILES := $(call recursive_files,cpp/cg,%.cpp %.hpp %.cu) $(call recursive_files,tests/cpp,%.cpp)
+VERSION = $(shell $(PYTHON) -c 'import pathlib, tomllib; print(tomllib.loads(pathlib.Path("pyproject.toml").read_text())["project"]["version"])')
 CMAKE_ARGS ?=
 PYPROF_SUITE ?= sparse-solvers
 PYPROF_THREADS ?= 1
@@ -48,13 +50,13 @@ gtest: configure
 	$(CMAKE) -E env OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 $(CTEST) --test-dir $(BUILD_DIR) --output-on-failure -L cpp
 
 lint:
-	$(RUFF) check python tests demo scripts
-	$(RUFF) format --check python tests demo scripts
+	$(RUFF) check python tests/python examples scripts docs/conf.py
+	$(RUFF) format --check python tests/python examples scripts docs/conf.py
 	$(CLANG_FORMAT) --dry-run --Werror $(CPP_FILES)
 
 format:
-	$(RUFF) check --fix python tests demo scripts
-	$(RUFF) format python tests demo scripts
+	$(RUFF) check --fix python tests/python examples scripts docs/conf.py
+	$(RUFF) format python tests/python examples scripts docs/conf.py
 	$(CLANG_FORMAT) -i $(CPP_FILES)
 
 wheel:
@@ -68,16 +70,16 @@ dist:
 	PIP_CACHE_DIR=$(CURDIR)/.cache/pip CMAKE_BUILD_PARALLEL_LEVEL=$(JOBS) $(PYTHON) -m build --outdir $(DIST_DIR) -Ccmake.define.CG_ENABLE_BLAS=$(DIST_BLAS) -Ccmake.define.CG_ENABLE_CUDA=$(DIST_CUDA) $(CUDA_DIST_ARGS) $(DIST_ARGS)
 
 test-dist: sdist
-	$(PYTHON) scripts/check_distribution.py --sdist $(DIST_DIR)/cgpy-0.4.0.tar.gz --blas $(DIST_BLAS) --cuda $(DIST_CUDA) --cuda-root $(CUDA_ROOT) --cuda-host-compiler $(CUDA_HOST_COMPILER) --cuda-architectures "$(CUDA_ARCHITECTURES)" --jobs $(JOBS)
+	$(PYTHON) scripts/check_distribution.py --sdist $(DIST_DIR)/cgpy-$(VERSION).tar.gz --blas $(DIST_BLAS) --cuda $(DIST_CUDA) --cuda-root $(CUDA_ROOT) --cuda-host-compiler $(CUDA_HOST_COMPILER) --cuda-architectures "$(CUDA_ARCHITECTURES)" --jobs $(JOBS)
 
 docs: build
-	PYTHONPATH=$(BUILD_DIR)/python:$(CURDIR)/python $(PYTHON) -m sphinx -W --keep-going -b html docs $(DOCS_DIR)/html
+	PYTHONPATH=$(BUILD_DIR)/python $(PYTHON) -m sphinx -W --keep-going -b html docs $(DOCS_DIR)/html
 
 doctest: build
-	PYTHONPATH=$(BUILD_DIR)/python:$(CURDIR)/python $(PYTHON) -m sphinx -W --keep-going -b doctest docs $(DOCS_DIR)/doctest
+	PYTHONPATH=$(BUILD_DIR)/python $(PYTHON) -m sphinx -W --keep-going -b doctest docs $(DOCS_DIR)/doctest
 
 pyprof: build
-	PYTHONPATH=$(BUILD_DIR)/python:$(CURDIR)/python $(PYTHON) -m cgbench run \
+	PYTHONPATH=$(BUILD_DIR)/python $(PYTHON) -m cgbench run \
 		--suite $(PYPROF_SUITE) --threads $(PYPROF_THREADS) --scope $(PYPROF_SCOPE) \
 		--rounds $(PYPROF_ROUNDS) --repetitions $(PYPROF_REPETITIONS) \
 		--output $(PYPROF_OUTPUT) $(PYPROF_ARGS)
@@ -86,5 +88,6 @@ clean:
 	$(CMAKE) -E rm -rf $(BUILD_DIR)
 
 demo: build
-	PYTHONPATH=$(BUILD_DIR)/python:$(CURDIR)/python $(PYTHON) demo/demo_matrix.py
-	PYTHONPATH=$(BUILD_DIR)/python:$(CURDIR)/python $(PYTHON) demo/demo_cg_method.py
+	PYTHONPATH=$(BUILD_DIR)/python $(PYTHON) examples/dense.py
+	PYTHONPATH=$(BUILD_DIR)/python $(PYTHON) examples/csr.py
+	PYTHONPATH=$(BUILD_DIR)/python $(PYTHON) examples/prepared.py

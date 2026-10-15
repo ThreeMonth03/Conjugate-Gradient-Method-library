@@ -1,4 +1,18 @@
 BasedOnStyle: LLVM
 IndentWidth: 4
+AccessModifierOffset: 0
 BreakBeforeBraces: Allman
-ColumnLimit: 100
+ColumnLimit: 120
+InsertBraces: true
+AllowShortFunctionsOnASingleLine: Inline
+IncludeCategories:
+  - Regex: '^<pybind11/pybind11\.h>$'
+    Priority: 0
+  - Regex: '^<cg/python/'
+    Priority: 1
+  - Regex: '^<pybind11/'
+    Priority: 2
+  - Regex: '^<cg/'
+    Priority: 3
+  - Regex: '.*'
+    Priority: 4

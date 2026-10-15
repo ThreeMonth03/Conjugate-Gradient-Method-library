@@ -3,11 +3,11 @@
 import hashlib
 import json
 import os
+import pathlib
 import platform
 import subprocess
 import sys
 import tempfile
-from pathlib import Path
 
 THREAD_VARIABLES = (
     "OMP_NUM_THREADS",
@@ -21,7 +21,9 @@ THREAD_VARIABLES = (
 
 def _command(arguments, cwd):
     try:
-        completed = subprocess.run(arguments, cwd=cwd, capture_output=True, text=True, check=True)
+        completed = subprocess.run(
+            arguments, cwd=cwd, capture_output=True, text=True, check=True
+        )
         return completed.stdout.strip()
     except (OSError, subprocess.CalledProcessError):
         return None
@@ -29,33 +31,35 @@ def _command(arguments, cwd):
 
 def environment_metadata(*, device="cpu", cuda_device=0):
     """Record actual library/thread/build information, with missing data explicit."""
-    from importlib.metadata import PackageNotFoundError, version
+    import importlib.metadata
 
     import numpy as np
 
-    root = Path(__file__).resolve().parents[2]
+    root = pathlib.Path(__file__).resolve().parents[2]
     packages = {}
     for name in ("numpy", "scipy", "torch", "threadpoolctl", "cgpy"):
         try:
-            packages[name] = version(name)
-        except PackageNotFoundError:
+            packages[name] = importlib.metadata.version(name)
+        except importlib.metadata.PackageNotFoundError:
             packages[name] = None
     threadpools = None
     try:
-        from threadpoolctl import threadpool_info
+        import threadpoolctl
 
-        threadpools = threadpool_info()
+        threadpools = threadpoolctl.threadpool_info()
     except ImportError:
         pass
     try:
         numpy_config = np.__config__.show(mode="dicts")
     except TypeError:
-        numpy_config = {"information": "configuration unavailable with this NumPy"}
+        numpy_config = {
+            "information": "configuration unavailable with this NumPy"
+        }
     cmake = None
     native = None
-    native_module = sys.modules.get("_cgcore")
+    native_module = sys.modules.get("cgpy._core")
     if native_module is not None and getattr(native_module, "__file__", None):
-        binary = Path(native_module.__file__).resolve()
+        binary = pathlib.Path(native_module.__file__).resolve()
         package = sys.modules.get("cgpy")
         build_info = getattr(package, "build_info", None)
         native = {
@@ -85,7 +89,7 @@ def environment_metadata(*, device="cpu", cuda_device=0):
             cmake = {"path": str(cache), "fields": fields}
             break
     cpu = platform.processor() or platform.machine()
-    cpuinfo = Path("/proc/cpuinfo")
+    cpuinfo = pathlib.Path("/proc/cpuinfo")
     if cpuinfo.exists():
         for line in cpuinfo.read_text(errors="replace").splitlines():
             if line.startswith("model name"):
@@ -96,7 +100,9 @@ def environment_metadata(*, device="cpu", cuda_device=0):
         "machine": platform.machine(),
         "cpu": cpu,
         "logical_cpus": os.cpu_count(),
-        "affinity": sorted(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else None,
+        "affinity": sorted(os.sched_getaffinity(0))
+        if hasattr(os, "sched_getaffinity")
+        else None,
         "python": sys.version,
         "python_executable": sys.executable,
         "python_compiler": platform.python_compiler(),
@@ -105,9 +111,12 @@ def environment_metadata(*, device="cpu", cuda_device=0):
         "git_status": _command(["git", "status", "--short"], root),
         "cmake": cmake,
         "native": native,
-        "thread_environment": {name: os.environ.get(name) for name in THREAD_VARIABLES},
+        "thread_environment": {
+            name: os.environ.get(name) for name in THREAD_VARIABLES
+        },
         "dynamic_thread_environment": {
-            name: os.environ.get(name) for name in ("OMP_DYNAMIC", "MKL_DYNAMIC")
+            name: os.environ.get(name)
+            for name in ("OMP_DYNAMIC", "MKL_DYNAMIC")
         },
         "threadpools": threadpools,
         "numpy_config": numpy_config,
@@ -122,29 +131,38 @@ def environment_metadata(*, device="cpu", cuda_device=0):
             "config": torch.__config__.show(),
         }
     if device == "cuda":
-        from .cuda_metadata import cuda_metadata
+        from . import cuda_metadata
 
-        metadata["cuda"] = cuda_metadata(cuda_device)
+        metadata["cuda"] = cuda_metadata.cuda_metadata(cuda_device)
     return metadata
 
 
 def validate_artifact(data):
-    if data.get("schema_version") != 1 or not isinstance(data.get("cases"), list):
+    if data.get("schema_version") != 1 or not isinstance(
+        data.get("cases"), list
+    ):
         raise ValueError("unsupported benchmark artifact")
     spec = data.get("spec", {})
     device = spec.get("device", "cpu")
     if device not in ("cpu", "cuda"):
         raise ValueError("artifact device must be cpu or cuda")
     if device == "cuda":
-        from .backends import CUDA_IMPLEMENTATIONS
+        from . import backends
 
         ordinal = spec.get("cuda_device")
         if type(ordinal) is not int or ordinal < 0:
-            raise ValueError("artifact CUDA device must be a nonnegative integer")
-        if any(name not in CUDA_IMPLEMENTATIONS for name in spec.get("implementations", [])):
+            raise ValueError(
+                "artifact CUDA device must be a nonnegative integer"
+            )
+        if any(
+            name not in backends.CUDA_IMPLEMENTATIONS
+            for name in spec.get("implementations", [])
+        ):
             raise ValueError("CUDA artifact cannot contain CPU candidates")
         if spec.get("scope") not in ("api", "prepared"):
-            raise ValueError("CUDA artifact must use an explicit resident scope")
+            raise ValueError(
+                "CUDA artifact must use an explicit resident scope"
+            )
     for case in data["cases"]:
         sampling = case["sampling"]
         rounds, repetitions = sampling["rounds"], sampling["repetitions"]
@@ -152,7 +170,11 @@ def validate_artifact(data):
             raise ValueError("invalid sampling or incomplete Williams cycle")
         if len(case["round_orders"]) != rounds:
             raise ValueError("artifact is missing timing rounds")
-        measured = {entry["name"] for entry in case["results"] if entry["status"] == "measured"}
+        measured = {
+            entry["name"]
+            for entry in case["results"]
+            if entry["status"] == "measured"
+        }
         for order in case["round_orders"]:
             # Failed post-measurement checks remain present in the saved schedule.
             expected = measured | {
@@ -162,12 +184,16 @@ def validate_artifact(data):
                 and entry.get("reason", "").startswith("post-measurement")
             }
             if len(order) != len(expected) or set(order) != expected:
-                raise ValueError("round order does not match measured candidates")
+                raise ValueError(
+                    "round order does not match measured candidates"
+                )
         for entry in case["results"]:
             elapsed = entry["round_elapsed_ns"]
             if entry["status"] == "measured":
                 if len(elapsed) != rounds or any(
-                    isinstance(value, bool) or not isinstance(value, int) or value < 0
+                    isinstance(value, bool)
+                    or not isinstance(value, int)
+                    or value < 0
                     for value in elapsed
                 ):
                     raise ValueError("invalid raw nanosecond samples")
@@ -178,14 +204,14 @@ def validate_artifact(data):
 
 def write_artifact(data, output):
     validate_artifact(data)
-    path = Path(output)
+    path = pathlib.Path(output)
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = None
     try:
         with tempfile.NamedTemporaryFile(
             mode="w", encoding="utf8", dir=path.parent, delete=False
         ) as stream:
-            temporary = Path(stream.name)
+            temporary = pathlib.Path(stream.name)
             json.dump(data, stream, indent=2, sort_keys=True, allow_nan=False)
             stream.write("\n")
             stream.flush()
@@ -197,7 +223,9 @@ def write_artifact(data, output):
 
 
 def load_artifact(path):
-    return validate_artifact(json.loads(Path(path).read_text(encoding="utf8")))
+    return validate_artifact(
+        json.loads(pathlib.Path(path).read_text(encoding="utf8"))
+    )
 
 
 def summarize(data):
@@ -217,7 +245,9 @@ def summarize(data):
                     np.asarray(entry["round_elapsed_ns"], dtype=np.float64)
                     / case["sampling"]["repetitions"]
                 )
-                p5, p25, median, p75, p95 = np.percentile(samples, [5, 25, 50, 75, 95])
+                p5, p25, median, p75, p95 = np.percentile(
+                    samples, [5, 25, 50, 75, 95]
+                )
                 row.update(
                     median_ns=float(median),
                     p5_ns=float(p5),
@@ -242,13 +272,18 @@ def print_summary(data):
         )
         for row in rows:
             if row["status"] != "measured":
-                print(f"{row['case']} {row['implementation']} {row['status']}: {row['reason']}")
+                print(
+                    f"{row['case']} {row['implementation']} {row['status']}: {row['reason']}"
+                )
                 continue
             setup = row["setup"]
             setup_ns = setup.get(
-                "factorization_setup_elapsed_ns", setup.get("preconditioner_setup_elapsed_ns")
+                "factorization_setup_elapsed_ns",
+                setup.get("preconditioner_setup_elapsed_ns"),
             )
-            setup_ms = f"{setup_ns / 1e6:.6f}" if setup_ns is not None else "n/a"
+            setup_ms = (
+                f"{setup_ns / 1e6:.6f}" if setup_ns is not None else "n/a"
+            )
             print(
                 f"{row['case']} {row['implementation']} measured {row['median_ns'] / 1e6:.6f} {row['p5_ns'] / 1e6:.6f} {row['p95_ns'] / 1e6:.6f} {row['iterations']} {row['matvecs']} {row['true_residual_norm']:.6e} {setup_ms} {setup.get('factor_stored_bytes', 0)}"
             )
@@ -262,24 +297,43 @@ def print_summary(data):
             "Stored input/factor/preconditioner array bytes are not peak process memory. Percentiles summarize round-average latency."
         )
         return
-    baseline = "cuda-native" if data.get("spec", {}).get("device", "cpu") == "cuda" else "native"
+    baseline = (
+        "cuda-native"
+        if data.get("spec", {}).get("device", "cpu") == "cuda"
+        else "native"
+    )
     native = {
         row["case"]: row["median_ns"]
         for row in rows
         if row["implementation"] == baseline and row["status"] == "measured"
     }
-    ratio_name = "cuda_native_speedup" if baseline == "cuda-native" else "native_speedup"
-    print("case implementation status median_ms p5_ms p95_ms iterations matvecs " + ratio_name)
+    ratio_name = (
+        "cuda_native_speedup"
+        if baseline == "cuda-native"
+        else "native_speedup"
+    )
+    print(
+        "case implementation status median_ms p5_ms p95_ms iterations matvecs "
+        + ratio_name
+    )
     for row in rows:
         if row["status"] == "measured":
             native_time = native.get(row["case"])
-            speedup = f"{row['median_ns'] / native_time:.3f}x" if native_time else "n/a"
+            speedup = (
+                f"{row['median_ns'] / native_time:.3f}x"
+                if native_time
+                else "n/a"
+            )
             print(
                 f"{row['case']} {row['implementation']} measured {row['median_ns'] / 1e6:.6f} {row['p5_ns'] / 1e6:.6f} {row['p95_ns'] / 1e6:.6f} {row['iterations']} {row['matvecs']} {speedup}"
             )
         else:
-            print(f"{row['case']} {row['implementation']} {row['status']}: {row['reason']}")
-    print("Percentiles describe per-round average ns/call, not individual-call latency.")
+            print(
+                f"{row['case']} {row['implementation']} {row['status']}: {row['reason']}"
+            )
+    print(
+        "Percentiles describe per-round average ns/call, not individual-call latency."
+    )
     print(
         f"{ratio_name} = this implementation's median / {baseline} median; >1 means {baseline} is faster."
     )

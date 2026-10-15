@@ -43,22 +43,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - python: '3.10'
-            preset: cpu-release
-          - python: '3.12'
-            preset: cpu-release
-          - python: '3.12'
-            preset: cpu-openmp
-          - python: '3.10'
-            preset: cpu-blas
-          - python: '3.12'
-            preset: cpu-blas
+        preset: [cpu-release, cpu-openmp, cpu-blas]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python }}
+          python-version: '3.12'
       - name: Install project-local tooling
         run: |
           python -m venv .venv
@@ -67,32 +57,32 @@ jobs:
         run: make test PRESET=${{ matrix.preset }} JOBS=2
 
       - name: Install project-local Sphinx tooling
-        if: matrix.python == '3.12' && matrix.preset != 'cpu-openmp'
+        if: matrix.preset != 'cpu-openmp'
         run: .venv/bin/python -m pip install --cache-dir .cache/pip -r requirements/docs.lock
       - name: Build API documentation and execute examples with warnings as errors
-        if: matrix.python == '3.12' && matrix.preset != 'cpu-openmp'
+        if: matrix.preset != 'cpu-openmp'
         run: make docs doctest PRESET=${{ matrix.preset }} JOBS=2
 
       - name: Reproduce sparse CG, PCG and direct-solver smoke comparisons
         run: make pyprof PRESET=${{ matrix.preset }} PYPROF_SUITE=smoke-sparse-solvers PYPROF_ROUNDS=6 PYPROF_REPETITIONS=1 JOBS=2
       - name: Install optional CPU benchmark candidates locally
-        if: matrix.python == '3.12' && matrix.preset == 'cpu-blas'
+        if: matrix.preset == 'cpu-blas'
         run: .venv/bin/python -m pip install --cache-dir .cache/pip -r requirements/benchmark.lock
       - name: Exercise explicit native and BLAS dense benchmark adapters
-        if: matrix.python == '3.12' && matrix.preset == 'cpu-blas'
+        if: matrix.preset == 'cpu-blas'
         run: |
           make pyprof PRESET=cpu-blas PYPROF_SUITE=smoke PYPROF_ROUNDS=8 PYPROF_REPETITIONS=1 JOBS=2 PYPROF_ARGS='--implementations native,native-blas,numpy-out,torch-eager-out'
           .venv/bin/python - <<'PY'
           import json
-          from pathlib import Path
-          artifact = json.loads(Path('build/cpu-blas/benchmarks/smoke-t1-prepared.json').read_text())
+          import pathlib
+          artifact = json.loads(pathlib.Path('build/cpu-blas/benchmarks/smoke-t1-prepared.json').read_text())
           for case in artifact['cases']:
               assert len(case['results']) == 4
               assert all(result['status'] == 'measured' for result in case['results'])
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: sparse-smoke-py${{ matrix.python }}-${{ matrix.preset }}
+          name: sparse-smoke-py312-${{ matrix.preset }}
           path: build/${{ matrix.preset }}/benchmarks/*.json
 
   sanitizer:
@@ -114,13 +104,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python: ['3.10', '3.12']
         blas: ['OFF', 'ON']
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python }}
+          python-version: '3.12'
       - name: Install project-local tooling
         run: |
           python -m venv .venv
@@ -167,7 +156,7 @@ jobs:
       - name: Build and require a real CUDA device
         run: |
           make build PRESET=cuda-release JOBS=2
-          PYTHONPATH="$PWD/build/cuda-release/python:$PWD/python" .venv/bin/python - <<'PY'
+          PYTHONPATH="$PWD/build/cuda-release/python" .venv/bin/python - <<'PY'
           from cgpy import cuda
           assert cuda.enabled() and cuda.is_available(), 'This job requires a real CUDA device'
           print(cuda.build_info())
@@ -182,8 +171,8 @@ jobs:
           make pyprof PRESET=cuda-release PYPROF_SUITE=smoke-cuda-dense PYPROF_ROUNDS=6 PYPROF_REPETITIONS=1 JOBS=2 PYPROF_ARGS='--device cuda --cuda-device 0 --implementations cuda-native,cuda-cublas,torch-cuda-eager'
           .venv/bin/python - <<'PY'
           import json
-          from pathlib import Path
-          artifact = json.loads(Path('build/cuda-release/benchmarks/smoke-cuda-dense-t1-prepared.json').read_text())
+          import pathlib
+          artifact = json.loads(pathlib.Path('build/cuda-release/benchmarks/smoke-cuda-dense-t1-prepared.json').read_text())
           for case in artifact['cases']:
               assert len(case['results']) == 3
               assert all(result['status'] == 'measured' for result in case['results'])

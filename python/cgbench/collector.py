@@ -15,16 +15,21 @@ def williams_rows(names):
     if count < 2:
         return (tuple(names),)
     pattern = [
-        ((position + 1) // 2 if position % 2 else count - position // 2) % count
+        ((position + 1) // 2 if position % 2 else count - position // 2)
+        % count
         for position in range(count)
     ]
-    base = [tuple((index + offset) % count for index in pattern) for offset in range(count)]
+    base = [
+        tuple((index + offset) % count for index in pattern)
+        for offset in range(count)
+    ]
     if count % 2:
         forward = (count + 1) // 2
         reverse = count - forward
         rows = [base[(offset * forward) % count] for offset in range(count)]
         rows += [
-            tuple(reversed(base[(offset * reverse) % count])) for offset in range(1, count + 1)
+            tuple(reversed(base[(offset * reverse) % count]))
+            for offset in range(1, count + 1)
         ]
     else:
         rows = base
@@ -36,7 +41,9 @@ def time_candidates(executors, sampling, clock=time.perf_counter_ns):
     names = tuple(executors)
     rows = williams_rows(names)
     if sampling["rounds"] % len(rows):
-        raise ValueError(f"rounds must be a multiple of the complete Williams cycle ({len(rows)})")
+        raise ValueError(
+            f"rounds must be a multiple of the complete Williams cycle ({len(rows)})"
+        )
     for index in range(-sampling["warmups"], 0):
         for name in rows[index % len(rows)]:
             executors[name]()
@@ -63,22 +70,34 @@ def check_outcome(outcome, arrays, options):
     """Independently validate the true residual before admitting timing data."""
     import numpy as np
 
-    from .numerics import stable_l2
+    from . import numerics
 
     matrix, rhs, _initial = arrays
     x = np.asarray(outcome.x)
     if x.shape != rhs.shape or x.dtype != rhs.dtype:
-        return {"eligible": False, "reason": "solution shape or dtype mismatch"}
+        return {
+            "eligible": False,
+            "reason": "solution shape or dtype mismatch",
+        }
     if not np.all(np.isfinite(x)):
-        return {"eligible": False, "reason": "solution contains non-finite values"}
-    true_norm = stable_l2(rhs - matrix @ x)
-    threshold = max(options["atol"], options["rtol"] * stable_l2(rhs))
+        return {
+            "eligible": False,
+            "reason": "solution contains non-finite values",
+        }
+    true_norm = numerics.stable_l2(rhs - matrix @ x)
+    threshold = max(options["atol"], options["rtol"] * numerics.stable_l2(rhs))
     # Permit only the rounding-scale difference between equivalent norm sums.
     rounding = 1.0 + 64.0 * np.finfo(rhs.dtype).eps
-    eligible = outcome.converged and math.isfinite(true_norm) and true_norm <= threshold * rounding
+    eligible = (
+        outcome.converged
+        and math.isfinite(true_norm)
+        and true_norm <= threshold * rounding
+    )
     return {
         "eligible": bool(eligible),
-        "reason": None if eligible else "solver did not converge to the requested true residual",
+        "reason": None
+        if eligible
+        else "solver did not converge to the requested true residual",
         "solver_status": outcome.status,
         "iterations": int(outcome.iterations),
         "matvecs": int(outcome.matvecs),
@@ -99,12 +118,16 @@ def _check_executor_outcome(execute, outcome, arrays, options):
 
 def collect_case(case_spec, run_spec):
     """Use exactly the case builder and solver adapters exercised by pytest."""
-    from .backends import make_executor
-    from .cases import input_hash, make_case
+    from . import backends
+    from . import cases as case_module
 
-    matrix, rhs, initial, known_solution = make_case(case_spec, run_spec["seed"])
+    matrix, rhs, initial, known_solution = case_module.make_case(
+        case_spec, run_spec["seed"]
+    )
     arrays = matrix, rhs, initial
-    exact_hash = input_hash(case_spec, (matrix, rhs, initial, known_solution))
+    exact_hash = case_module.input_hash(
+        case_spec, (matrix, rhs, initial, known_solution)
+    )
     expected_hash = run_spec.get("expected_hashes", {}).get(case_spec.name)
     if expected_hash is not None and exact_hash != expected_hash:
         raise ValueError("replay input hash mismatch: " + case_spec.name)
@@ -113,7 +136,7 @@ def collect_case(case_spec, run_spec):
     options = run_spec["solver"]
     for name in run_spec["implementations"]:
         try:
-            execute = make_executor(
+            execute = backends.make_executor(
                 name,
                 arrays,
                 options,
@@ -124,7 +147,9 @@ def collect_case(case_spec, run_spec):
             )
         except ImportError as exc:
             if run_spec.get("device", "cpu") == "cuda":
-                raise RuntimeError(f"Requested CUDA candidate {name} is unavailable") from exc
+                raise RuntimeError(
+                    f"Requested CUDA candidate {name} is unavailable"
+                ) from exc
             results.append(
                 {
                     "name": name,
@@ -135,14 +160,18 @@ def collect_case(case_spec, run_spec):
             )
             continue
         outcome = execute()
-        correctness = _check_executor_outcome(execute, outcome, arrays, options)
+        correctness = _check_executor_outcome(
+            execute, outcome, arrays, options
+        )
         eligible = correctness.pop("eligible")
         entry = {
             "name": name,
             "status": "measured" if eligible else "invalid",
             **correctness,
             "round_elapsed_ns": [],
-            "setup": execute.benchmark_metadata() if hasattr(execute, "benchmark_metadata") else {},
+            "setup": execute.benchmark_metadata()
+            if hasattr(execute, "benchmark_metadata")
+            else {},
         }
         results.append(entry)
         if eligible:
@@ -150,26 +179,41 @@ def collect_case(case_spec, run_spec):
     # Missing optional candidates may shorten the design. Round upward to a
     # full cycle, and record the resolved sampling rather than a partial design.
     sampling = dict(run_spec["sampling"])
-    expected_candidates = run_spec.get("expected_candidates", {}).get(case_spec.name)
-    if expected_candidates is not None and list(candidates) != expected_candidates:
-        raise ValueError("replay eligible candidates changed: " + case_spec.name)
+    expected_candidates = run_spec.get("expected_candidates", {}).get(
+        case_spec.name
+    )
+    if (
+        expected_candidates is not None
+        and list(candidates) != expected_candidates
+    ):
+        raise ValueError(
+            "replay eligible candidates changed: " + case_spec.name
+        )
     saved_sampling = run_spec.get("resolved_sampling", {}).get(case_spec.name)
     if saved_sampling is not None:
         sampling = dict(saved_sampling)
     cycle = len(williams_rows(tuple(candidates)))
     sampling["rounds"] = ((sampling["rounds"] + cycle - 1) // cycle) * cycle
-    expected_orders = run_spec.get("expected_round_orders", {}).get(case_spec.name)
+    expected_orders = run_spec.get("expected_round_orders", {}).get(
+        case_spec.name
+    )
     if expected_orders is not None:
         rows = williams_rows(tuple(candidates))
-        generated = [list(rows[index % cycle]) for index in range(sampling["rounds"])]
+        generated = [
+            list(rows[index % cycle]) for index in range(sampling["rounds"])
+        ]
         if generated != expected_orders:
-            raise ValueError("replay timing schedule changed: " + case_spec.name)
+            raise ValueError(
+                "replay timing schedule changed: " + case_spec.name
+            )
     orders, elapsed = time_candidates(candidates, sampling)
     # Revalidate after measurement too, catching state-reset regressions.
     for entry in results:
         name = entry["name"]
         if name in candidates:
-            after = _check_executor_outcome(candidates[name], candidates[name](), arrays, options)
+            after = _check_executor_outcome(
+                candidates[name], candidates[name](), arrays, options
+            )
             if not after.pop("eligible"):
                 entry.update(after)
                 entry["status"] = "invalid"
@@ -186,7 +230,9 @@ def collect_case(case_spec, run_spec):
             rhs.nbytes
             + initial.nbytes
             + (
-                matrix.data.nbytes + matrix.indices.nbytes + matrix.indptr.nbytes
+                matrix.data.nbytes
+                + matrix.indices.nbytes
+                + matrix.indptr.nbytes
                 if case_spec.storage == "csr"
                 else matrix.nbytes
             )

@@ -4,10 +4,10 @@ import csv
 import hashlib
 import io
 import os
+import pathlib
 import shutil
 import subprocess
 import sys
-from pathlib import Path
 
 
 def cuda_metadata(device):
@@ -27,24 +27,34 @@ def cuda_metadata(device):
             )
         },
     }
-    extension = sys.modules.get("_cgcuda")
+    extension = sys.modules.get("cgpy._cuda")
     package = sys.modules.get("cgpy.cuda")
     if extension is not None and getattr(extension, "__file__", None):
-        binary = Path(extension.__file__).resolve()
+        binary = pathlib.Path(extension.__file__).resolve()
         metadata["native"] = {
             "module_path": str(binary),
             "module_sha256": hashlib.sha256(binary.read_bytes()).hexdigest(),
-            "build_info": package.build_info() if package is not None else None,
-            "runtime_info": package.runtime_info(device=device) if package is not None else None,
+            "build_info": package.build_info()
+            if package is not None
+            else None,
+            "runtime_info": package.runtime_info(device=device)
+            if package is not None
+            else None,
         }
     torch = sys.modules.get("torch")
-    if torch is not None and torch.cuda.is_available() and device < torch.cuda.device_count():
+    if (
+        torch is not None
+        and torch.cuda.is_available()
+        and device < torch.cuda.device_count()
+    ):
         properties = torch.cuda.get_device_properties(device)
         metadata["torch"] = {
             "runtime_version": torch.version.cuda,
             "device": device,
             "name": properties.name,
-            "uuid": str(properties.uuid) if getattr(properties, "uuid", None) is not None else None,
+            "uuid": str(properties.uuid)
+            if getattr(properties, "uuid", None) is not None
+            else None,
             "compute_capability": [properties.major, properties.minor],
             "total_memory_bytes": properties.total_memory,
             "multiprocessor_count": properties.multi_processor_count,
@@ -53,9 +63,12 @@ def cuda_metadata(device):
             "deterministic_algorithms": torch.are_deterministic_algorithms_enabled(),
         }
     elif torch is not None:
-        metadata["torch"] = {"runtime_version": torch.version.cuda, "available": False}
+        metadata["torch"] = {
+            "runtime_version": torch.version.cuda,
+            "available": False,
+        }
     executable = shutil.which("nvidia-smi")
-    wsl_executable = Path("/usr/lib/wsl/lib/nvidia-smi")
+    wsl_executable = pathlib.Path("/usr/lib/wsl/lib/nvidia-smi")
     if executable is None and wsl_executable.is_file():
         executable = str(wsl_executable)
     if executable is not None:
@@ -71,7 +84,13 @@ def cuda_metadata(device):
                 text=True,
                 timeout=10,
             )
-            names = ("physical_index", "name", "uuid", "driver_version", "pci_bus_id")
+            names = (
+                "physical_index",
+                "name",
+                "uuid",
+                "driver_version",
+                "pci_bus_id",
+            )
             metadata["nvidia_smi"] = [
                 dict(zip(names, (value.strip() for value in row), strict=True))
                 for row in csv.reader(io.StringIO(result.stdout))

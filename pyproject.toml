@@ -7,28 +7,28 @@ name = "cgpy"
 version = "0.4.0"
 description = "Conjugate gradient solvers with native CPU and optional CUDA implementations"
 readme = "README.md"
-requires-python = ">=3.10"
-dependencies = ["numpy>=1.24"]
+requires-python = ">=3.12,<3.13"
+dependencies = ["numpy>=1.26"]
 
 [project.optional-dependencies]
-legacy = ["autograd>=1.8"]
 cuda = ["nvidia-cuda-runtime-cu12==12.8.90; sys_platform == 'linux'", "nvidia-cublas-cu12==12.8.4.1; sys_platform == 'linux'"]
 
 [tool.scikit-build]
 cmake.version = ">=3.24"
 build-dir = "build/wheel/{wheel_tag}"
 wheel.packages = ["python/cgpy", "python/cgbench"]
+install.components = ["python"]
 # An explicit source-file allowlist excludes untracked research files, virtual
 # environments, caches and local provider/build artifacts from every sdist.
 sdist.exclude = ["**"]
 sdist.include = [
     "/CMakeLists.txt", "/CMakePresets.json", "/Makefile", "/pyproject.toml",
-    "/README.md", "/.gitignore", "/.clang-format", "/.clang-tidy", "/LICENSE*",
-    "/cmake/*.cmake", "/include/cg/*.hpp", "/include/cg/detail/*.hpp",
-    "/src/*.cpp", "/src/*.cu", "/bindings/*.cpp", "/cpp/*/*.cpp", "/cpp/*/*.hpp",
-    "/python/cgpy/**/*.py", "/python/cgbench/**/*.py", "/python/utils.py", "/python/README.md",
-    "/tests/*.py", "/tests/cpp/*.cpp", "/scripts/*.py", "/demo/*.py",
-    "/requirements/*.lock", "/docs/*.rst", "/docs/*.md", "/docs/conf.py",
+    "/README.md", "/STYLE.md", "/.python-version", "/.editorconfig",
+    "/.gitignore", "/.clang-format", "/.clang-tidy", "/LICENSE*",
+    "/cmake/*.cmake", "/cpp/cg/**/*.hpp", "/cpp/cg/**/*.cpp", "/cpp/cg/**/*.cu",
+    "/python/cgpy/**/*.py", "/python/cgbench/**/*.py", "/python/README.md",
+    "/tests/python/**/*.py", "/tests/cpp/**/*.cpp", "/scripts/*.py", "/examples/*.py",
+    "/requirements/*.lock", "/requirements/README.md", "/docs/*.rst", "/docs/conf.py",
     "/docs/_static/*.css", "/benchmarks/README.md",
 ]
 
@@ -40,12 +40,12 @@ CG_ENABLE_BLAS = "OFF"
 CG_ENABLE_CUDA = "OFF"
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests/python"]
 addopts = "--import-mode=importlib"
 
 [tool.ruff]
-target-version = "py310"
-line-length = 100
+target-version = "py312"
+line-length = 79
 extend-exclude = [
     ".deps", ".cache", "build", "contrib",
 ]

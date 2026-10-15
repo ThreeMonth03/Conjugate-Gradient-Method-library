@@ -80,4 +80,9 @@ set_target_properties(cg_private_blas PROPERTIES
 add_dependencies(cg_private_blas cg_openblas_build)
 # Redistribution license travels with either Python extension wheel.
 install(FILES "${CG_BLAS_ROOT}/source/LICENSE"
-    DESTINATION cgpy/_licenses RENAME OpenBLAS.txt)
+    DESTINATION cgpy/_licenses RENAME OpenBLAS.txt COMPONENT python)
+install(FILES "${CG_BLAS_ARCHIVE}"
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}" COMPONENT development)
+install(FILES "${CG_BLAS_ROOT}/source/LICENSE"
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/licenses/cgpy"
+    RENAME OpenBLAS.txt COMPONENT development)

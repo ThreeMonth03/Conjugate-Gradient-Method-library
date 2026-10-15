@@ -1,10 +1,10 @@
 Installation
 ============
 
-Use Python 3.10 or newer. The default package uses the native CPU kernel and
-requires NumPy at runtime. Nonlinear legacy helpers additionally use the
-optional ``autograd`` dependency. CUDA is disabled in the default build and
-adds no NVIDIA runtime dependency to a CPU wheel. See :doc:`cuda` for explicit
+Use CPython 3.12.x. The package metadata accepts ``>=3.12,<3.13`` and
+CMake enforces that range for Python builds. The default package uses the
+native CPU kernel and requires NumPy at runtime. CUDA is disabled in the
+default build and adds no NVIDIA runtime dependency to a CPU wheel. See :doc:`cuda` for explicit
 CUDA builds and installation with the pinned public-runtime extra.
 Development and documentation commands below
 keep Python tools, downloads and build products inside the checkout.
@@ -18,19 +18,9 @@ not require the source checkout or a compiler.
 
 .. code-block:: bash
 
-   python3 -m venv .venv
+   python3.12 -m venv .venv
    .venv/bin/python -m pip install --cache-dir .cache/pip dist/cgpy-*.whl
    .venv/bin/python -c 'import cgpy; print(cgpy.build_info())'
-
-To build this checkout with the optional legacy derivatives, run:
-
-.. code-block:: bash
-
-   .venv/bin/python -m pip install --cache-dir .cache/pip '.[legacy]'
-
-For a local wheel, append ``[legacy]`` to the selected wheel's full path in
-the pip install argument. These are local source/wheel installs; a published
-package release is not required.
 
 Build and install from source
 -----------------------------
@@ -39,7 +29,7 @@ Use an existing C++17 compiler. From the repository root:
 
 .. code-block:: bash
 
-   python3 -m venv .venv
+   python3.12 -m venv .venv
    .venv/bin/python -m pip install --cache-dir .cache/pip -r requirements/dev.lock
    .venv/bin/python -m pip install --cache-dir .cache/pip --no-build-isolation .
 

@@ -1,16 +1,16 @@
 """Preallocated NumPy/PyTorch references and the public native API adapter."""
 
+import dataclasses
 import math
 import sys
 import time
-from dataclasses import dataclass
 
-from .numerics import l2_from_square
+from . import numerics
 
 CUDA_IMPLEMENTATIONS = ("cuda-native", "cuda-cublas", "torch-cuda-eager")
 
 
-@dataclass
+@dataclasses.dataclass
 class Outcome:
     x: object
     status: str
@@ -33,7 +33,10 @@ class NativeExecutor:
         self.matrix, self.rhs, self.initial = arrays
         if hasattr(self.matrix, "indptr"):
             self.matrix = cgpy.CSRMatrix(
-                self.matrix.indptr, self.matrix.indices, self.matrix.data, self.matrix.shape
+                self.matrix.indptr,
+                self.matrix.indices,
+                self.matrix.data,
+                self.matrix.shape,
             )
         self.options = dict(options)
         self.preconditioner = self.options.pop("preconditioner", "none")
@@ -43,11 +46,18 @@ class NativeExecutor:
         self.scope = scope
         self.threads = threads
         self.setup_metadata = {"preconditioner": self.preconditioner}
-        settings = {"preconditioner": self.preconditioner, "dense_kernel": self.dense_kernel}
+        settings = {
+            "preconditioner": self.preconditioner,
+            "dense_kernel": self.dense_kernel,
+        }
         if scope == "prepared":
             start = time.perf_counter_ns()
-            self.solver = cgpy.prepare(self.matrix, num_threads=threads, **settings)
-            self.setup_metadata["operator_setup_elapsed_ns"] = time.perf_counter_ns() - start
+            self.solver = cgpy.prepare(
+                self.matrix, num_threads=threads, **settings
+            )
+            self.setup_metadata["operator_setup_elapsed_ns"] = (
+                time.perf_counter_ns() - start
+            )
             self.workspace = self.solver.create_workspace()
             self.x = np.empty_like(self.initial)
             plan = self.solver
@@ -56,7 +66,9 @@ class NativeExecutor:
         else:
             plan = None
         self.setup_metadata["preconditioner_setup_elapsed_ns"] = (
-            getattr(plan, "preconditioner_setup_ns", None) if self.preconditioner == "jacobi" else 0
+            getattr(plan, "preconditioner_setup_ns", None)
+            if self.preconditioner == "jacobi"
+            else 0
         )
         self.setup_metadata["preconditioner_stored_bytes"] = (
             int(getattr(plan, "preconditioner_nbytes", self.initial.nbytes))
@@ -73,7 +85,10 @@ class NativeExecutor:
             )
             x = self.x
         else:
-            settings = {"preconditioner": self.preconditioner, "dense_kernel": self.dense_kernel}
+            settings = {
+                "preconditioner": self.preconditioner,
+                "dense_kernel": self.dense_kernel,
+            }
             info = self.cgpy.solve(
                 self.matrix,
                 self.rhs,
@@ -96,8 +111,12 @@ class NativeExecutor:
             **self.setup_metadata,
             "implementation_role": "native",
             "dense_kernel": self.dense_kernel,
-            "blas": self.cgpy.build_info()["blas"] if self.dense_kernel == "blas" else None,
-            "solver_family": "pcg" if self.preconditioner == "jacobi" else "cg",
+            "blas": self.cgpy.build_info()["blas"]
+            if self.dense_kernel == "blas"
+            else None,
+            "solver_family": "pcg"
+            if self.preconditioner == "jacobi"
+            else "cg",
             "setup_in_timed_call": self.scope == "api",
             "setup_measurement": "native plan setup outside timing; API setup repeats inside every timed solve",
             "residual_policy": self.options["algorithm"]
@@ -122,10 +141,14 @@ class NumpyOps:
 
     def inverse_diagonal(self):
         diagonal = self.matrix.diagonal().copy()
-        if not self.np.all(self.np.isfinite(diagonal)) or not self.np.all(diagonal > 0.0):
+        if not self.np.all(self.np.isfinite(diagonal)) or not self.np.all(
+            diagonal > 0.0
+        ):
             raise ValueError("Jacobi requires a finite positive diagonal")
         self.np.reciprocal(diagonal, out=diagonal)
-        if not self.np.all(self.np.isfinite(diagonal)) or not self.np.all(diagonal > 0.0):
+        if not self.np.all(self.np.isfinite(diagonal)) or not self.np.all(
+            diagonal > 0.0
+        ):
             raise ValueError("Jacobi reciprocal must be finite and positive")
         return diagonal
 
@@ -133,7 +156,11 @@ class NumpyOps:
         self.np.multiply(inverse, residual, out=out)
 
     def validate(self, api):
-        arrays = (self.matrix, self.rhs, self.initial) if api else (self.rhs, self.initial)
+        arrays = (
+            (self.matrix, self.rhs, self.initial)
+            if api
+            else (self.rhs, self.initial)
+        )
         if not all(self.np.all(self.np.isfinite(array)) for array in arrays):
             raise ValueError("inputs must be finite")
 
@@ -194,9 +221,14 @@ class TorchOps:
             )
         else:
             self.matrix = torch.from_numpy(matrix)
-        self.rhs, self.initial = torch.from_numpy(rhs), torch.from_numpy(initial)
+        self.rhs, self.initial = (
+            torch.from_numpy(rhs),
+            torch.from_numpy(initial),
+        )
         self.validate(True)
-        if self.sparse and not bool(torch.isfinite(self.matrix.values()).all()):
+        if self.sparse and not bool(
+            torch.isfinite(self.matrix.values()).all()
+        ):
             raise ValueError("CSR inputs must be finite")
 
     def workspace(self):
@@ -206,11 +238,17 @@ class TorchOps:
         return self.torch.empty_like(self.initial)
 
     def inverse_diagonal(self):
-        diagonal = self.torch.from_numpy(self.original_matrix.diagonal().copy())
-        if not bool(self.torch.isfinite(diagonal).all()) or not bool((diagonal > 0).all()):
+        diagonal = self.torch.from_numpy(
+            self.original_matrix.diagonal().copy()
+        )
+        if not bool(self.torch.isfinite(diagonal).all()) or not bool(
+            (diagonal > 0).all()
+        ):
             raise ValueError("Jacobi requires a finite positive diagonal")
         diagonal.reciprocal_()
-        if not bool(self.torch.isfinite(diagonal).all()) or not bool((diagonal > 0).all()):
+        if not bool(self.torch.isfinite(diagonal).all()) or not bool(
+            (diagonal > 0).all()
+        ):
             raise ValueError("Jacobi reciprocal must be finite and positive")
         return diagonal
 
@@ -298,12 +336,17 @@ class ReferenceExecutor:
         self.preconditioner = options.get("preconditioner", "none")
         if self.preconditioner not in ("none", "jacobi"):
             raise ValueError("preconditioner must be none or jacobi")
-        if self.preconditioner == "jacobi" and options["algorithm"] != "standard":
+        if (
+            self.preconditioner == "jacobi"
+            and options["algorithm"] != "standard"
+        ):
             raise ValueError("Jacobi PCG requires the standard recurrence")
         # Prepare a snapshot once, matching the native prepared operator.
         if scope == "prepared":
             self.ops.matrix = (
-                self.ops.matrix.copy() if isinstance(ops, NumpyOps) else self.ops.matrix.clone()
+                self.ops.matrix.copy()
+                if isinstance(ops, NumpyOps)
+                else self.ops.matrix.clone()
             )
         self.storage = ops.workspace() if scope == "prepared" else None
         self.inverse = None
@@ -319,11 +362,14 @@ class ReferenceExecutor:
     def benchmark_metadata(self):
         return {
             "implementation_role": "same_policy_reference",
-            "solver_family": "pcg" if self.preconditioner == "jacobi" else "cg",
+            "solver_family": "pcg"
+            if self.preconditioner == "jacobi"
+            else "cg",
             "preconditioner": self.preconditioner,
             "preconditioner_setup_elapsed_ns": self.preconditioner_setup_ns,
             "preconditioner_stored_bytes": int(self.ops.initial.numel() * 8)
-            if isinstance(self.ops, TorchOps) and self.preconditioner == "jacobi"
+            if isinstance(self.ops, TorchOps)
+            and self.preconditioner == "jacobi"
             else int(self.ops.initial.size * 8)
             if self.preconditioner == "jacobi"
             else 0,
@@ -357,7 +403,7 @@ class ReferenceExecutor:
             # Do not export Torch tensors on the ordinary squared-norm path.
             if squared >= sys.float_info.min and math.isfinite(squared):
                 return math.sqrt(squared)
-            return l2_from_square(squared, ops.export(vector))
+            return numerics.l2_from_square(squared, ops.export(vector))
 
         b_norm = norm(ops.dot(ops.rhs, ops.rhs), ops.rhs)
         tolerance = max(self.options["atol"], self.options["rtol"] * b_norm)
@@ -375,7 +421,11 @@ class ReferenceExecutor:
             residual_norm = norm(rho, residual)
             # CUDA keeps the solution resident until an untimed correctness
             # gate explicitly downloads it. CPU exports retain their behavior.
-            output = ops.outcome_x(x) if hasattr(ops, "outcome_x") else ops.export(x)
+            output = (
+                ops.outcome_x(x)
+                if hasattr(ops, "outcome_x")
+                else ops.export(x)
+            )
             return Outcome(output, status, iterations, matvecs, residual_norm)
 
         def finish(status):
@@ -415,7 +465,11 @@ class ReferenceExecutor:
                 return finish("non_positive_curvature")
             if denominator < sys.float_info.min:
                 return finish("non_finite")
-            alpha = -ops.dot(residual, direction) / denominator if explicit else rho / denominator
+            alpha = (
+                -ops.dot(residual, direction) / denominator
+                if explicit
+                else rho / denominator
+            )
             if not math.isfinite(alpha):
                 return finish("non_finite")
             ops.axpy(alpha, direction, x, scratch)
@@ -427,7 +481,10 @@ class ReferenceExecutor:
                     return result("non_finite", rho_next)
                 if norm_next <= tolerance:
                     return result("converged", rho_next)
-                if not math.isfinite(rho_next) or rho_next < sys.float_info.min:
+                if (
+                    not math.isfinite(rho_next)
+                    or rho_next < sys.float_info.min
+                ):
                     return result("non_finite", rho_next)
                 if iterations == self.options["maxiter"]:
                     return result("max_iterations", rho_next)
@@ -451,7 +508,10 @@ class ReferenceExecutor:
                         return result("non_finite", rho_next)
                     if norm_next <= tolerance:
                         return result("converged", rho_next)
-                    if not math.isfinite(rho_next) or rho_next < sys.float_info.min:
+                    if (
+                        not math.isfinite(rho_next)
+                        or rho_next < sys.float_info.min
+                    ):
                         return result("non_finite", rho_next)
                     if iterations == self.options["maxiter"]:
                         return result("max_iterations", rho_next)
@@ -466,49 +526,76 @@ class ReferenceExecutor:
                             return result("non_finite", rho_next)
                         ops.initialize_direction(z, direction, False)
                     continue
-                if not math.isfinite(rho_next) or rho_next < sys.float_info.min:
+                if (
+                    not math.isfinite(rho_next)
+                    or rho_next < sys.float_info.min
+                ):
                     return finish("non_finite")
                 if inverse is not None:
                     ops.precondition(inverse, residual, z)
                     rho_next = ops.dot(residual, z)
-                    if not math.isfinite(rho_next) or rho_next < sys.float_info.min:
+                    if (
+                        not math.isfinite(rho_next)
+                        or rho_next < sys.float_info.min
+                    ):
                         return finish("non_finite")
                 beta = rho_next / rho
             if not math.isfinite(beta):
                 return finish("non_finite")
-            ops.direction(beta, residual if inverse is None else z, direction, explicit)
+            ops.direction(
+                beta, residual if inverse is None else z, direction, explicit
+            )
             rho = rho_next
         rho = true_residual()
         if not math.isfinite(rho):
             return result("non_finite", rho)
-        return result("converged" if math.sqrt(rho) <= tolerance else "max_iterations", rho)
+        return result(
+            "converged" if math.sqrt(rho) <= tolerance else "max_iterations",
+            rho,
+        )
 
 
-def make_executor(name, arrays, options, scope, threads, *, device="cpu", cuda_device=0):
+def make_executor(
+    name, arrays, options, scope, threads, *, device="cpu", cuda_device=0
+):
     if name in CUDA_IMPLEMENTATIONS:
         if device != "cuda":
             raise ValueError("CUDA candidates require --device cuda")
-        from .cuda_backends import CudaNativeExecutor, TorchCudaExecutor
+        from . import cuda_backends
 
         if name == "torch-cuda-eager":
-            return TorchCudaExecutor(arrays, options, scope, threads, cuda_device)
-        return CudaNativeExecutor(
-            arrays, options, scope, cuda_device, "cublas" if name == "cuda-cublas" else "native"
+            return cuda_backends.TorchCudaExecutor(
+                arrays, options, scope, threads, cuda_device
+            )
+        return cuda_backends.CudaNativeExecutor(
+            arrays,
+            options,
+            scope,
+            cuda_device,
+            "cublas" if name == "cuda-cublas" else "native",
         )
     if device != "cpu":
-        raise ValueError("CPU candidates require --device cpu; CUDA never falls back to CPU")
+        raise ValueError(
+            "CPU candidates require --device cpu; CUDA never falls back to CPU"
+        )
     if name == "native-blas":
         if hasattr(arrays[0], "indptr"):
             raise ValueError("native-blas requires dense inputs")
-        return NativeExecutor(arrays, {**options, "dense_kernel": "blas"}, scope, threads)
+        return NativeExecutor(
+            arrays, {**options, "dense_kernel": "blas"}, scope, threads
+        )
     if name in ("scipy-lu-total", "scipy-lu-reuse"):
-        from .sparse_solvers import SparseLUExecutor
+        from . import sparse_solvers
 
-        return SparseLUExecutor(arrays, options, scope, reuse=name.endswith("reuse"))
+        return sparse_solvers.SparseLUExecutor(
+            arrays, options, scope, reuse=name.endswith("reuse")
+        )
     if name in ("scipy-cg", "scipy-pcg"):
-        from .sparse_solvers import ScipyKrylovExecutor
+        from . import sparse_solvers
 
-        return ScipyKrylovExecutor(arrays, options, scope, jacobi=name == "scipy-pcg")
+        return sparse_solvers.ScipyKrylovExecutor(
+            arrays, options, scope, jacobi=name == "scipy-pcg"
+        )
     aliases = {
         "native-cg": ("native", "none"),
         "native-pcg": ("native", "jacobi"),
@@ -521,10 +608,14 @@ def make_executor(name, arrays, options, scope, threads, *, device="cpu", cuda_d
         name, preconditioner = aliases[name]
         options = {**options, "preconditioner": preconditioner}
     if name == "native":
-        return NativeExecutor(arrays, {**options, "dense_kernel": "native"}, scope, threads)
+        return NativeExecutor(
+            arrays, {**options, "dense_kernel": "native"}, scope, threads
+        )
     if name == "numpy-out":
         if hasattr(arrays[0], "indptr"):
-            raise ValueError("numpy-out requires dense inputs; use scipy-out for CSR")
+            raise ValueError(
+                "numpy-out requires dense inputs; use scipy-out for CSR"
+            )
         return ReferenceExecutor(NumpyOps(arrays), options, scope)
     if name == "scipy-out":
         return ReferenceExecutor(ScipyOps(arrays), options, scope)
