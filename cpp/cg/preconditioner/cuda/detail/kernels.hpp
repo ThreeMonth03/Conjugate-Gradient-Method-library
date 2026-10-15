@@ -12,8 +12,10 @@ namespace cuda
 namespace detail
 {
 
-void initialize_jacobi(DenseMatrixView A, VectorView inverse, const Context &context);
-void initialize_jacobi(CsrMatrixView A, VectorView inverse, const Context &context);
+// The caller owns aligned invalid-flag storage disjoint from inverse and keeps
+// both alive through the synchronous validation below.
+void initialize_jacobi(DenseMatrixView A, VectorView inverse, int *invalid, const Context &context);
+void initialize_jacobi(CsrMatrixView A, VectorView inverse, int *invalid, const Context &context);
 
 } // namespace detail
 } // namespace cuda

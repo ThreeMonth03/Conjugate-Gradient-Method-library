@@ -101,6 +101,10 @@ static_assert(!std::is_copy_constructible_v<gpu::CsrMatrix>);
 static_assert(!std::is_copy_assignable_v<gpu::CsrMatrix>);
 static_assert(std::is_nothrow_move_constructible_v<gpu::CsrMatrix>);
 static_assert(std::is_nothrow_move_assignable_v<gpu::CsrMatrix>);
+static_assert(!std::is_copy_constructible_v<gpu::JacobiPreconditioner>);
+static_assert(!std::is_copy_assignable_v<gpu::JacobiPreconditioner>);
+static_assert(std::is_nothrow_move_constructible_v<gpu::JacobiPreconditioner>);
+static_assert(std::is_nothrow_move_assignable_v<gpu::JacobiPreconditioner>);
 
 TEST(CudaCapability, DeviceCountIsSafeWithoutAnAvailableDriver)
 {
@@ -802,6 +806,113 @@ TEST_F(Cuda, JacobiRejectsInvalidMissingAndUnrepresentableDiagonals)
     }
     const gpu::CsrMatrix missing(cg::CsrMatrix(2, 2, {0, 1, 1}, {0}, {1}), *context);
     EXPECT_THROW(gpu::JacobiPreconditioner(missing, *context), std::invalid_argument);
+}
+
+TEST_F(Cuda, JacobiOddInverseSnapshotSurvivesMoveConstructionAssignmentAndSelfMove)
+{
+    const cg::DenseMatrix host(3, 3, {3, 0, 0, 0, 7, 0, 0, 0, 11});
+    const std::vector<double> rhs{1, 2, 3};
+    gpu::Vector r(rhs, *context), z(3, *context);
+    gpu::detail::ExecutionResources resources(*context);
+    const gpu::detail::Backend backend(resources);
+    const auto empty = [](const gpu::JacobiPreconditioner &M)
+    {
+        EXPECT_EQ(M.size(), 0u);
+        EXPECT_EQ(M.device(), -1);
+        EXPECT_EQ(M.inverse_diagonal().data(), nullptr);
+        EXPECT_EQ(M.inverse_diagonal().size(), 0u);
+    };
+    const auto check = [&](gpu::JacobiPreconditioner source)
+    {
+        const auto *allocation = source.inverse_diagonal().data();
+        EXPECT_EQ(reinterpret_cast<std::uintptr_t>(allocation) % alignof(double), 0u);
+        gpu::JacobiPreconditioner moved(std::move(source));
+        empty(source);
+        auto &same = moved;
+        moved = std::move(same);
+        EXPECT_EQ(moved.inverse_diagonal().data(), allocation);
+        const gpu::DenseMatrix replacement(host.view(), *context);
+        gpu::JacobiPreconditioner assigned(replacement.view(), *context);
+        assigned = std::move(moved);
+        empty(moved);
+        source = std::move(assigned);
+        empty(assigned);
+        EXPECT_EQ(source.size(), 3u);
+        EXPECT_EQ(source.device(), context->device());
+        EXPECT_EQ(source.inverse_diagonal().data(), allocation);
+        EXPECT_EQ(source.inverse_diagonal().size(), 3u);
+        std::vector<double> inverse(3), output(3);
+        ASSERT_EQ(
+            cudaMemcpy(inverse.data(), source.inverse_diagonal().data(), 3 * sizeof(double), cudaMemcpyDeviceToHost),
+            cudaSuccess);
+        EXPECT_DOUBLE_EQ(inverse[0], 1.0 / 3.0);
+        EXPECT_DOUBLE_EQ(inverse[1], 1.0 / 7.0);
+        EXPECT_DOUBLE_EQ(inverse[2], 1.0 / 11.0);
+        EXPECT_NEAR(source.apply_and_dot(r.view(), z.view(), backend), 1.0 / 3.0 + 4.0 / 7.0 + 9.0 / 11.0, 1e-14);
+        z.download(output, *context);
+        for (std::size_t i = 0; i < output.size(); ++i)
+        {
+            EXPECT_NEAR(output[i], rhs[i] * inverse[i], 1e-14);
+        }
+    };
+    // Both source matrices are destroyed before the preconditioner is applied.
+    check(
+        [&]
+        {
+            const gpu::DenseMatrix A(host.view(), *context);
+            return gpu::JacobiPreconditioner(A.view(), *context);
+        }());
+    check(
+        [&]
+        {
+            const gpu::CsrMatrix A(as_csr(host.view()), *context);
+            return gpu::JacobiPreconditioner(A, *context);
+        }());
+}
+
+TEST_F(Cuda, JacobiRejectsInverseStorageOverflowBeforeAllocation)
+{
+    const auto size = std::numeric_limits<std::size_t>::max() / sizeof(double) + 1;
+    const gpu::DenseMatrixView too_large(nullptr, size, size, size, context->device());
+    try
+    {
+        gpu::JacobiPreconditioner M(too_large, *context);
+        FAIL() << "overflowing inverse storage must be rejected";
+    }
+    catch (const std::invalid_argument &error)
+    {
+        EXPECT_STREQ(error.what(), "storage size overflows size_t");
+    }
+}
+
+TEST_F(Cuda, OneShotJacobiValidationFailurePreservesOutputAndAllowsFreshSetupOnReuse)
+{
+    const cg::DenseMatrix valid(3, 3, {3, 0, 0, 0, 7, 0, 0, 0, 11});
+    const cg::DenseMatrix invalid(3, 3, {3, 0, 0, 0, 7, 0, 0, 0, -11});
+    const gpu::DenseMatrix dense_good(valid.view(), *context), dense_bad(invalid.view(), *context);
+    const gpu::CsrMatrix csr_good(as_csr(valid.view()), *context), csr_bad(as_csr(invalid.view()), *context);
+    const std::vector<double> rhs{1, 2, 3};
+    gpu::Vector b(rhs, *context), x(3, *context);
+    for (const auto mode : {gpu::ExecutionMode::host, gpu::ExecutionMode::device})
+    {
+        gpu::Workspace workspace(3, *context, gpu::DenseKernel::native, mode);
+        const auto check = [&](const auto &bad, const auto &good)
+        {
+            x.fill(0, *context);
+            EXPECT_THROW(gpu::solve_into(bad, b.view(), x.view(), workspace, *context, {}, true,
+                                         gpu::DenseKernel::native, cg::PreconditionerKind::jacobi),
+                         std::invalid_argument);
+            std::vector<double> output(3);
+            x.download(output, *context);
+            EXPECT_EQ(output, (std::vector<double>{0, 0, 0}));
+            const auto result = gpu::solve_into(good, b.view(), x.view(), workspace, *context, {}, true,
+                                                gpu::DenseKernel::native, cg::PreconditionerKind::jacobi);
+            EXPECT_EQ(result.status, cg::Status::converged);
+            EXPECT_EQ(result.iterations, 1u);
+        };
+        check(dense_bad.view(), dense_good.view());
+        check(csr_bad, csr_good);
+    }
 }
 
 TEST_F(Cuda, StableNormAndRangeFailuresNeverClaimFalseConvergence)
