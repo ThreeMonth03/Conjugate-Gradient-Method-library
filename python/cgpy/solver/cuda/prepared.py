@@ -3,7 +3,6 @@
 from ... import _core
 from ..._interop import cuda as cuda_interop
 from ...storage import cuda as storage
-from .. import _validation
 from . import workspace as workspace_module
 
 
@@ -120,9 +119,6 @@ class PreparedSolver:
         RuntimeError
             CUDA allocation, stream or execution failure.
         """
-        maxiter, residual_refresh = _validation.validate_iteration_limits(
-            maxiter, residual_refresh
-        )
         return self._native.solve_into(
             cuda_interop.native_object(b),
             cuda_interop.native_object(x),

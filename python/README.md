@@ -161,3 +161,11 @@ the package root.
 
 The supported interface is modern linear CG and Jacobi PCG. The earlier
 `_cgpy`, `utils`, matrix subclasses and nonlinear methods have been removed.
+
+Iteration limits now share one contract across CPU/CUDA convenience, strict
+and prepared solves: integer-index values must be nonnegative and fit native
+`size_t`; invalid counts raise `ValueError` naming the option. CPU prepared
+calls previously raised `TypeError` for these conversion failures, so update
+exception handlers accordingly. User-defined `__index__` exceptions other
+than invalid-conversion `TypeError` remain visible. Solver arithmetic and
+stopping rules are unchanged.

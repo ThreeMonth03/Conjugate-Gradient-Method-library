@@ -84,14 +84,14 @@ cg::SolveInfo run(const Operator &A, const py::array &b, py::array &x, PythonWor
     return cg::solve_into(A, bv, xv, workspace.value, backend, settings, preconditioner);
 }
 cg::SolveInfo run_prepared(const cg::PreparedSolver &plan, const py::array &b, py::array x, PythonWorkspace &workspace,
-                           double rtol, double atol, std::size_t maxiter, const std::string &algorithm, bool fused,
-                           std::size_t residual_refresh)
+                           double rtol, double atol, const py::object &maxiter, const std::string &algorithm,
+                           bool fused, const py::object &residual_refresh)
 {
+    const auto options = parse_solver_options(rtol, atol, maxiter, algorithm, residual_refresh);
     validate_vector_array(b, false);
     validate_vector_array(x, true);
     const cg::ConstVectorView bv{static_cast<const double *>(b.data()), static_cast<std::size_t>(b.size())};
     const cg::VectorView xv{static_cast<double *>(x.mutable_data()), static_cast<std::size_t>(x.size())};
-    const auto options = parse_solver_options(rtol, atol, maxiter, algorithm, residual_refresh);
     WorkspaceUseGuard use(workspace);
     py::gil_scoped_release release;
     return plan.solve_into(bv, xv, workspace.value, options, fused);
@@ -184,8 +184,11 @@ Raises
 ------
 ValueError
     Invalid arrays, options, workspace use, aliasing or algorithm/preconditioner.
+    Iteration limits must implement the integer index protocol and fit a
+    nonnegative native size_t; negative, nonintegral and overflowing counts
+    name the invalid option in this exception.
 TypeError
-    Negative, out-of-range or nonintegral native iteration counts.
+    An array or workspace argument has an unsupported native type.
 
 Notes
 -----
@@ -198,6 +201,7 @@ mutation until the synchronous call returns. The GIL is released for the solve.
 
 void register_cpu_solver(py::module_ &m)
 {
+    m.def("_validate_iteration_limits", &parse_iteration_limits, py::arg("maxiter"), py::arg("residual_refresh"));
     py::class_<cg::SolveInfo>(m, "SolveInfo", R"doc(
 Read-only numerical status and operation counts for a completed native call.
 
@@ -290,8 +294,8 @@ Examples
     m.def(
         "solve_into",
         [](py::object A, const py::array &b, py::array x, PythonWorkspace &workspace, int threads, double rtol,
-           double atol, std::size_t maxiter, const std::string &algorithm, bool fused, std::size_t residual_refresh,
-           const std::string &preconditioner, const std::string &kernel)
+           double atol, const py::object &maxiter, const std::string &algorithm, bool fused,
+           const py::object &residual_refresh, const std::string &preconditioner, const std::string &kernel)
         {
             const auto selected = parse_dense_kernel(kernel);
             const auto kind = parse_preconditioner_kind(preconditioner);

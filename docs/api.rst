@@ -103,3 +103,31 @@ Build capabilities
 
 These report the extension actually imported by this Python process. They do
 not describe a different CMake build or a wheel installed elsewhere.
+
+Iteration limits and migration
+------------------------------
+
+``maxiter`` and ``residual_refresh`` follow the same contract for CPU and CUDA
+convenience, strict and prepared solves. They accept Python integers, NumPy
+integer scalars and objects implementing ``__index__``. Python booleans retain
+their integer meaning of zero or one. Values must be nonnegative and fit the
+platform's native ``size_t``; floating-point values are not truncated.
+Invalid types, negative values and overflow raise ``ValueError`` naming the
+option. Exceptions raised by user-defined ``__index__`` implementations,
+other than an invalid integer-conversion ``TypeError``, are propagated.
+
+This intentionally changes CPU prepared solves: callers that previously
+caught ``TypeError`` for an invalid iteration limit must catch ``ValueError``.
+The accepted numerical options, iteration policy and native C++ ``CgOptions``
+representation are unchanged. Convenience calls check limits before allocating
+their output/workspace; strict and prepared bindings use the same parser
+before entering the solver.
+Integer-protocol callbacks are evaluated once per option and complete before
+the binding validates and borrows array views; a callback cannot bypass output
+writeability checks by changing flags after an earlier descriptor was captured.
+
+CSR conversion owns its native snapshot. Foreign dtype, byte order,
+alignment or strides may require an additional normalization buffer; the
+native snapshot does not borrow those buffers. NumPy arrays are copied through
+the buffer interface without converting each scalar through Python. Canonical
+row/column validation remains in the C++ matrix constructor.

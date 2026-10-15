@@ -136,31 +136,173 @@ def test_convenience_rejects_complex_inputs_without_discarding_values(target):
 
 
 @pytest.mark.parametrize("option", ["maxiter", "residual_refresh"])
-@pytest.mark.parametrize("value", [-1, 1.5, 1 << 100])
-def test_high_level_iteration_counts_raise_value_error(option, value):
+@pytest.mark.parametrize("value", [-1, 1.5, 1 << 100, None, "1"])
+def test_public_iteration_counts_raise_value_error_and_preserve_workspace(
+    option, value
+):
     A, b = system()
+    plan = cgpy.prepare(A)
+    workspace = plan.create_workspace()
+    x = np.zeros_like(b)
     with pytest.raises(ValueError, match=option):
         cgpy.solve(A, b, **{option: value})
     with pytest.raises(ValueError, match=option):
         cgpy.solve_into(
             A,
             b,
-            np.zeros_like(b),
-            workspace=cgpy.Workspace(b.size),
+            x,
+            workspace=workspace,
             **{option: value},
         )
+    with pytest.raises(ValueError, match=option):
+        plan.solve_into(b, x, workspace=workspace, **{option: value})
+    np.testing.assert_array_equal(x, np.zeros_like(b))
+    assert plan.solve_into(b, x, workspace=workspace).converged
 
 
-def test_native_prepared_iteration_conversion_is_documented_as_type_error():
-    A, b = system()
-    solver = cgpy.prepare(A)
-    with pytest.raises(TypeError):
-        solver.solve_into(
-            b,
-            np.zeros_like(b),
-            workspace=solver.create_workspace(),
-            maxiter=-1,
+class IndexCount:
+    def __init__(self, value):
+        self.value = value
+        self.calls = 0
+
+    def __index__(self):
+        self.calls += 1
+        return self.value
+
+
+@pytest.mark.parametrize("entry", ["convenience", "strict", "prepared"])
+@pytest.mark.parametrize("option", ["maxiter", "residual_refresh"])
+def test_cpu_integer_protocol_is_evaluated_once_per_option(entry, option):
+    A, b = np.eye(2), np.ones(2)
+    count = IndexCount(2)
+    options = {option: count}
+    if entry == "convenience":
+        assert cgpy.solve(A, b, **options).converged
+    else:
+        plan = cgpy.prepare(A)
+        workspace = plan.create_workspace()
+        x = np.zeros_like(b)
+        info = (
+            cgpy.solve_into(A, b, x, workspace=workspace, **options)
+            if entry == "strict"
+            else plan.solve_into(b, x, workspace=workspace, **options)
         )
+        assert info.converged
+    assert count.calls == 1
+
+
+@pytest.mark.parametrize("entry", ["strict", "prepared"])
+@pytest.mark.parametrize("option", ["maxiter", "residual_refresh"])
+def test_cpu_validates_output_after_integer_protocol_callbacks(entry, option):
+    A, b = np.eye(2), np.ones(2)
+    plan = cgpy.prepare(A)
+    workspace = plan.create_workspace()
+    x = np.zeros_like(b)
+
+    class FreezeOutput(IndexCount):
+        def __index__(self):
+            x.setflags(write=False)
+            return super().__index__()
+
+    count = FreezeOutput(2)
+    with pytest.raises(ValueError, match="writable"):
+        if entry == "strict":
+            cgpy.solve_into(A, b, x, workspace=workspace, **{option: count})
+        else:
+            plan.solve_into(b, x, workspace=workspace, **{option: count})
+    assert count.calls == 1
+    np.testing.assert_array_equal(x, np.zeros_like(b))
+    x.setflags(write=True)
+    assert plan.solve_into(b, x, workspace=workspace).converged
+
+
+@pytest.mark.parametrize(
+    "count", [np.int64(2), np.uint64(2), IndexCount(2), True]
+)
+def test_all_cpu_entry_points_accept_integer_index_protocol(count):
+    A, b = np.eye(2), np.ones(2)
+    plan = cgpy.prepare(A)
+    workspace = plan.create_workspace()
+    assert cgpy.solve(A, b, maxiter=count, residual_refresh=count).converged
+    x = np.zeros_like(b)
+    assert cgpy.solve_into(
+        A, b, x, workspace=workspace, maxiter=count, residual_refresh=count
+    ).converged
+    x.fill(0)
+    assert plan.solve_into(
+        b, x, workspace=workspace, maxiter=count, residual_refresh=count
+    ).converged
+
+
+@pytest.mark.parametrize("count", [False, IndexCount(0), np.uint64(0)])
+def test_zero_update_limit_has_same_meaning_for_all_cpu_entry_points(count):
+    A, b = np.eye(2), np.ones(2)
+    plan = cgpy.prepare(A)
+    workspace = plan.create_workspace()
+    x = np.zeros_like(b)
+    results = [
+        cgpy.solve(A, b, maxiter=count).info,
+        cgpy.solve_into(A, b, x, workspace=workspace, maxiter=count),
+        plan.solve_into(b, x, workspace=workspace, maxiter=count),
+    ]
+    assert all(info.status == "max_iterations" for info in results)
+    assert all(info.iterations == 0 for info in results)
+    np.testing.assert_array_equal(x, np.zeros_like(b))
+
+
+def test_native_size_t_max_is_accepted_without_truncating_iteration_counts():
+    maximum = int(np.iinfo(np.uintp).max)
+    A, b = np.eye(2), np.zeros(2)
+    plan = cgpy.prepare(A)
+    workspace = plan.create_workspace()
+    x = np.zeros_like(b)
+    options = {"maxiter": maximum, "residual_refresh": maximum}
+    assert cgpy.solve(A, b, **options).converged
+    assert cgpy.solve_into(A, b, x, workspace=workspace, **options).converged
+    assert plan.solve_into(b, x, workspace=workspace, **options).converged
+
+
+@pytest.mark.parametrize("error", [MemoryError, RuntimeError])
+def test_iteration_index_protocol_preserves_unexpected_exceptions(error):
+    class BrokenIndex:
+        def __index__(self):
+            raise error("index sentinel")
+
+    A, b = np.eye(2), np.ones(2)
+    plan = cgpy.prepare(A)
+    workspace = plan.create_workspace()
+    x = np.zeros_like(b)
+    for call in (
+        lambda: cgpy.solve(A, b, maxiter=BrokenIndex()),
+        lambda: cgpy.solve_into(
+            A, b, x, workspace=workspace, maxiter=BrokenIndex()
+        ),
+        lambda: plan.solve_into(
+            b, x, workspace=workspace, maxiter=BrokenIndex()
+        ),
+    ):
+        with pytest.raises(error, match="index sentinel"):
+            call()
+    np.testing.assert_array_equal(x, np.zeros_like(b))
+    assert plan.solve_into(b, x, workspace=workspace).converged
+
+
+def test_convenience_normalizes_foreign_storage_and_owns_initial_guess_copy():
+    values = np.array([1.0, 99.0, 2.0, 99.0], dtype=">f4")
+    initial = values[::2]
+    initial.setflags(write=False)
+    A = np.asfortranarray(np.eye(2, dtype=np.float32))
+    b = np.array([2.0, 1.0], dtype=np.float32)[::-1]
+    b.setflags(write=False)
+    answer = cgpy.solve(A, b, initial)
+    assert answer.converged and answer.iterations == 0
+    assert answer.x.dtype == np.float64
+    assert answer.x.flags.c_contiguous and answer.x.flags.aligned
+    assert answer.x.flags.owndata and answer.x.flags.writeable
+    assert not np.shares_memory(answer.x, initial)
+    answer.x.fill(0)
+    np.testing.assert_array_equal(initial, [1.0, 2.0])
+    np.testing.assert_array_equal(b, [1.0, 2.0])
 
 
 def test_alias_workspace_and_option_validation():

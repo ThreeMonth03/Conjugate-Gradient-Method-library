@@ -89,18 +89,18 @@ std::unique_ptr<gpu::PreparedSolver> prepare_host(py::object matrix, int device,
 }
 
 cg::SolveInfo solve_prepared(const gpu::PreparedSolver &solver, py::object b, py::object x, CudaWorkspace &workspace,
-                             double rtol, double atol, std::size_t maxiter, const std::string &algorithm, bool fused,
-                             std::size_t refresh)
+                             double rtol, double atol, const py::object &maxiter, const std::string &algorithm,
+                             bool fused, const py::object &refresh)
 {
+    const auto settings = parse_solver_options(rtol, atol, maxiter, algorithm, refresh);
     const auto bv = device_array(b, 1, workspace.context, false);
     const auto xv = device_array(x, 1, workspace.context, true);
-    const auto settings = parse_solver_options(rtol, atol, maxiter, algorithm, refresh);
     py::gil_scoped_release release;
     return solver.solve_into(as_vector_view(bv), as_mutable_vector_view(xv), workspace.value, settings, fused);
 }
 
 cg::SolveInfo solve(py::object matrix, py::object b, py::object x, CudaWorkspace &workspace, double rtol, double atol,
-                    std::size_t maxiter, const std::string &algorithm, bool fused, std::size_t refresh,
+                    const py::object &maxiter, const std::string &algorithm, bool fused, const py::object &refresh,
                     const std::string &preconditioner_name, const std::string &kernel_name)
 {
     const auto kernel = parse_dense_kernel(kernel_name);

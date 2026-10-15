@@ -66,7 +66,9 @@ def prepare(
     True
     """
     matrix = (
-        A if isinstance(A, csr.CsrMatrix) else host.normalize_dense_matrix(A)
+        A
+        if isinstance(A, csr.CsrMatrix)
+        else host.normalize_host_array(A, 2, name="A")
     )
     _validation.validate_operator_shape(matrix.shape)
     native_matrix = (
@@ -163,9 +165,6 @@ def solve_into(
     >>> info.status
     'converged'
     """
-    maxiter, residual_refresh = _validation.validate_iteration_limits(
-        maxiter, residual_refresh
-    )
     native_A = A._native if isinstance(A, csr.CsrMatrix) else A
     return _core.solve_into(
         native_A,
@@ -266,30 +265,21 @@ def solve(
     True
     >>> np.testing.assert_allclose(result.x, [1 / 11, 7 / 11])
     """
-    maxiter, residual_refresh = _validation.validate_iteration_limits(
+    maxiter, residual_refresh = _core._validate_iteration_limits(
         maxiter, residual_refresh
     )
     if not isinstance(A, csr.CsrMatrix):
-        A = host.normalize_dense_matrix(A)
+        A = host.normalize_host_array(A, 2, name="A")
     _validation.validate_operator_shape(A.shape)
-    b = np.require(
-        host.normalize_real_array(b, "b"),
-        dtype=np.float64,
-        requirements=("C", "A"),
-    )
-    if b.ndim != 1 or b.size != A.shape[0]:
+    b = host.normalize_host_array(b, 1, name="b")
+    if b.size != A.shape[0]:
         raise ValueError("b must be a vector matching A")
     x = (
         np.zeros_like(b)
         if x0 is None
-        else np.array(
-            host.normalize_real_array(x0, "x0"),
-            dtype=np.float64,
-            order="C",
-            copy=True,
-        )
+        else host.normalize_host_array(x0, 1, name="x0", copy=True)
     )
-    if x.ndim != 1 or x.size != b.size:
+    if x.size != b.size:
         raise ValueError("x0 must be a vector matching b")
     info = solve_into(
         A,
