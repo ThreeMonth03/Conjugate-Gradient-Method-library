@@ -1,9 +1,8 @@
 """Dense and sparse CG/PCG solvers for symmetric positive-definite systems."""
 
 from ._core import blas_enabled, build_info, openmp_enabled
-from .matrix import CSRMatrix
+from .matrix import CsrMatrix
 from .solver import (
-    PreparedCsrSolver,
     PreparedSolver,
     SolveInfo,
     SolveResult,
@@ -14,8 +13,7 @@ from .solver import (
 )
 
 __all__ = [
-    "CSRMatrix",
-    "PreparedCsrSolver",
+    "CsrMatrix",
     "PreparedSolver",
     "SolveInfo",
     "SolveResult",

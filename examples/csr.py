@@ -5,7 +5,7 @@ import numpy as np
 
 
 def main() -> None:
-    matrix = cgpy.CSRMatrix(
+    matrix = cgpy.CsrMatrix(
         indptr=[0, 2, 5, 7],
         indices=[0, 1, 0, 1, 2, 1, 2],
         data=[2.0, -1.0, -1.0, 2.0, -1.0, -1.0, 2.0],

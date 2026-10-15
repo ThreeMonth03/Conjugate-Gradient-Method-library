@@ -1,6 +1,6 @@
 #pragma once
 
-#include <cg/backend/cuda/context.hpp>
+#include <cg/runtime/cuda/context.hpp>
 
 #include <cstddef>
 #include <memory>

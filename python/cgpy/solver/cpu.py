@@ -4,24 +4,24 @@ import numpy as np
 import numpy.typing as npt
 
 from .. import _core
-from .._runtime import validation
+from .._interop import host
 from ..matrix import csr
-from . import result
+from . import _validation, result
 from . import workspace as workspace_module
 
 
 def prepare(
-    A: npt.ArrayLike | csr.CSRMatrix,
+    A: npt.ArrayLike | csr.CsrMatrix,
     *,
     num_threads: int = 1,
     preconditioner: str = "none",
     dense_kernel: str = "native",
-) -> _core.PreparedSolver | _core.PreparedCsrSolver:
+) -> _core.PreparedSolver:
     """Snapshot a matrix and cache optional Jacobi setup for repeated solves.
 
     Parameters
     ----------
-    A : array_like or CSRMatrix
+    A : array_like or CsrMatrix
         Nonempty square real SPD operator. Dense inputs are normalized to
         aligned C-contiguous float64 storage before the owning snapshot.
     num_threads : int, default=1
@@ -36,7 +36,7 @@ def prepare(
 
     Returns
     -------
-    PreparedSolver or PreparedCsrSolver
+    PreparedSolver
         Owning immutable matrix/preconditioner snapshot. Thread count and
         kernel choice are fixed; each solve selects its tolerances and fusion.
 
@@ -65,17 +65,20 @@ def prepare(
     >>> info.converged
     True
     """
-    if isinstance(A, csr.CSRMatrix):
-        return _core.PreparedCsrSolver(
-            A._native, num_threads, preconditioner, dense_kernel
-        )
+    matrix = (
+        A if isinstance(A, csr.CsrMatrix) else host.normalize_dense_matrix(A)
+    )
+    _validation.validate_operator_shape(matrix.shape)
+    native_matrix = (
+        matrix._native if isinstance(matrix, csr.CsrMatrix) else matrix
+    )
     return _core.PreparedSolver(
-        validation.dense_matrix(A), num_threads, preconditioner, dense_kernel
+        native_matrix, num_threads, preconditioner, dense_kernel
     )
 
 
 def solve_into(
-    A: np.ndarray | csr.CSRMatrix,
+    A: np.ndarray | csr.CsrMatrix,
     b: np.ndarray,
     x: np.ndarray,
     *,
@@ -94,7 +97,7 @@ def solve_into(
 
     Parameters
     ----------
-    A : numpy.ndarray or CSRMatrix
+    A : numpy.ndarray or CsrMatrix
         Nonempty square real SPD operator. Dense arrays must already be
         aligned, C-contiguous and float64.
     b : numpy.ndarray
@@ -160,16 +163,11 @@ def solve_into(
     >>> info.status
     'converged'
     """
-    maxiter, residual_refresh = validation.iteration_limits(
+    maxiter, residual_refresh = _validation.validate_iteration_limits(
         maxiter, residual_refresh
     )
-    implementation = (
-        _core.solve_csr_into
-        if isinstance(A, csr.CSRMatrix)
-        else _core.solve_into
-    )
-    native_A = A._native if isinstance(A, csr.CSRMatrix) else A
-    return implementation(
+    native_A = A._native if isinstance(A, csr.CsrMatrix) else A
+    return _core.solve_into(
         native_A,
         b,
         x,
@@ -187,7 +185,7 @@ def solve_into(
 
 
 def solve(
-    A: npt.ArrayLike | csr.CSRMatrix,
+    A: npt.ArrayLike | csr.CsrMatrix,
     b: npt.ArrayLike,
     x0: npt.ArrayLike | None = None,
     *,
@@ -205,7 +203,7 @@ def solve(
 
     Parameters
     ----------
-    A : array_like or CSRMatrix
+    A : array_like or CsrMatrix
         Nonempty square operator. Dense input is normalized to aligned
         C-contiguous float64 storage. Symmetry and positive definiteness are
         caller preconditions.
@@ -268,16 +266,14 @@ def solve(
     True
     >>> np.testing.assert_allclose(result.x, [1 / 11, 7 / 11])
     """
-    maxiter, residual_refresh = validation.iteration_limits(
+    maxiter, residual_refresh = _validation.validate_iteration_limits(
         maxiter, residual_refresh
     )
-    if isinstance(A, csr.CSRMatrix):
-        if A.shape[0] == 0 or A.shape[0] != A.shape[1]:
-            raise ValueError("A must be a nonempty square matrix")
-    else:
-        A = validation.dense_matrix(A)
+    if not isinstance(A, csr.CsrMatrix):
+        A = host.normalize_dense_matrix(A)
+    _validation.validate_operator_shape(A.shape)
     b = np.require(
-        validation.real_array(b, "b"),
+        host.normalize_real_array(b, "b"),
         dtype=np.float64,
         requirements=("C", "A"),
     )
@@ -287,7 +283,7 @@ def solve(
         np.zeros_like(b)
         if x0 is None
         else np.array(
-            validation.real_array(x0, "x0"),
+            host.normalize_real_array(x0, "x0"),
             dtype=np.float64,
             order="C",
             copy=True,

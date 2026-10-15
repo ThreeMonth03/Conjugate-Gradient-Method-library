@@ -21,19 +21,22 @@ endif()
 add_library(cg_cuda STATIC
     cpp/cg/storage/cuda/vector.cu
     cpp/cg/storage/cuda/allocation.cu
-    cpp/cg/storage/cuda/validation.cu
+    cpp/cg/storage/cuda/detail/validation.cu
     cpp/cg/matrix/cuda/dense_matrix.cu
     cpp/cg/matrix/cuda/csr_matrix.cu
+    cpp/cg/matrix/cuda/detail/validation.cu
     cpp/cg/solver/cuda/workspace.cu
     cpp/cg/solver/cuda/conjugate_gradient.cu
+    cpp/cg/solver/cuda/prepared_solver.cu
     cpp/cg/preconditioner/cuda/jacobi.cu
     cpp/cg/preconditioner/cuda/kernels.cu
     cpp/cg/backend/cuda/backend.cu
+    cpp/cg/backend/cuda/execution_resources.cu
     cpp/cg/backend/cuda/vector.cu
     cpp/cg/backend/cuda/reduction.cu
     cpp/cg/backend/cuda/dense.cu
     cpp/cg/backend/cuda/csr.cu
-    cpp/cg/backend/cuda/context.cu
+    cpp/cg/runtime/cuda/context.cu
 )
 add_library(cg::cuda ALIAS cg_cuda)
 target_compile_features(cg_cuda PUBLIC cxx_std_20)
@@ -49,8 +52,7 @@ set_target_properties(cg_cuda PROPERTIES
 target_link_libraries(cg_cuda PUBLIC cg_core CUDA::cudart CUDA::cublas)
 set(CG_CUDA_PUBLIC_HEADERS
     cuda.hpp
-    backend/cuda/context.hpp
-    backend/cuda/backend.hpp
+    runtime/cuda/context.hpp
     backend/cuda/dense_kernel.hpp
     storage/cuda/vector.hpp
     storage/cuda/device_memory.hpp
@@ -61,6 +63,7 @@ set(CG_CUDA_PUBLIC_HEADERS
     matrix/cuda/dense_matrix_view.hpp
     solver/cuda/workspace.hpp
     solver/cuda/conjugate_gradient.hpp
+    solver/cuda/prepared_solver.hpp
     preconditioner/cuda/jacobi.hpp
 )
 install(TARGETS cg_cuda ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}" COMPONENT development)

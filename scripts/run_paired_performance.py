@@ -71,7 +71,7 @@ class Worker:
 
 def _worker() -> None:
     # Worker startup supplies thread limits before any numerical imports.
-    from cgbench import artifacts, backends, cases, collector
+    from cgbench import artifacts, cases, collector, execution
 
     execute = None
     arrays = None
@@ -99,7 +99,7 @@ def _worker() -> None:
                 fixture = cases.make_case(spec, job["seed"])
                 arrays = fixture[:3]
                 options = job["options"]
-                execute = backends.make_executor(
+                execute = execution.make_executor(
                     job["implementation"], arrays, options, job["scope"], 1
                 )
                 response = checked_outcome()

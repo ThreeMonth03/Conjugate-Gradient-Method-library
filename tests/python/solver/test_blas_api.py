@@ -6,9 +6,9 @@ from concurrent.futures import ThreadPoolExecutor
 import cgpy
 import numpy as np
 import pytest
-from cgbench.backends import make_executor
 from cgbench.cases import SUITES, make_case
 from cgbench.collector import check_outcome
+from cgbench.execution import make_executor
 
 
 @pytest.fixture(params=["native", "blas"])
@@ -110,7 +110,7 @@ def test_blas_rejects_multiple_threads_and_csr():
         pytest.skip("optional BLAS provider is not enabled")
     with pytest.raises(ValueError, match="1"):
         cgpy.prepare(np.eye(2), dense_kernel="blas", num_threads=2)
-    matrix = cgpy.CSRMatrix([0, 1, 2], [0, 1], [1.0, 2.0], (2, 2))
+    matrix = cgpy.CsrMatrix([0, 1, 2], [0, 1], [1.0, 2.0], (2, 2))
     for prepare in (
         lambda: cgpy.prepare(matrix, dense_kernel="blas"),
         lambda: cgpy.solve(matrix, [1.0, 1.0], dense_kernel="blas"),

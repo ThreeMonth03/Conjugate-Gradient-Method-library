@@ -27,8 +27,9 @@ pybind11_add_module(_core MODULE
     cpp/cg/python/module.cpp
     cpp/cg/python/runtime.cpp
     cpp/cg/python/array_conversion.cpp
-    cpp/cg/matrix/pymod/module.cpp
-    cpp/cg/solver/pymod/module.cpp
+    cpp/cg/matrix/pymod/cpu.cpp
+    cpp/cg/solver/pymod/cpu.cpp
+    cpp/cg/solver/pymod/options.cpp
 )
 target_link_libraries(_core PRIVATE cg_core)
 string(TOUPPER "${CMAKE_BUILD_TYPE}" CG_BUILD_CONFIG)
@@ -49,6 +50,7 @@ if(CG_ENABLE_CUDA)
         cpp/cg/python/cuda_module.cpp
         cpp/cg/python/cuda_runtime.cpp
         cpp/cg/python/array_conversion.cpp
+        cpp/cg/solver/pymod/options.cpp
         cpp/cg/python/cuda_array_conversion.cpp
         cpp/cg/storage/pymod/cuda.cpp
         cpp/cg/matrix/pymod/cuda.cpp

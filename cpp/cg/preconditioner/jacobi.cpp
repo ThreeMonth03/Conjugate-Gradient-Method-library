@@ -1,4 +1,4 @@
-#include <cg/matrix/validation.hpp>
+#include <cg/matrix/detail/validation.hpp>
 #include <cg/preconditioner/jacobi.hpp>
 
 #include <cg/matrix/csr_matrix.hpp>
@@ -83,10 +83,10 @@ void JacobiPreconditioner::apply(ConstVectorView r, VectorView z, const CpuBacke
     backend.multiply(m_inverse, r, z);
 }
 
-double JacobiPreconditioner::apply_dot(ConstVectorView r, VectorView z, const CpuBackend &backend) const
+double JacobiPreconditioner::apply_and_dot(ConstVectorView r, VectorView z, const CpuBackend &backend) const
 {
     validate_output(m_inverse, z);
-    return backend.multiply_dot(m_inverse, r, z);
+    return backend.multiply_and_dot(m_inverse, r, z);
 }
 
 } // namespace cg

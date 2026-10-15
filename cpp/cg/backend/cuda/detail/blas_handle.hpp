@@ -1,6 +1,6 @@
 #pragma once
 
-#include <cg/backend/cuda/detail/runtime.hpp>
+#include <cg/runtime/cuda/detail/runtime.hpp>
 
 #include <cublas_v2.h>
 

@@ -1,6 +1,8 @@
-#include <cg/matrix/cuda/validation.hpp>
+#include <cg/backend/cuda/detail/backend.hpp>
+#include <cg/matrix/cuda/detail/validation.hpp>
 #include <cg/preconditioner/cuda/jacobi.hpp>
 #include <cg/solver/cuda/conjugate_gradient.hpp>
+#include <cg/solver/cuda/detail/workspace_use_guard.hpp>
 #include <cg/solver/detail/engine.hpp>
 #include <cg/solver/detail/validation.hpp>
 
@@ -82,51 +84,43 @@ void validate_solve(const Matrix &A, ConstVectorView b, VectorView x, Workspace 
     }
 }
 
-struct WorkspaceUse
-{
-    WorkspaceUse(Workspace &workspace, const Context &context) : workspace(workspace), context(context)
-    {
-        if (!workspace.try_acquire())
-        {
-            throw std::invalid_argument("CUDA workspace is already in use by another solve");
-        }
-    }
-    WorkspaceUse(const WorkspaceUse &) = delete;
-    WorkspaceUse &operator=(const WorkspaceUse &) = delete;
-    ~WorkspaceUse()
-    {
-        if (!completed)
-        {
-            try
-            {
-                context.synchronize();
-            }
-            catch (...)
-            {
-            }
-        }
-        workspace.release();
-    }
-    Workspace &workspace;
-    const Context &context;
-    bool completed = false;
-};
-
 template <class Matrix>
 SolveInfo run(const Matrix &A, ConstVectorView b, VectorView x, Workspace &workspace, const Context &context,
               const CgOptions &options, bool fused, DenseKernel kernel, const JacobiPreconditioner *M)
 {
     validate_solve(A, b, x, workspace, context, options, M);
-    WorkspaceUse use(workspace, context);
+    detail::WorkspaceUseGuard use(workspace, context);
     detail::DeviceGuard guard(context.device());
-    const Backend backend(context, workspace, fused, kernel);
+    const detail::Backend backend(use.resources(), fused, kernel);
     const auto norm = [&](ConstVectorView value, double squared) { return backend.norm_from_squared(value, squared); };
     const auto info = options.algorithm == Algorithm::explicit_residual
                           ? cg::detail::solve_explicit(A, b, x, workspace, backend, options, norm)
                           : cg::detail::solve_recurrence(A, b, x, workspace, backend, options, M, norm);
     context.synchronize();
-    use.completed = true;
+    use.complete();
     return info;
+}
+
+template <class Matrix>
+SolveInfo solve_with_preconditioner(const Matrix &A, ConstVectorView b, VectorView x, Workspace &workspace,
+                                    const Context &context, const CgOptions &options, bool fused, DenseKernel kernel,
+                                    PreconditionerKind preconditioner)
+{
+    if (preconditioner != PreconditionerKind::none && preconditioner != PreconditionerKind::jacobi)
+    {
+        throw std::invalid_argument("unsupported preconditioner kind");
+    }
+    cg::detail::validate_options(options, preconditioner == PreconditionerKind::jacobi);
+    if (preconditioner == PreconditionerKind::none)
+    {
+        return run(A, b, x, workspace, context, options, fused, kernel, nullptr);
+    }
+    if (preconditioner == PreconditionerKind::jacobi)
+    {
+        const JacobiPreconditioner M(A, context);
+        return run(A, b, x, workspace, context, options, fused, kernel, &M);
+    }
+    throw std::invalid_argument("unsupported preconditioner kind");
 }
 
 } // namespace
@@ -144,6 +138,21 @@ SolveInfo solve_into(const CsrMatrix &A, ConstVectorView b, VectorView x, Worksp
         throw std::invalid_argument("CUDA cuBLAS dense kernels do not support CSR");
     }
     return run(A, b, x, workspace, context, options, fused, kernel, M);
+}
+
+SolveInfo solve_into(DenseMatrixView A, ConstVectorView b, VectorView x, Workspace &workspace, const Context &context,
+                     const CgOptions &options, bool fused, DenseKernel kernel, PreconditionerKind preconditioner)
+{
+    return solve_with_preconditioner(A, b, x, workspace, context, options, fused, kernel, preconditioner);
+}
+SolveInfo solve_into(const CsrMatrix &A, ConstVectorView b, VectorView x, Workspace &workspace, const Context &context,
+                     const CgOptions &options, bool fused, DenseKernel kernel, PreconditionerKind preconditioner)
+{
+    if (kernel != DenseKernel::native)
+    {
+        throw std::invalid_argument("CUDA cuBLAS dense kernels do not support CSR");
+    }
+    return solve_with_preconditioner(A, b, x, workspace, context, options, fused, kernel, preconditioner);
 }
 
 } // namespace cuda

@@ -3,7 +3,7 @@
 #include <cg/python/cuda_array_conversion.hpp>
 #include <cg/python/module.hpp>
 #include <cg/storage/cuda/vector.hpp>
-#include <cg/storage/validation.hpp>
+#include <cg/storage/detail/validation.hpp>
 
 #include <memory>
 
@@ -46,7 +46,7 @@ void register_cuda_storage(py::module_ &m)
             "copy_from_host",
             [](gpu::Vector &value, const py::array &host, std::uintptr_t stream)
             {
-                host_array(host, 1);
+                validate_host_array(host, 1);
                 const gpu::Context context(value.device(), stream);
                 cg::detail::validate_raw_vector(static_cast<const double *>(host.data()),
                                                 static_cast<std::size_t>(host.size()));
@@ -63,7 +63,7 @@ void register_cuda_storage(py::module_ &m)
                 const gpu::Context context(value.device(), stream);
                 const auto array = device_array(source, 1, context, false);
                 py::gil_scoped_release release;
-                value.copy_from_device(vector_view(array), context);
+                value.copy_from_device(as_vector_view(array), context);
             },
             py::arg("source"), py::arg("stream") = 0)
         .def(

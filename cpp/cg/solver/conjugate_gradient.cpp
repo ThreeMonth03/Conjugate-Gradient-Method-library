@@ -1,4 +1,5 @@
-#include <cg/matrix/validation.hpp>
+#include <cg/backend/cpu/detail/reduction.hpp>
+#include <cg/matrix/detail/validation.hpp>
 #include <cg/solver/conjugate_gradient.hpp>
 #include <cg/solver/detail/engine.hpp>
 #include <cg/solver/detail/validation.hpp>
@@ -78,23 +79,24 @@ void validate_solve(const Matrix &A, ConstVectorView b, VectorView x, Workspace 
     }
 }
 
-} // namespace
-
-const char *status_name(Status status) noexcept
+template <class Matrix>
+SolveInfo solve_with_setup(const Matrix &A, ConstVectorView b, VectorView x, Workspace &workspace,
+                           const CpuBackend &backend, const CgOptions &options, PreconditionerKind preconditioner)
 {
-    switch (status)
+    if (preconditioner == PreconditionerKind::none)
     {
-    case Status::converged:
-        return "converged";
-    case Status::max_iterations:
-        return "max_iterations";
-    case Status::non_positive_curvature:
-        return "non_positive_curvature";
-    case Status::non_finite:
-        return "non_finite";
+        return solve_into(A, b, x, workspace, backend, options);
     }
-    return "unknown";
+    if (preconditioner != PreconditionerKind::jacobi)
+    {
+        throw std::invalid_argument("unsupported preconditioner");
+    }
+    detail::validate_options(options, true);
+    const JacobiPreconditioner prepared(A);
+    return solve_into(A, b, x, workspace, backend, options, &prepared);
 }
+
+} // namespace
 
 SolveInfo solve_into(DenseMatrixView A, ConstVectorView b, VectorView x, Workspace &workspace,
                      const CpuBackend &backend, const CgOptions &options, const JacobiPreconditioner *M)
@@ -116,6 +118,18 @@ SolveInfo solve_into(const CsrMatrix &A, ConstVectorView b, VectorView x, Worksp
     return options.algorithm == Algorithm::explicit_residual
                ? detail::solve_explicit(A, b, x, workspace, backend, options, detail::norm_from_squared)
                : detail::solve_recurrence(A, b, x, workspace, backend, options, M, detail::norm_from_squared);
+}
+
+SolveInfo solve_into(DenseMatrixView A, ConstVectorView b, VectorView x, Workspace &workspace,
+                     const CpuBackend &backend, const CgOptions &options, PreconditionerKind preconditioner)
+{
+    return solve_with_setup(A, b, x, workspace, backend, options, preconditioner);
+}
+
+SolveInfo solve_into(const CsrMatrix &A, ConstVectorView b, VectorView x, Workspace &workspace,
+                     const CpuBackend &backend, const CgOptions &options, PreconditionerKind preconditioner)
+{
+    return solve_with_setup(A, b, x, workspace, backend, options, preconditioner);
 }
 
 } // namespace cg

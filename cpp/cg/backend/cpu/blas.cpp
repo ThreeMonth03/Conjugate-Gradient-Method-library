@@ -1,5 +1,5 @@
 #include <cg/backend/cpu/backend.hpp>
-#include <cg/backend/cpu/blas.hpp>
+#include <cg/backend/cpu/detail/blas.hpp>
 
 #include <algorithm>
 #include <limits>

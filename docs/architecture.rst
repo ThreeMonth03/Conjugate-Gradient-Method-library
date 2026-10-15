@@ -12,8 +12,8 @@ Feature layout
 Headers and implementation live together under ``cpp/cg/``. Consumers include
 feature headers such as ``<cg/matrix/csr_matrix.hpp>`` or the CPU umbrella
 ``<cg/cg.hpp>``. CUDA has a separate ``<cg/cuda.hpp>`` umbrella. Installation
-exports public headers into ``include/cg/``; private binding helpers stay in
-the source tree.
+exports public headers into ``include/cg/``. Private implementation helpers
+live in ``detail/``; binding helpers stay in the source tree.
 
 .. list-table:: Source responsibilities
    :header-rows: 1
@@ -21,35 +21,42 @@ the source tree.
 
    * - Path
      - Responsibility
+   * - ``runtime/cuda/``
+     - Device selection, borrowed stream context and low-level runtime helpers.
    * - ``storage/``
-     - Owning vectors and borrowed const/mutable vector views.
+     - Standard host containers/views and CUDA allocation, vectors and fill.
    * - ``matrix/``
      - Dense matrix ownership/views and validated canonical CSR storage.
    * - ``backend/cpu/``
      - CPU primitives, fused operations, local thread count and dense-kernel
        selection.
    * - ``backend/cuda/``
-     - Device/borrowed-stream context and native/cuBLAS operations.
+     - Native/cuBLAS operations and private execution resources: reductions,
+       pinned scalar and optional cuBLAS handle/scratch.
    * - ``preconditioner/``
      - Validate and cache the immutable Jacobi inverse.
    * - ``solver/``
-     - Options, statuses, operation counts, reusable workspace and the shared
-       CG/PCG engine in ``detail/engine.hpp``.
+     - Options, result metadata, reusable workspace, owning ``PreparedSolver``
+       and the shared CG/PCG engine in ``detail/engine.hpp``.
    * - ``<feature>/cuda/``
      - Device storage, workspace and feature-specific CUDA implementation.
    * - ``<feature>/pymod/``
-     - Bind that feature's public types and operations.
+     - Register that feature's CPU/CUDA APIs in ``cpu.cpp``/``cuda.cpp``;
+       parse Python configuration at the language boundary.
    * - ``python/``
      - Extension registration and shared array conversion/lifetime helpers.
    * - ``python/cgpy/``
      - Public ``matrix``, ``storage``, ``solver`` and ``cuda`` packages;
-       ``_runtime`` owns native loading and validation support.
+       ``_runtime`` loads native modules, ``_interop`` normalizes host
+       representations, and ``solver/_validation.py`` checks solve policy.
    * - ``python/cgbench/``
-     - Shared benchmark/test fixtures, independent accuracy gates, balanced
-       scheduling and raw measurement artifacts.
+     - ``adapters/`` invoke implementations; ``reference/`` owns an independent
+       recurrence with a small array-operations protocol. ``execution.py``
+       defines their result contract and explicit candidate factory.
 
-The dependency direction is storage/matrix to backend operations to solver
-coordination. The preconditioner owns setup state used by the solver. Language
+Dependencies point from solver coordination to preconditioner/backend, then
+matrix/storage and runtime. Lower layers never include solver state. The
+preconditioner owns setup state used by the solver. Language
 bindings depend on the core; core headers and the ``cg_core`` CMake target do
 not depend on Python or pybind11. ``CG_BUILD_PYTHON=OFF`` must build without
 locating either dependency. The optional ``cg_cuda`` target owns CUDA SDK
@@ -58,7 +65,9 @@ requirements.
 The ``cgpy._core`` and optional ``cgpy._cuda`` extension entry points register
 feature bindings; they contain no numerical recurrence. Per-feature ``pymod``
 code validates layout and ownership, retains borrowed Python owners, guards
-workspace concurrency and releases the GIL around native solves. Python
+workspace concurrency and releases the GIL around native solves. Prepared
+matrix ownership and Jacobi setup belong to native ``solver/`` classes,
+so C++ consumers use them without importing Python. Python
 modules import their defining peers rather than private helpers from the
 package root. ``cgpy.__init__`` supplies explicit public re-exports.
 
@@ -67,7 +76,11 @@ Workspace and ownership
 
 CPU workspace owns five vectors: residual ``r``, direction ``p``, product
 ``Ap``, true-residual scratch and preconditioned residual ``z``. Prepare its
-size before calling the native solver. A prepared native solve with a prepared
+size before calling the native solver. It is noncopyable and movable; a
+moved-from workspace is empty and reusable. ``capacity()`` is the minimum
+capacity of all five buffers. ``prepare()`` commits growth only after every
+allocation succeeds and preserves existing state on failure. A prepared
+native solve with a prepared
 preconditioner does not allocate vector storage; backend/runtime resource
 initialization remains separate. Standalone Python calls prepare Jacobi for
 that call.
@@ -75,7 +88,9 @@ that call.
 ``solve`` normalizes inputs and allocates output/workspace. ``solve_into``
 borrows compatible arrays and uses caller-owned output/workspace. ``prepare``
 owns a matrix snapshot and optional Jacobi inverse; immutable preparation can
-be shared across calls. Preparation fixes thread count and dense-kernel
+be shared across calls. Dense and CSR preparation return the same concrete
+``PreparedSolver`` type. ``CsrMatrix`` has the same spelling in C++ and Python.
+Preparation fixes thread count and dense-kernel
 selection. Keep output/workspace disjoint from inputs and use separate
 workspace/output for overlapping solves. Every public solve completes before
 returning; borrowed arrays must remain alive and free from conflicting
@@ -116,9 +131,11 @@ CUDA execution
 
 CUDA owns explicit device matrices/vectors and borrows a device stream. The
 shared solver engine invokes CUDA adapters; it preserves the same recurrence,
-true-residual policy and failure statuses. Device workspace owns vectors,
-reductions and pinned scalars on one device/stream. Only a workspace prepared
-for the cuBLAS kernel also owns its handle and 4 MiB scratch allocation.
+true-residual policy and failure statuses. Device workspace composes solver
+vectors and private backend execution resources on one device/stream. A
+solver-local RAII guard acquires the workspace and lends those resources to
+the backend; the backend never sees solver state. Only resources prepared
+for the cuBLAS kernel own a handle and 4 MiB scratch allocation.
 
 Calls synchronize before returning and restore the caller's current device.
 CPU pointers are never treated as device pointers. External device arrays
@@ -140,7 +157,9 @@ GoogleTest checks native ownership, aliasing, kernels, CSR invariants and
 numerical breakdown. Pytest checks conversion, strict arrays, snapshots,
 GIL/workspace behavior and benchmark contracts. Sphinx imports the real
 extension and executes examples. Distribution checks build through an sdist
-and exercise a relocated wheel outside the checkout.
+and exercise a relocated wheel outside the checkout. A small architecture
+test checks native feature include directions, excludes Python from the core,
+and prevents the product package from importing benchmark code.
 
 Presets isolate serial, OpenMP, BLAS, CUDA, debug and CPU sanitizer builds. CI
 uses CPython 3.12 throughout, compiles CUDA on hosted runners and requires a

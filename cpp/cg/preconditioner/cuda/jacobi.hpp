@@ -9,7 +9,10 @@ namespace cg
 namespace cuda
 {
 
+namespace detail
+{
 class Backend;
+}
 
 class JacobiPreconditioner
 {
@@ -19,7 +22,7 @@ class JacobiPreconditioner
     std::size_t size() const noexcept { return m_inverse.size(); }
     int device() const noexcept { return m_inverse.device(); }
     ConstVectorView inverse_diagonal() const noexcept { return m_inverse.view(); }
-    double apply_dot(ConstVectorView r, VectorView z, const Backend &backend) const;
+    double apply_and_dot(ConstVectorView r, VectorView z, const detail::Backend &backend) const;
 
     private:
     Vector m_inverse;

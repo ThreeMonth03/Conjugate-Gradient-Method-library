@@ -1,13 +1,15 @@
 #include <cg/cg.hpp>
-#include <cg/storage/validation.hpp>
+#include <cg/storage/detail/validation.hpp>
 
 #include <gtest/gtest.h>
 
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <future>
 #include <limits>
 #include <stdexcept>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -98,6 +100,65 @@ TEST(Storage, DenseMatrixCopiesOwnValuesAndMovesLeaveAnEmptyShape)
     EXPECT_DOUBLE_EQ(assigned.data()[3], 3.0);
 }
 
+static_assert(!std::is_copy_constructible_v<cg::Workspace>);
+static_assert(!std::is_copy_assignable_v<cg::Workspace>);
+static_assert(std::is_nothrow_move_constructible_v<cg::Workspace>);
+static_assert(std::is_nothrow_move_assignable_v<cg::Workspace>);
+
+TEST(Workspace, MovesPreserveAllBuffersAndLeaveReusableEmptySources)
+{
+    const auto buffers = [](cg::Workspace &workspace)
+    {
+        return std::array<cg::VectorView, 5>{workspace.residual(), workspace.direction(), workspace.product(),
+                                             workspace.scratch(), workspace.preconditioned()};
+    };
+    cg::Workspace source(8);
+    const auto original = buffers(source);
+    for (std::size_t index = 0; index < original.size(); ++index)
+    {
+        original[index][0] = static_cast<double>(index + 1);
+    }
+    cg::Workspace moved(std::move(source));
+    EXPECT_EQ(source.size(), 0u);
+    for (const auto buffer : buffers(source))
+    {
+        EXPECT_TRUE(buffer.empty());
+    }
+    auto transferred = buffers(moved);
+    for (std::size_t index = 0; index < transferred.size(); ++index)
+    {
+        EXPECT_EQ(transferred[index].data(), original[index].data());
+        EXPECT_EQ(transferred[index].size(), 8u);
+        EXPECT_DOUBLE_EQ(transferred[index][0], static_cast<double>(index + 1));
+    }
+    source.prepare(3);
+    for (const auto buffer : buffers(source))
+    {
+        EXPECT_EQ(buffer.size(), 3u);
+    }
+    cg::Workspace assigned(2);
+    assigned = std::move(moved);
+    EXPECT_EQ(moved.size(), 0u);
+    for (const auto buffer : buffers(moved))
+    {
+        EXPECT_TRUE(buffer.empty());
+    }
+    auto &alias = assigned;
+    assigned = std::move(alias);
+    transferred = buffers(assigned);
+    for (std::size_t index = 0; index < transferred.size(); ++index)
+    {
+        EXPECT_EQ(transferred[index].data(), original[index].data());
+        EXPECT_EQ(transferred[index].size(), 8u);
+        EXPECT_DOUBLE_EQ(transferred[index][0], static_cast<double>(index + 1));
+    }
+    moved.prepare(4);
+    for (const auto buffer : buffers(moved))
+    {
+        EXPECT_EQ(buffer.size(), 4u);
+    }
+}
+
 TEST(Workspace, ReusesStorageAcrossSameAndSmallerSizes)
 {
     cg::Workspace workspace(32);
@@ -146,7 +207,7 @@ TEST(Backend, HandlesPaddedRowMajorStorage)
     backend.apply(A, input, output);
     EXPECT_DOUBLE_EQ(output.data()[0], 8);
     EXPECT_DOUBLE_EQ(output.data()[1], 18);
-    EXPECT_DOUBLE_EQ(backend.apply_dot(A, input, output), 70);
+    EXPECT_DOUBLE_EQ(backend.apply_and_dot(A, input, output), 70);
 }
 
 TEST(Backend, EmptyColumnsProduceZeroProductsWithoutDereferencingNullStorage)
@@ -162,9 +223,9 @@ TEST(Backend, EmptyColumnsProduceZeroProductsWithoutDereferencingNullStorage)
         {
             EXPECT_DOUBLE_EQ(output.data()[i], 0);
         }
-        EXPECT_DOUBLE_EQ(backend.residual(A, b, {}, output), 14);
+        EXPECT_DOUBLE_EQ(backend.residual_squared_norm(A, b, {}, output), 14);
         EXPECT_DOUBLE_EQ(output.data()[1], 2);
-        EXPECT_DOUBLE_EQ(backend.residual(A, b, {}, output, false), 14);
+        EXPECT_DOUBLE_EQ(backend.residual_squared_norm(A, b, {}, output, cg::ResidualSign::product_minus_rhs), 14);
         EXPECT_DOUBLE_EQ(output.data()[1], -2);
     }
 }
@@ -204,10 +265,10 @@ TEST(Backend, ResidualSignIsExplicit)
     std::vector<double> x({1, 2});
     std::vector<double> r(2);
     const cg::CpuBackend backend;
-    EXPECT_DOUBLE_EQ(backend.residual(A.view(), b, x, r), 18);
+    EXPECT_DOUBLE_EQ(backend.residual_squared_norm(A.view(), b, x, r), 18);
     EXPECT_DOUBLE_EQ(r.data()[0], 3);
     EXPECT_DOUBLE_EQ(r.data()[1], 3);
-    EXPECT_DOUBLE_EQ(backend.residual(A.view(), b, x, r, false), 18);
+    EXPECT_DOUBLE_EQ(backend.residual_squared_norm(A.view(), b, x, r, cg::ResidualSign::product_minus_rhs), 18);
     EXPECT_DOUBLE_EQ(r.data()[0], -3);
 }
 
@@ -381,7 +442,7 @@ TEST(CGExplicit, ReportsIterationLimitAndTrueResidual)
     EXPECT_EQ(info.status, cg::Status::max_iterations);
     EXPECT_EQ(info.iterations, 1u);
     std::vector<double> check(2);
-    EXPECT_DOUBLE_EQ(info.residual_norm, std::sqrt(backend.residual(A.view(), b, x, check)));
+    EXPECT_DOUBLE_EQ(info.residual_norm, std::sqrt(backend.residual_squared_norm(A.view(), b, x, check)));
 }
 
 TEST(CGExplicit, ReportsBreakdownAndNonfiniteData)
@@ -468,15 +529,15 @@ TEST(FusedOperations, MatchesReferenceVectorUpdatesIncludingSimdTails)
         std::vector<double> reference_r = r;
         const cg::CpuBackend fused(1, true);
         const cg::CpuBackend reference(1, false);
-        const auto actual = fused.update_x_r_norm2(x, r, p, ap, 0.25);
-        const auto expected = reference.update_x_r_norm2(reference_x, reference_r, p, ap, 0.25);
+        const auto actual = fused.update_x_r_squared_norm(x, r, p, ap, 0.25);
+        const auto expected = reference.update_x_r_squared_norm(reference_x, reference_r, p, ap, 0.25);
         EXPECT_NEAR(actual, expected, std::max(1.0, expected) * 1e-12);
         for (std::size_t i = 0; i < size; ++i)
         {
             EXPECT_DOUBLE_EQ(x.data()[i], reference_x.data()[i]);
             EXPECT_DOUBLE_EQ(r.data()[i], reference_r.data()[i]);
         }
-        EXPECT_THROW(fused.update_x_r_norm2(x, x, p, ap, 0.25), std::invalid_argument);
+        EXPECT_THROW(fused.update_x_r_squared_norm(x, x, p, ap, 0.25), std::invalid_argument);
     }
 }
 
@@ -494,8 +555,9 @@ TEST(FusedOperations, MatchesReferenceDenseReductionAndResidual)
         const int threads = cg::CpuBackend::openmp_enabled() ? 2 : 1;
         const cg::CpuBackend fused(threads, true);
         const cg::CpuBackend reference(threads, false);
-        EXPECT_NEAR(fused.apply_dot(A.view(), p, ap), reference.apply_dot(A.view(), p, reference_ap), 1e-10);
-        EXPECT_NEAR(fused.residual(A.view(), b, p, r), reference.residual(A.view(), b, p, reference_r), 1e-10);
+        EXPECT_NEAR(fused.apply_and_dot(A.view(), p, ap), reference.apply_and_dot(A.view(), p, reference_ap), 1e-10);
+        EXPECT_NEAR(fused.residual_squared_norm(A.view(), b, p, r),
+                    reference.residual_squared_norm(A.view(), b, p, reference_r), 1e-10);
         for (std::size_t i = 0; i < size; ++i)
         {
             const double tolerance = 16.0 * std::numeric_limits<double>::epsilon();
@@ -561,8 +623,8 @@ TEST(DenseRows, OptimizationPreservesNonfiniteMultiplicationBehavior)
         const cg::CpuBackend backend(1, optimized);
         backend.apply(A.view(), x, output);
         EXPECT_TRUE(std::isnan(output.data()[0]));
-        EXPECT_TRUE(std::isnan(backend.apply_dot(A.view(), x, output)));
-        EXPECT_TRUE(std::isnan(backend.residual(A.view(), b, x, output)));
+        EXPECT_TRUE(std::isnan(backend.apply_and_dot(A.view(), x, output)));
+        EXPECT_TRUE(std::isnan(backend.residual_squared_norm(A.view(), b, x, output)));
     }
 }
 
@@ -589,8 +651,8 @@ TEST(CGRecurrence, SolvesAndVerifiesTrueResidualWithBothKernelPolicies)
         EXPECT_EQ(info.status, cg::Status::converged);
         EXPECT_EQ(info.restarts, 0u);
         EXPECT_EQ(info.matvecs, 2 + info.iterations);
-        EXPECT_DOUBLE_EQ(info.residual_norm, std::sqrt(backend.residual(A.view(), b, x, check)));
-        EXPECT_LE(info.residual_norm, options.rtol * std::sqrt(backend.norm2(b)));
+        EXPECT_DOUBLE_EQ(info.residual_norm, std::sqrt(backend.residual_squared_norm(A.view(), b, x, check)));
+        EXPECT_LE(info.residual_norm, options.rtol * std::sqrt(backend.squared_norm(b)));
         for (std::size_t i = 0; i < x.size(); ++i)
         {
             EXPECT_NEAR(x.data()[i], truth.data()[i], 1e-7);
@@ -616,7 +678,7 @@ TEST(CGRecurrence, CountsRefreshMatvecsAndRestartsDirections)
     EXPECT_EQ(info.iterations, 3u);
     EXPECT_EQ(info.restarts, 2u);
     EXPECT_EQ(info.matvecs, 7u);
-    EXPECT_DOUBLE_EQ(info.residual_norm, std::sqrt(backend.residual(A.view(), b, x, check)));
+    EXPECT_DOUBLE_EQ(info.residual_norm, std::sqrt(backend.residual_squared_norm(A.view(), b, x, check)));
 }
 
 TEST(CGRecurrence, ChecksInitialGuessIterationLimitAndBreakdown)

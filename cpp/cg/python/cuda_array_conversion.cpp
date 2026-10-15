@@ -1,7 +1,7 @@
 #include <pybind11/pybind11.h>
 
 #include <cg/python/cuda_array_conversion.hpp>
-#include <cg/backend/cuda/detail/event.hpp>
+#include <cg/runtime/cuda/detail/event.hpp>
 
 namespace cg
 {
@@ -79,7 +79,7 @@ DeviceArray device_array(py::object object, int ndim, const gpu::Context &contex
     {
         throw std::invalid_argument("CUDA array size or alignment is invalid");
     }
-    DeviceScope selected(context.device());
+    gpu::detail::DeviceGuard selected(context.device());
     if (elements != 0)
     {
         if (address == 0)
@@ -116,19 +116,19 @@ DeviceArray device_array(py::object object, int ndim, const gpu::Context &contex
     return {std::move(object), reinterpret_cast<void *>(address), shape, itemsize, context.device(), typestr};
 }
 
-gpu::ConstVectorView vector_view(const DeviceArray &array)
+gpu::ConstVectorView as_vector_view(const DeviceArray &array)
 {
     return {static_cast<const double *>(array.data), array.shape[0], array.device};
 }
-gpu::VectorView mutable_view(const DeviceArray &array)
+gpu::VectorView as_mutable_vector_view(const DeviceArray &array)
 {
     return {static_cast<double *>(array.data), array.shape[0], array.device};
 }
-gpu::DenseMatrixView matrix_view(const DeviceArray &array)
+gpu::DenseMatrixView as_dense_matrix_view(const DeviceArray &array)
 {
     return {static_cast<const double *>(array.data), array.shape[0], array.shape[1], array.shape[1], array.device};
 }
-void host_array(const py::array &array, int ndim)
+void validate_host_array(const py::array &array, int ndim)
 {
     if (!array.dtype().is(py::dtype::of<double>()) || array.ndim() != ndim || !(array.flags() & py::array::c_style) ||
         reinterpret_cast<std::uintptr_t>(array.data()) % alignof(double) != 0)
@@ -136,9 +136,9 @@ void host_array(const py::array &array, int ndim)
         throw std::invalid_argument("host input must be aligned C-contiguous float64");
     }
 }
-cg::DenseMatrixView host_matrix(const py::array &array)
+cg::DenseMatrixView as_host_matrix_view(const py::array &array)
 {
-    host_array(array, 2);
+    validate_host_array(array, 2);
     return {static_cast<const double *>(array.data()), static_cast<std::size_t>(array.shape(0)),
             static_cast<std::size_t>(array.shape(1))};
 }

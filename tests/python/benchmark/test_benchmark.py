@@ -17,7 +17,6 @@ from cgbench.artifacts import (
     validate_artifact,
     write_artifact,
 )
-from cgbench.backends import Outcome, make_executor
 from cgbench.cases import SUITES, CaseSpec, input_hash, make_case
 from cgbench.collector import (
     check_outcome,
@@ -25,6 +24,7 @@ from cgbench.collector import (
     time_candidates,
     williams_rows,
 )
+from cgbench.execution import Outcome, make_executor
 
 
 @pytest.fixture
@@ -406,7 +406,7 @@ def test_csr_collection_does_not_densify(
 def test_native_csr_uses_shared_fixture(solver_options, algorithm):
     pytest.importorskip("scipy")
     cgpy = pytest.importorskip("cgpy")
-    if not hasattr(cgpy, "CSRMatrix"):
+    if not hasattr(cgpy, "CsrMatrix"):
         pytest.skip("native CSR binding is not available")
     arrays = make_case(SUITES["smoke-csr"][0])[:3]
     options = {**solver_options, "algorithm": algorithm}
@@ -536,7 +536,7 @@ def test_reference_pcg_rejects_explicit_algorithm(solver_options):
 def test_sparse_solver_smoke_all_six_candidates(smoke_spec):
     pytest.importorskip("scipy")
     cgpy = pytest.importorskip("cgpy")
-    if not hasattr(cgpy, "CSRMatrix"):
+    if not hasattr(cgpy, "CsrMatrix"):
         pytest.skip("native CSR binding is not available")
     from cgbench.cli import SPARSE_SOLVERS
 

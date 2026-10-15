@@ -18,7 +18,7 @@ class JacobiPreconditioner
     std::size_t size() const noexcept { return m_inverse.size(); }
     ConstVectorView inverse_diagonal() const noexcept { return m_inverse; }
     void apply(ConstVectorView r, VectorView z, const CpuBackend &backend) const;
-    double apply_dot(ConstVectorView r, VectorView z, const CpuBackend &backend) const;
+    double apply_and_dot(ConstVectorView r, VectorView z, const CpuBackend &backend) const;
 
     private:
     std::vector<double> m_inverse;

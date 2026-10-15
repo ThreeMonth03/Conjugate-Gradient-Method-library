@@ -9,7 +9,7 @@ namespace detail
 
 void *allocate_device_storage(std::size_t count, std::size_t itemsize, int device)
 {
-    const auto bytes = product(count, itemsize);
+    const auto bytes = checked_product(count, itemsize);
     DeviceGuard guard(device);
     void *pointer = nullptr;
     if (bytes != 0)

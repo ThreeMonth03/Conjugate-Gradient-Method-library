@@ -1,6 +1,6 @@
 #pragma once
 
-#include <cg/backend/cuda/detail/runtime.hpp>
+#include <cg/runtime/cuda/detail/runtime.hpp>
 #include <cg/storage/cuda/device_memory.hpp>
 
 #include <memory>

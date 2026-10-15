@@ -31,7 +31,7 @@ sdist.include = [
     "/.gitignore", "/.clang-format", "/.clang-tidy", "/LICENSE*",
     "/cmake/*.cmake", "/cpp/cg/**/*.hpp", "/cpp/cg/**/*.cpp", "/cpp/cg/**/*.cu", "/cpp/cg/**/*.cuh",
     "/python/cgpy/**/*.py", "/python/cgbench/**/*.py", "/python/README.md",
-    "/tests/python/**/*.py", "/tests/cpp/**/*.cpp", "/scripts/*.py", "/examples/*.py",
+    "/tests/python/**/*.py", "/tests/cpp/**/*.cpp", "/tests/cpp/**/*.hpp", "/scripts/*.py", "/examples/*.py",
     "/requirements/*.lock", "/requirements/README.md", "/docs/**/*.rst", "/docs/conf.py",
     "/docs/_static/*.css",
 ]

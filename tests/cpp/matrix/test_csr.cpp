@@ -103,7 +103,7 @@ TEST(CSR, RectangularApplyIsAllowedButCGAndApplyDotRequireSquare)
     backend.apply(A, x, y);
     EXPECT_DOUBLE_EQ(y.data()[0], 11);
     EXPECT_DOUBLE_EQ(y.data()[1], 8);
-    EXPECT_THROW(backend.apply_dot(A, x, y), std::invalid_argument);
+    EXPECT_THROW(backend.apply_and_dot(A, x, y), std::invalid_argument);
     EXPECT_THROW(cg::solve_into(A, b, y, workspace, backend), std::invalid_argument);
 }
 
@@ -114,7 +114,7 @@ TEST(CSR, RejectsOverlappingOutputs)
     cg::Workspace workspace(2);
     const cg::CpuBackend backend;
     EXPECT_THROW(backend.apply(A, x, x), std::invalid_argument);
-    EXPECT_THROW(backend.residual(A, b, x, b), std::invalid_argument);
+    EXPECT_THROW(backend.residual_squared_norm(A, b, x, b), std::invalid_argument);
     EXPECT_THROW(cg::solve_into(A, b, b, workspace, backend), std::invalid_argument);
     // No write occurs: reject a view of the owner's coefficient storage first.
     cg::VectorView coefficients{const_cast<double *>(A.values().data()), A.nnz()};
@@ -135,10 +135,10 @@ TEST(CSR, FusedOperationsMatchReferenceWithParallelRows)
     const cg::CpuBackend reference(1, false);
     const int threads = cg::CpuBackend::openmp_enabled() ? 2 : 1;
     const cg::CpuBackend fused(threads, true);
-    const double expected_dot = reference.apply_dot(A, p, reference_ap);
-    EXPECT_NEAR(fused.apply_dot(A, p, ap), expected_dot, std::abs(expected_dot) * 1e-12);
-    const double expected_norm = reference.residual(A, b, p, reference_r);
-    EXPECT_NEAR(fused.residual(A, b, p, r), expected_norm, expected_norm * 1e-12);
+    const double expected_dot = reference.apply_and_dot(A, p, reference_ap);
+    EXPECT_NEAR(fused.apply_and_dot(A, p, ap), expected_dot, std::abs(expected_dot) * 1e-12);
+    const double expected_norm = reference.residual_squared_norm(A, b, p, reference_r);
+    EXPECT_NEAR(fused.residual_squared_norm(A, b, p, r), expected_norm, expected_norm * 1e-12);
     for (std::size_t i = 0; i < A.rows(); ++i)
     {
         EXPECT_DOUBLE_EQ(ap.data()[i], reference_ap.data()[i]);
@@ -165,8 +165,8 @@ TEST(CSR, BothAlgorithmsSolveTheSamePoissonProblemAndReportTrueResidual)
         options.rtol = 1e-10;
         const auto info = cg::solve_into(A, b, x, workspace, backend, options);
         EXPECT_EQ(info.status, cg::Status::converged);
-        EXPECT_LE(info.residual_norm, options.rtol * std::sqrt(backend.norm2(b)));
-        EXPECT_DOUBLE_EQ(info.residual_norm, std::sqrt(backend.residual(A, b, x, check)));
+        EXPECT_LE(info.residual_norm, options.rtol * std::sqrt(backend.squared_norm(b)));
+        EXPECT_DOUBLE_EQ(info.residual_norm, std::sqrt(backend.residual_squared_norm(A, b, x, check)));
         for (std::size_t i = 0; i < A.rows(); ++i)
         {
             EXPECT_NEAR(x.data()[i], truth.data()[i], 1e-8);

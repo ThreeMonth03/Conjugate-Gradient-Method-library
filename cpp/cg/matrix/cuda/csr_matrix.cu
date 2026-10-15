@@ -1,6 +1,6 @@
-#include <cg/matrix/csr_validation.hpp>
 #include <cg/matrix/cuda/csr_matrix.hpp>
-#include <cg/matrix/cuda/validation.hpp>
+#include <cg/matrix/cuda/detail/validation.hpp>
+#include <cg/matrix/detail/csr_validation.hpp>
 #include <cg/storage/cuda/detail/allocation.hpp>
 #include <cg/storage/cuda/vector.hpp>
 
@@ -42,8 +42,8 @@ std::vector<std::size_t> download_indices(const void *source, std::size_t size, 
     std::vector<T> raw(size);
     if (size != 0)
     {
-        detail::check(cudaMemcpyAsync(raw.data(), source, detail::product(size, sizeof(T)), cudaMemcpyDeviceToHost,
-                                      detail::stream(context)),
+        detail::check(cudaMemcpyAsync(raw.data(), source, detail::checked_product(size, sizeof(T)),
+                                      cudaMemcpyDeviceToHost, detail::stream(context)),
                       "cudaMemcpyAsync CSR indices");
     }
     context.synchronize();
@@ -93,8 +93,9 @@ CsrMatrix::CsrMatrix(CsrMatrixView source, const Context &context)
         throw std::invalid_argument("unsupported CUDA CSR index type");
     }
     const std::size_t width = source.index_type == IndexType::int32 ? 4 : 8;
-    detail::validate_pointer(source.indptr, detail::product(source.rows + 1, width), width, source.device, context);
-    detail::validate_pointer(source.indices, detail::product(source.nnz, width), width, source.device, context);
+    detail::validate_pointer(source.indptr, detail::checked_product(source.rows + 1, width), width, source.device,
+                             context);
+    detail::validate_pointer(source.indices, detail::checked_product(source.nnz, width), width, source.device, context);
     detail::validate(ConstVectorView{source.data, source.nnz, source.device}, context);
     detail::DeviceGuard guard(context.device());
     const auto rowptr = source.index_type == IndexType::int32

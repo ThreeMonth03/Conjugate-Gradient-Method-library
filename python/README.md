@@ -13,7 +13,7 @@ result = cgpy.solve(
 )
 ```
 
-`A` is a nonempty square dense array or `cgpy.CSRMatrix`. `b` and `x0` are one-dimensional vectors matching its size. Dense array-like inputs are normalized to aligned C-contiguous float64 arrays. Compatible inputs can be borrowed for this synchronous call, so do not modify them concurrently. The output owns its storage; `A`, `b`, and `x0` are preserved. An omitted `x0` selects a zero initial guess.
+`A` is a nonempty square dense array or `cgpy.CsrMatrix`. `b` and `x0` are one-dimensional vectors matching its size. Dense array-like inputs are normalized to aligned C-contiguous float64 arrays. Compatible inputs can be borrowed for this synchronous call, so do not modify them concurrently. The output owns its storage; `A`, `b`, and `x0` are preserved. An omitted `x0` selects a zero initial guess.
 
 | Option | Contract |
 | --- | --- |
@@ -80,7 +80,7 @@ BLAS delegates dense matrix-vector multiplication and retains the chosen CPU vec
 ## Sparse matrices
 
 ```python
-A = cgpy.CSRMatrix(
+A = cgpy.CsrMatrix(
     indptr=np.array([0, 2, 4], dtype=np.int64),
     indices=np.array([0, 1, 0, 1], dtype=np.int64),
     data=np.array([4.0, 1.0, 1.0, 3.0], dtype=np.float64),
@@ -111,7 +111,7 @@ assert info.converged
 print(device_x.to_host())
 ```
 
-Host transfer is explicit. `cuda.prepare` accepts a device matrix; `prepare_host` uploads and snapshots host dense or `cgpy.CSRMatrix` storage. Device `solve` returns `cuda.SolveResult` with an owned `Vector`. Device `solve_into` borrows compatible CUDA Array Interface arrays and uses supplied output/workspace. `dense_kernel="native"` uses project kernels; `"cublas"` selects dense GEMV and rejects CSR. Jacobi supports `algorithm="standard"`; vector fusion remains an independent option.
+Host transfer is explicit. `cuda.prepare` accepts a device matrix; `prepare_host` uploads and snapshots host dense or `cgpy.CsrMatrix` storage. Device `solve` returns `cuda.SolveResult` with an owned `Vector`. Device `solve_into` borrows compatible CUDA Array Interface arrays and uses supplied output/workspace. `dense_kernel="native"` uses project kernels; `"cublas"` selects dense GEMV and rejects CSR. Jacobi supports `algorithm="standard"`; vector fusion remains an independent option.
 
 Calls finish on the selected borrowed stream before returning. Keep nondefault streams alive, and use a distinct workspace/output for each overlapping solve. External arrays must be contiguous float64, writable for output, disjoint and free from conflicting mutation. CUDA Array Interface v3 producer dependencies are honored; v2 producers need caller-established readiness or explicit synchronization. No call changes PyTorch's current stream or converts host pointers to device pointers.
 
@@ -123,6 +123,7 @@ The native source interface uses feature headers under `cpp/cg/` and the CMake `
 
 ```cpp
 #include <cg/cg.hpp>
+#include <utility>
 #include <vector>
 
 int main()
@@ -130,18 +131,16 @@ int main()
     cg::DenseMatrix A(2, 2, {4.0, 1.0, 1.0, 3.0});
     std::vector<double> b{1.0, 2.0};
     std::vector<double> x(2);
-    cg::Workspace workspace(2);
-    cg::CpuBackend backend(1, true);
+    cg::PreparedSolver plan(std::move(A), 1, cg::PreconditionerKind::jacobi);
+    auto workspace = plan.create_workspace();
     cg::CgOptions options;
     options.algorithm = cg::Algorithm::recurrence;
-    cg::JacobiPreconditioner preconditioner(A.view());
-    auto info = cg::solve_into(A.view(), b, x, workspace,
-                               backend, options, &preconditioner);
+    auto info = plan.solve_into(b, x, workspace, options);
     return info.status == cg::Status::converged ? 0 : 1;
 }
 ```
 
-Omit the final preconditioner pointer for plain CG. `cg::CsrMatrix` accepts owning row-pointer, column-index, and value vectors and works with the same native solver interface. `CpuBackend` contains execution options; matrix and vector storage do not contain process-wide thread settings. Core operations include matvec, dot, vector updates, and selected fused operations. Workspace reuse avoids repeated allocation of solver vectors; the backend and runtime can still perform their own initialization.
+Select `cg::PreconditionerKind::none` for plain CG. `cg::CsrMatrix` accepts owning row-pointer, column-index, and value vectors and constructs the same `cg::PreparedSolver` type. Prepared ownership and Jacobi setup live in the C++ core. `cg::solve_into` also accepts borrowed operators for one-shot solves. `CpuBackend` contains execution options; matrix and vector storage do not contain process-wide thread settings. Workspace reuse avoids repeated allocation of solver vectors; the backend and runtime can still perform their own initialization.
 
 ## Feature modules
 
@@ -149,7 +148,8 @@ Omit the final preconditioner pointer for plain CG. `cg::CsrMatrix` accepts owni
 boundaries: `cgpy.matrix` owns matrix conversion, `cgpy.storage` groups device storage
 and transfers, and `cgpy.solver` owns solve functions, workspace and result
 types.
-`cgpy._runtime` contains native loading and validation; `cgpy.cuda` is the
+`cgpy._runtime` loads native modules, `_interop` handles host representation,
+and `solver/_validation.py` checks solve policy. `cgpy.cuda` is the
 explicit device facade. The private extensions are `cgpy._core` and
 `cgpy._cuda`. Internal modules import their peers rather than reaching through
 the package root.

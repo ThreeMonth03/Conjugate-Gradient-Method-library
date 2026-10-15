@@ -7,7 +7,7 @@ import pathlib
 import subprocess
 import sys
 
-from . import backends
+from . import execution
 
 IMPLEMENTATIONS = (
     "native",
@@ -25,7 +25,7 @@ IMPLEMENTATIONS = (
     "scipy-reference-pcg",
     "scipy-lu-total",
     "scipy-lu-reuse",
-) + backends.CUDA_IMPLEMENTATIONS
+) + execution.CUDA_IMPLEMENTATIONS
 SPARSE_SOLVERS = (
     "native-cg",
     "native-pcg",
@@ -147,9 +147,9 @@ def _run_worker(spec, output):
     from . import collector
 
     if spec.get("device", "cpu") == "cuda":
-        from . import cuda_backends
+        from . import cuda_runtime
 
-        cuda_backends.preflight_cuda(
+        cuda_runtime.preflight_cuda(
             spec["implementations"], spec.get("cuda_device", 0)
         )
     cases = [
@@ -250,13 +250,13 @@ def benchmark_spec(arguments):
             raise SystemExit(
                 "--device cuda requires explicit --implementations"
             )
-        if any(name not in backends.CUDA_IMPLEMENTATIONS for name in names):
+        if any(name not in execution.CUDA_IMPLEMENTATIONS for name in names):
             raise SystemExit(
                 "--device cuda requires CUDA candidates; CPU fallback is disabled"
             )
         comparison = "implementations"
     elif any(
-        name in backends.CUDA_IMPLEMENTATIONS for name in names
+        name in execution.CUDA_IMPLEMENTATIONS for name in names
     ) or arguments.suite.startswith(("cuda-", "smoke-cuda-")):
         raise SystemExit(
             "CUDA candidates and suite aliases require --device cuda"

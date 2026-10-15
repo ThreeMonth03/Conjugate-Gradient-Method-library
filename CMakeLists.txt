@@ -14,13 +14,18 @@ option(CG_ENABLE_CLANG_TIDY "Run clang-tidy while compiling project sources" OFF
 
 find_package(Threads REQUIRED)
 add_library(cg_core STATIC
-    cpp/cg/storage/validation.cpp
+    cpp/cg/storage/detail/validation.cpp
     cpp/cg/matrix/dense_matrix.cpp
     cpp/cg/matrix/csr_matrix.cpp
     cpp/cg/solver/workspace.cpp
     cpp/cg/solver/conjugate_gradient.cpp
+    cpp/cg/solver/prepared_solver.cpp
+    cpp/cg/solver/solve_info.cpp
     cpp/cg/preconditioner/jacobi.cpp
     cpp/cg/backend/cpu/backend.cpp
+    cpp/cg/backend/cpu/vector.cpp
+    cpp/cg/backend/cpu/reduction.cpp
+    cpp/cg/backend/cpu/dense.cpp
     cpp/cg/backend/cpu/csr.cpp
     cpp/cg/backend/cpu/blas.cpp
 )
@@ -41,7 +46,11 @@ set(CG_PUBLIC_HEADERS
     solver/workspace.hpp
     solver/options.hpp
     solver/conjugate_gradient.hpp
+    solver/prepared_solver.hpp
+    solver/solve_info.hpp
     preconditioner/jacobi.hpp
+    preconditioner/kind.hpp
+    backend/residual_sign.hpp
     backend/cpu/backend.hpp
 )
 install(TARGETS cg_core ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}" COMPONENT development)
@@ -105,15 +114,21 @@ if(BUILD_TESTING)
         tests/cpp/solver/test_core.cpp
         tests/cpp/matrix/test_csr.cpp
         tests/cpp/solver/test_pcg.cpp
+        tests/cpp/solver/test_prepared.cpp
         tests/cpp/backend/test_blas.cpp
     )
     target_link_libraries(cg_gtests PRIVATE cg_core GTest::gtest_main)
     include(GoogleTest)
     gtest_discover_tests(cg_gtests PROPERTIES LABELS cpp)
-    add_executable(cg_copy_gtests tests/cpp/matrix/test_copy_assignment.cpp)
-    target_link_libraries(cg_copy_gtests PRIVATE cg_core GTest::gtest_main)
-    gtest_discover_tests(cg_copy_gtests PROPERTIES LABELS cpp)
-    add_custom_target(cg_native_tests DEPENDS cg_gtests cg_copy_gtests)
+    add_executable(cg_allocation_gtests
+        tests/cpp/matrix/test_copy_assignment.cpp
+        tests/cpp/solver/test_workspace_allocation.cpp
+        tests/cpp/support/allocation_failure.cpp
+    )
+    target_include_directories(cg_allocation_gtests PRIVATE tests/cpp)
+    target_link_libraries(cg_allocation_gtests PRIVATE cg_core GTest::gtest_main)
+    gtest_discover_tests(cg_allocation_gtests PROPERTIES LABELS cpp)
+    add_custom_target(cg_native_tests DEPENDS cg_gtests cg_allocation_gtests)
     if(CG_ENABLE_CUDA)
         add_executable(cg_cuda_gtests tests/cpp/cuda/test_cuda.cpp)
         target_link_libraries(cg_cuda_gtests PRIVATE cg_cuda GTest::gtest_main)

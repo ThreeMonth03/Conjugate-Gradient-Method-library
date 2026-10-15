@@ -1,12 +1,15 @@
-#include <cg/backend/cuda/backend.hpp>
-#include <cg/backend/cuda/detail/launch.hpp>
+#include <cg/backend/cuda/detail/backend.hpp>
+#include <cg/backend/cuda/detail/execution_resources.hpp>
 #include <cg/backend/cuda/detail/reduction.cuh>
 #include <cg/backend/cuda/detail/validation.hpp>
-#include <cg/solver/cuda/detail/workspace.hpp>
+#include <cg/runtime/cuda/detail/launch.hpp>
+#include <cg/storage/cuda/detail/fill.hpp>
 
 namespace cg
 {
 namespace cuda
+{
+namespace detail
 {
 namespace
 {
@@ -64,8 +67,8 @@ __global__ void residual_kernel(ConstVectorView b, VectorView r, bool b_minus_ax
 
 void Backend::apply(DenseMatrixView A, ConstVectorView x, VectorView output) const
 {
-    detail::validate_apply(A, x, output, m_context);
-    detail::DeviceGuard guard(m_context.device());
+    detail::validate_apply(A, x, output, m_resources.context);
+    detail::DeviceGuard guard(m_resources.context.device());
     if (m_kernel == DenseKernel::cublas)
     {
         const auto limit = static_cast<std::size_t>(std::numeric_limits<int>::max());
@@ -79,51 +82,53 @@ void Backend::apply(DenseMatrixView A, ConstVectorView x, VectorView output) con
         }
         if (A.cols == 0)
         {
-            detail::fill(output, 0.0, m_context);
+            detail::fill(output, 0.0, m_resources.context);
             return;
         }
         const double alpha = 1.0, beta = 0.0;
-        detail::check(cublasDgemv(m_workspace.m_impl->cublas->handle.value, CUBLAS_OP_T, static_cast<int>(A.cols),
+        detail::check(cublasDgemv(m_resources.cublas->handle.value, CUBLAS_OP_T, static_cast<int>(A.cols),
                                   static_cast<int>(A.rows), &alpha, A.data, static_cast<int>(A.row_stride), x.data, 1,
                                   &beta, output.data, 1),
                       "cublasDgemv");
     }
     else
     {
-        dense_kernel<<<detail::dense_blocks(A.rows), detail::block_size, 0, detail::stream(m_context)>>>(
+        dense_kernel<<<detail::dense_blocks(A.rows), detail::block_size, 0, detail::stream(m_resources.context)>>>(
             A, x, {}, output, 0, true, nullptr);
         detail::launch_check();
     }
 }
 
-double Backend::apply_dot(DenseMatrixView A, ConstVectorView p, VectorView ap) const
+double Backend::apply_and_dot(DenseMatrixView A, ConstVectorView p, VectorView ap) const
 {
-    detail::same_size(p, ap, m_context);
-    detail::validate_apply(A, p, ap, m_context);
+    detail::same_size(p, ap, m_resources.context);
+    detail::validate_apply(A, p, ap, m_resources.context);
     if (!m_fused || m_kernel == DenseKernel::cublas)
     {
         apply(A, p, ap);
         return dot(p, ap);
     }
-    detail::DeviceGuard guard(m_context.device());
+    detail::DeviceGuard guard(m_resources.context.device());
     const auto blocks = detail::dense_blocks(A.rows);
-    dense_kernel<<<blocks, detail::block_size, 0, detail::stream(m_context)>>>(A, p, {}, ap, 1, true,
-                                                                               m_workspace.m_impl->partials.get());
+    dense_kernel<<<blocks, detail::block_size, 0, detail::stream(m_resources.context)>>>(A, p, {}, ap, 1, true,
+                                                                                         m_resources.partials.get());
     detail::launch_check();
     return finish_reduction(blocks);
 }
 
-double Backend::residual(DenseMatrixView A, ConstVectorView b, ConstVectorView x, VectorView r, bool b_minus_ax) const
+double Backend::residual_squared_norm(DenseMatrixView A, ConstVectorView b, ConstVectorView x, VectorView r,
+                                      ResidualSign sign) const
 {
-    detail::same_size(b, r, m_context);
+    const bool b_minus_ax = sign == ResidualSign::rhs_minus_product;
+    detail::same_size(b, r, m_resources.context);
     detail::no_overlap(b, r);
-    detail::validate_apply(A, x, r, m_context);
-    detail::DeviceGuard guard(m_context.device());
+    detail::validate_apply(A, x, r, m_resources.context);
+    detail::DeviceGuard guard(m_resources.context.device());
     if (m_fused && m_kernel == DenseKernel::native)
     {
         const auto blocks = detail::dense_blocks(A.rows);
-        dense_kernel<<<blocks, detail::block_size, 0, detail::stream(m_context)>>>(A, x, b, r, 2, b_minus_ax,
-                                                                                   m_workspace.m_impl->partials.get());
+        dense_kernel<<<blocks, detail::block_size, 0, detail::stream(m_resources.context)>>>(
+            A, x, b, r, 2, b_minus_ax, m_resources.partials.get());
         detail::launch_check();
         return finish_reduction(blocks);
     }
@@ -134,11 +139,12 @@ double Backend::residual(DenseMatrixView A, ConstVectorView b, ConstVectorView x
         return dot(r, r);
     }
     const auto blocks = detail::blocks(r.size);
-    residual_kernel<<<blocks, detail::block_size, 0, detail::stream(m_context)>>>(b, r, b_minus_ax,
-                                                                                  m_workspace.m_impl->partials.get());
+    residual_kernel<<<blocks, detail::block_size, 0, detail::stream(m_resources.context)>>>(b, r, b_minus_ax,
+                                                                                            m_resources.partials.get());
     detail::launch_check();
     return finish_reduction(blocks);
 }
 
+} // namespace detail
 } // namespace cuda
 } // namespace cg

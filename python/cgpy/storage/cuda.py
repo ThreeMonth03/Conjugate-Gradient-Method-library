@@ -4,8 +4,8 @@ import typing
 
 import numpy as np
 
+from .._interop import host
 from .._runtime import cuda as cuda_runtime
-from .._runtime import validation
 
 
 class Vector:
@@ -44,7 +44,7 @@ class Vector:
         cls, source: object, *, device: int = 0, stream: int = 0
     ) -> typing.Self:
         """Snapshot a real host vector, normalizing and uploading it once."""
-        source = validation.host_array(source, 1)
+        source = host.normalize_host_array(source, 1)
         result = cls._empty(source.size, device, stream)
         result.copy_from_host(source, stream=stream)
         return result
@@ -75,7 +75,9 @@ class Vector:
 
     def copy_from_host(self, source: object, *, stream: int = 0) -> None:
         """Normalize and synchronously upload a matching host vector."""
-        self._native.copy_from_host(validation.host_array(source, 1), stream)
+        self._native.copy_from_host(
+            host.normalize_host_array(source, 1), stream
+        )
 
     def copy_from_device(self, source: object, *, stream: int = 0) -> None:
         """Copy a matching contiguous float64 device vector on a stream.

@@ -220,3 +220,34 @@ def test_threads_use_independent_workspaces():
         np.testing.assert_allclose(
             x, np.linalg.solve(A, b), rtol=1e-8, atol=1e-9
         )
+
+
+@pytest.mark.parametrize("storage", ("dense", "csr"))
+@pytest.mark.parametrize("preconditioner", ("none", "jacobi"))
+def test_prepared_type_and_resource_contract_is_independent_of_matrix_storage(
+    storage, preconditioner
+):
+    dense = np.array([[4.0, 1.0], [1.0, 3.0]])
+    operator = (
+        dense
+        if storage == "dense"
+        else cgpy.CsrMatrix([0, 2, 4], [0, 1, 0, 1], dense.ravel(), (2, 2))
+    )
+    plan = cgpy.prepare(operator, preconditioner=preconditioner)
+    assert type(plan) is cgpy.PreparedSolver
+    assert plan.shape == (2, 2)
+    assert plan.size == 2
+    assert plan.preconditioner == preconditioner
+    assert plan.preconditioner_nbytes == (
+        16 if preconditioner == "jacobi" else 0
+    )
+    assert plan.preconditioner_setup_ns >= 0
+    workspace = plan.create_workspace()
+    assert workspace.size == plan.size
+    b = np.array([1.0, 2.0])
+    x = np.zeros_like(b)
+    info = plan.solve_into(b, x, workspace=workspace)
+    assert info.converged
+    np.testing.assert_allclose(x, np.linalg.solve(dense, b))
+    assert not hasattr(cgpy, "PreparedCsrSolver")
+    assert not hasattr(cgpy, "CSRMatrix")

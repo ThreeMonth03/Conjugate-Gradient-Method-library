@@ -1,5 +1,5 @@
 """Matrix representations independent of solver policy."""
 
-from .csr import CSRMatrix
+from .csr import CsrMatrix
 
-__all__ = ["CSRMatrix"]
+__all__ = ["CsrMatrix"]

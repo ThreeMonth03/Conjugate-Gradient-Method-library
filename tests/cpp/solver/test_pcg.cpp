@@ -66,7 +66,7 @@ TEST(Jacobi, OwnsItsInverseDiagonalSnapshot)
     {
         EXPECT_DOUBLE_EQ(z.data()[i], 2);
     }
-    EXPECT_DOUBLE_EQ(M.apply_dot(r, z, backend), 56);
+    EXPECT_DOUBLE_EQ(M.apply_and_dot(r, z, backend), 56);
 }
 
 TEST(Jacobi, RejectsMissingNonpositiveNonfiniteAndUnrepresentableDiagonal)
@@ -105,8 +105,8 @@ TEST(Jacobi, FusedApplyMatchesReferenceIncludingParallelVectorTails)
     const cg::CpuBackend reference(1, false);
     const int threads = cg::CpuBackend::openmp_enabled() ? 2 : 1;
     const cg::CpuBackend fused(threads, true);
-    const double expected = M.apply_dot(r, reference_z, reference);
-    EXPECT_NEAR(M.apply_dot(r, z, fused), expected, expected * 1e-12);
+    const double expected = M.apply_and_dot(r, reference_z, reference);
+    EXPECT_NEAR(M.apply_and_dot(r, z, fused), expected, expected * 1e-12);
     for (std::size_t i = 0; i < size; ++i)
     {
         EXPECT_DOUBLE_EQ(z.data()[i], reference_z.data()[i]);
@@ -135,7 +135,7 @@ TEST(PCG, JacobiReducesIterationsOnADiagonallyScaledSPDSystem)
     EXPECT_EQ(plain.status, cg::Status::converged);
     EXPECT_EQ(pcg.status, cg::Status::converged);
     EXPECT_LT(pcg.iterations, plain.iterations);
-    EXPECT_LE(pcg.residual_norm, options.rtol * std::sqrt(backend.norm2(b)));
+    EXPECT_LE(pcg.residual_norm, options.rtol * std::sqrt(backend.squared_norm(b)));
     for (std::size_t i = 0; i < x.size(); ++i)
     {
         EXPECT_NEAR(x.data()[i], truth.data()[i], 1e-6);
@@ -167,7 +167,8 @@ TEST(PCG, DenseAndCSRSolversUseTheSamePreconditionedRecurrence)
         const auto sparse_info = cg::solve_into(sparse, b, sparse_x, sparse_workspace, backend, options, &sparse_M);
         EXPECT_EQ(dense_info.status, cg::Status::converged);
         EXPECT_EQ(sparse_info.status, cg::Status::converged);
-        EXPECT_DOUBLE_EQ(sparse_info.residual_norm, std::sqrt(backend.residual(sparse, b, sparse_x, check)));
+        EXPECT_DOUBLE_EQ(sparse_info.residual_norm,
+                         std::sqrt(backend.residual_squared_norm(sparse, b, sparse_x, check)));
         for (std::size_t i = 0; i < b.size(); ++i)
         {
             EXPECT_NEAR(dense_x.data()[i], sparse_x.data()[i], 1e-7);
@@ -196,7 +197,7 @@ TEST(PCG, RefreshRestartsWithPreconditionedTrueResidualAndWorkspaceCanBeReused)
         EXPECT_EQ(info.restarts, info.iterations - 1);
         EXPECT_EQ(info.matvecs, 1 + 2 * info.iterations);
         EXPECT_EQ(workspace.preconditioned().data(), z_pointer);
-        EXPECT_DOUBLE_EQ(info.residual_norm, std::sqrt(backend.residual(A.view(), b, x, check)));
+        EXPECT_DOUBLE_EQ(info.residual_norm, std::sqrt(backend.residual_squared_norm(A.view(), b, x, check)));
         EXPECT_NEAR(x.data()[0], 1.0 / 11, 1e-9);
         EXPECT_NEAR(x.data()[1], 7.0 / 11, 1e-9);
     }
@@ -221,7 +222,7 @@ TEST(PCG, RejectsIncompatibleAlgorithmDimensionsAndOutputAliasingBeforeMutation)
     EXPECT_THROW(M.apply(b, inverse_output, backend), std::invalid_argument);
     EXPECT_THROW(cg::solve_into(A.view(), b, workspace.preconditioned(), workspace, backend, options, &M),
                  std::invalid_argument);
-    EXPECT_THROW(M.apply_dot(b, b, backend), std::invalid_argument);
+    EXPECT_THROW(M.apply_and_dot(b, b, backend), std::invalid_argument);
     EXPECT_DOUBLE_EQ(M.inverse_diagonal().data()[0], 0.25);
 }
 

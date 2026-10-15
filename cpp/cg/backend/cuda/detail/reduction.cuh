@@ -1,6 +1,6 @@
 #pragma once
 
-#include <cg/backend/cuda/detail/launch.hpp>
+#include <cg/runtime/cuda/detail/launch.hpp>
 
 namespace cg
 {

@@ -1,3 +1,11 @@
-Checks: '-*,clang-analyzer-*,bugprone-use-after-move,bugprone-sizeof-expression,performance-unnecessary-copy-initialization,performance-for-range-copy'
+Checks: '-*,clang-analyzer-*,bugprone-use-after-move,bugprone-sizeof-expression,performance-unnecessary-copy-initialization,performance-for-range-copy,readability-identifier-naming'
 WarningsAsErrors: '*'
 HeaderFilterRegex: '/cpp/cg/'
+CheckOptions:
+  readability-identifier-naming.ClassCase: CamelCase
+  readability-identifier-naming.StructCase: CamelCase
+  readability-identifier-naming.EnumCase: CamelCase
+  readability-identifier-naming.EnumConstantCase: lower_case
+  readability-identifier-naming.FunctionCase: lower_case
+  readability-identifier-naming.TypeAliasCase: CamelCase
+  readability-identifier-naming.PrivateMemberPrefix: m_
