@@ -35,7 +35,7 @@ live in ``detail/``; binding helpers stay in the source tree.
        selection.
    * - ``backend/cuda/``
      - Native/cuBLAS operations and private execution resources: reductions,
-       pinned scalar and optional cuBLAS handle/scratch.
+       inline host scalar and optional cuBLAS handle/scratch.
    * - ``preconditioner/``
      - Validate and cache the immutable Jacobi inverse.
    * - ``solver/``

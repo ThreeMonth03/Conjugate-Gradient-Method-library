@@ -108,14 +108,14 @@ __global__ void stable_norm_kernel(ConstVectorView x, double *result)
 double Backend::finish_reduction(std::size_t blocks) const
 {
     auto &work = m_resources;
-    finish_kernel<<<1, detail::block_size, 0, detail::stream(m_resources.context)>>>(work.partials.get(), blocks,
-                                                                                     work.scalar.get());
+    finish_kernel<<<1, detail::block_size, 0, detail::stream(m_resources.context)>>>(work.partials, blocks,
+                                                                                     work.scalar);
     detail::launch_check();
-    detail::check(cudaMemcpyAsync(work.host.get(), work.scalar.get(), sizeof(double), cudaMemcpyDeviceToHost,
+    detail::check(cudaMemcpyAsync(&work.host, work.scalar, sizeof(double), cudaMemcpyDeviceToHost,
                                   detail::stream(m_resources.context)),
                   "cudaMemcpyAsync reduction");
     m_resources.context.synchronize();
-    return *work.host.get();
+    return work.host;
 }
 
 double Backend::dot(ConstVectorView x, ConstVectorView y) const
@@ -123,8 +123,7 @@ double Backend::dot(ConstVectorView x, ConstVectorView y) const
     detail::same_size(x, y, m_resources.context);
     detail::DeviceGuard guard(m_resources.context.device());
     const auto blocks = detail::blocks(x.size());
-    dot_kernel<<<blocks, detail::block_size, 0, detail::stream(m_resources.context)>>>(x, y,
-                                                                                       m_resources.partials.get());
+    dot_kernel<<<blocks, detail::block_size, 0, detail::stream(m_resources.context)>>>(x, y, m_resources.partials);
     detail::launch_check();
     return finish_reduction(blocks);
 }
@@ -143,13 +142,13 @@ double Backend::norm_from_squared(ConstVectorView x, double squared) const
     detail::validate(x, m_resources.context, false);
     detail::DeviceGuard guard(m_resources.context.device());
     auto &work = m_resources;
-    stable_norm_kernel<<<1, detail::block_size, 0, detail::stream(m_resources.context)>>>(x, work.scalar.get());
+    stable_norm_kernel<<<1, detail::block_size, 0, detail::stream(m_resources.context)>>>(x, work.scalar);
     detail::launch_check();
-    detail::check(cudaMemcpyAsync(work.host.get(), work.scalar.get(), sizeof(double), cudaMemcpyDeviceToHost,
+    detail::check(cudaMemcpyAsync(&work.host, work.scalar, sizeof(double), cudaMemcpyDeviceToHost,
                                   detail::stream(m_resources.context)),
                   "cudaMemcpyAsync stable norm");
     m_resources.context.synchronize();
-    return *work.host.get();
+    return work.host;
 }
 
 } // namespace detail

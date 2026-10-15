@@ -17,7 +17,7 @@ namespace detail
 class WorkspaceUseGuard;
 }
 // One active solve per workspace. The workspace owns its reduction buffers,
-// pinned scalar, and optional cuBLAS resources, allocated before any solve.
+// inline host scalar, and optional cuBLAS resources, allocated before any solve.
 class Workspace
 {
     public:
