@@ -27,6 +27,11 @@ class ReferenceExecutor:
         if scope == "prepared":
             self.ops.snapshot_matrix()
         self.storage = ops.workspace() if scope == "prepared" else None
+        if scope == "session":
+            # Cache only iteration vectors, never the returned solution.
+            self.storage = [ops.empty_vector() for _ in range(4)]
+            if self.preconditioner == "jacobi":
+                self.storage.append(ops.empty_vector())
         self.inverse = None
         self.preconditioner_setup_ns = 0
         if self.preconditioner == "jacobi":
@@ -48,7 +53,7 @@ class ReferenceExecutor:
             "preconditioner_stored_bytes": self.ops.initial_nbytes
             if self.preconditioner == "jacobi"
             else 0,
-            "setup_in_timed_call": self.scope == "api",
+            "setup_in_timed_call": self.scope in ("api", "session"),
             "setup_measurement": "single untimed setup probe",
             "residual_policy": self.options["algorithm"]
             + " with residual_refresh="
@@ -61,11 +66,21 @@ class ReferenceExecutor:
 
     def _solve(self):
         ops = self.ops
-        storage = self.storage if self.storage is not None else ops.workspace()
+        storage = (
+            [ops.empty_vector(), *self.storage]
+            if self.scope == "session"
+            else self.storage
+            if self.storage is not None
+            else ops.workspace()
+        )
         inverse = self.inverse
-        if self.preconditioner == "jacobi" and self.scope == "api":
+        if self.preconditioner == "jacobi" and self.scope in (
+            "api",
+            "session",
+        ):
             inverse = ops.inverse_diagonal()
-            storage.append(ops.empty_vector())
+            if self.scope == "api":
+                storage.append(ops.empty_vector())
         x, residual, direction, product, scratch = storage[:5]
         z = storage[5] if inverse is not None else None
         ops.copy(ops.initial, x)

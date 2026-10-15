@@ -46,7 +46,13 @@ Timing boundaries
   Each timed solve restores the initial output.
 * ``api`` includes output/workspace allocation, native validation and per-call
   Jacobi setup. Input generation, canonical CSR conversion and library-ready
-  matrix construction stay outside both scopes.
+  matrix construction stay outside solve timing.
+* CUDA-only ``session`` reuses iteration vectors and execution resources,
+  allocating a fresh output and optional Jacobi inverse on every call for native
+  and eager Torch. It does not snapshot/cache the matrix or preconditioner.
+  Output reset and per-call setup are timed; session construction/destruction
+  stay outside sampling. Torch retains its documented caching allocator.
+  Existing ``api``/``prepared`` specifications keep their meanings.
 * Official SciPy CG allocates iterative workspace in both scopes.
   SuperLU ``total`` factors and solves on every call; ``reuse`` factors before
   timing in either scope. CSR-to-CSC conversion is outside both.
@@ -65,6 +71,24 @@ the same input fixtures, numerical options, reset and completion boundaries.
 Device status packets, residual checks and final completion remain timed.
 Keep distinct mode artifacts and inspect their operation counts before
 interpreting a latency difference.
+
+Scopes describe different allocation/setup contracts. Keep their artifacts
+separate: the strict comparator rejects mismatched scopes, even if operation
+counts match. Session reuse is not an improvement to the fresh API contract.
+CPU candidates reject session scope. No hidden pool or automatic selection
+is introduced.
+
+For a session comparison on resident inputs:
+
+.. code-block:: bash
+
+   make pyprof PRESET=cuda-release PYTHON="$PWD/.venv-cuda/bin/python" \
+       PYPROF_SUITE=smoke-cuda-dense PYPROF_SCOPE=session \
+       PYPROF_THREADS=1 PYPROF_ROUNDS=30 PYPROF_REPETITIONS=3 \
+       PYPROF_ARGS='--device cuda --cuda-execution-mode device --implementations cuda-native,cuda-cublas,torch-cuda-eager --preconditioner jacobi --warmups 3'
+
+Use ``PYPROF_SCOPE=api`` or ``prepared`` in separate artifacts to compare the
+other contracts. For CSR, select ``cuda-native,torch-cuda-eager``.
 
 Setup probes and stored-array counts are supplementary measurements.
 Stored bytes exclude owning snapshots, workspace, allocator and internal

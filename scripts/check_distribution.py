@@ -85,6 +85,7 @@ def check_sdist(path):
         "python/cgpy/_interop/host.py",
         "python/cgpy/solver/_validation.py",
         "python/cgpy/solver/cuda/api.py",
+        "python/cgpy/solver/cuda/session.py",
         "python/cgpy/solver/cuda/prepared.py",
         "python/cgpy/cuda/__init__.py",
         "python/cgbench/cli.py",

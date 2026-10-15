@@ -1,6 +1,5 @@
 #include <cg/preconditioner/cuda/detail/kernels.hpp>
 #include <cg/runtime/cuda/detail/launch.hpp>
-#include <cg/storage/cuda/device_memory.hpp>
 
 namespace cg
 {
@@ -53,15 +52,14 @@ __global__ void csr_jacobi_kernel(CsrMatrixView A, VectorView inverse, int *inva
 
 namespace detail
 {
-template <class Launch> void prepare_jacobi(const Context &context, Launch launch)
+template <class Launch> void prepare_jacobi(const Context &context, int *invalid, Launch launch)
 {
     DeviceGuard guard(context.device());
-    auto invalid = device_allocation<int>(1, context);
-    check(cudaMemsetAsync(invalid.get(), 0, sizeof(int), stream(context)), "cudaMemsetAsync Jacobi");
-    launch(invalid.get());
+    check(cudaMemsetAsync(invalid, 0, sizeof(int), stream(context)), "cudaMemsetAsync Jacobi");
+    launch(invalid);
     detail::launch_check();
     int host = 0;
-    check(cudaMemcpyAsync(&host, invalid.get(), sizeof(int), cudaMemcpyDeviceToHost, stream(context)),
+    check(cudaMemcpyAsync(&host, invalid, sizeof(int), cudaMemcpyDeviceToHost, stream(context)),
           "cudaMemcpyAsync Jacobi validation");
     context.synchronize();
     if (host != 0)
@@ -69,15 +67,15 @@ template <class Launch> void prepare_jacobi(const Context &context, Launch launc
         throw std::invalid_argument("CUDA Jacobi requires a finite positive diagonal and inverse");
     }
 }
-void initialize_jacobi(DenseMatrixView A, VectorView inverse, const Context &context)
+void initialize_jacobi(DenseMatrixView A, VectorView inverse, int *invalid, const Context &context)
 {
-    prepare_jacobi(context, [&](int *invalid)
-                   { dense_jacobi_kernel<<<blocks(A.rows()), block_size, 0, stream(context)>>>(A, inverse, invalid); });
+    prepare_jacobi(context, invalid, [&](int *flag)
+                   { dense_jacobi_kernel<<<blocks(A.rows()), block_size, 0, stream(context)>>>(A, inverse, flag); });
 }
-void initialize_jacobi(CsrMatrixView A, VectorView inverse, const Context &context)
+void initialize_jacobi(CsrMatrixView A, VectorView inverse, int *invalid, const Context &context)
 {
-    prepare_jacobi(context, [&](int *invalid)
-                   { csr_jacobi_kernel<<<blocks(A.rows()), block_size, 0, stream(context)>>>(A, inverse, invalid); });
+    prepare_jacobi(context, invalid, [&](int *flag)
+                   { csr_jacobi_kernel<<<blocks(A.rows()), block_size, 0, stream(context)>>>(A, inverse, flag); });
 }
 } // namespace detail
 

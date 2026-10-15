@@ -476,7 +476,7 @@ def _require_gpu(implementation):
 @pytest.mark.parametrize(
     "implementation", ("cuda-native", "cuda-cublas", "torch-cuda-eager")
 )
-@pytest.mark.parametrize("scope", ("prepared", "api"))
+@pytest.mark.parametrize("scope", ("prepared", "api", "session"))
 @pytest.mark.parametrize(
     "algorithm,preconditioner",
     (("standard", "none"), ("standard", "jacobi"), ("explicit", "none")),
@@ -505,6 +505,10 @@ def test_actual_cuda_dense_resident_modes_reset_and_converge(
     else:
         first.x.fill(1e6)
     second = executor.host_outcome(executor())
+    if scope == "session":
+        np.testing.assert_array_equal(
+            executor.host_outcome(first).x, np.full_like(arrays[1], 1e6)
+        )
     assert check_outcome(second, arrays, options)["eligible"]
     np.testing.assert_allclose(second.x, host.x, rtol=1e-10, atol=1e-12)
     assert (
@@ -513,7 +517,7 @@ def test_actual_cuda_dense_resident_modes_reset_and_converge(
 
 
 @pytest.mark.parametrize("implementation", ("cuda-native", "torch-cuda-eager"))
-@pytest.mark.parametrize("scope", ("prepared", "api"))
+@pytest.mark.parametrize("scope", ("prepared", "api", "session"))
 @pytest.mark.parametrize("execution_mode", ("host", "device"))
 def test_actual_cuda_csr_pcg_shares_cpu_fixture(
     options, implementation, scope, execution_mode
@@ -650,6 +654,7 @@ def test_torch_reference_keeps_its_control_when_native_device_mode_is_selected(
 
     def initialize(self, selected_ops, selected_options, scope):
         self.ops = selected_ops
+        self.scope = scope
         captured.update(selected_options)
 
     monkeypatch.setattr(adapters.torch_cuda, "TorchCudaOps", lambda *a: ops)

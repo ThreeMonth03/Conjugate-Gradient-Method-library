@@ -25,10 +25,7 @@ class CudaNativeExecutor:
     """
 
     def __init__(self, arrays, options, scope, device, kernel):
-        if scope not in ("prepared", "api"):
-            raise ValueError(
-                "CUDA supports prepared/api device-resident scopes"
-            )
+        validation.validate_scope(scope, "cuda")
         if kernel == "cublas" and hasattr(arrays[0], "indptr"):
             raise ValueError("cuda-cublas requires dense inputs")
         self.cuda = cuda_runtime.native_cuda(device)
@@ -80,6 +77,18 @@ class CudaNativeExecutor:
                 stream=0, execution_mode=self.execution_mode
             )
             self.x = plan.create_vector(stream=0)
+        elif scope == "session":
+            self.synchronize()
+            session_start = time.perf_counter_ns()
+            self.session = self.cuda.Session(
+                rhs.size,
+                device=device,
+                stream=0,
+                dense_kernel=kernel,
+                execution_mode=self.execution_mode,
+            )
+            self.synchronize()
+            self.session_setup_ns = time.perf_counter_ns() - session_start
         self.synchronize()
         self.setup_ns = time.perf_counter_ns() - start
 
@@ -93,6 +102,15 @@ class CudaNativeExecutor:
                 self.rhs, self.x, workspace=self.workspace, **self.options
             )
             x = self.x
+        elif self.scope == "session":
+            info = self.session.solve(
+                self.matrix,
+                self.rhs,
+                x0=self.initial,
+                preconditioner=self.preconditioner,
+                **self.options,
+            )
+            x = info.x
         else:
             info = self.cuda.solve(
                 self.matrix,
@@ -118,7 +136,7 @@ class CudaNativeExecutor:
         return _host_outcome(outcome, outcome.x.to_host(stream=0))
 
     def benchmark_metadata(self):
-        return {
+        metadata = {
             "implementation_role": "native",
             "device": "cuda",
             "cuda_device": self.device,
@@ -131,7 +149,7 @@ class CudaNativeExecutor:
             "preconditioner_stored_bytes": self.preconditioner_nbytes,
             "host_upload_setup_elapsed_ns": self.upload_ns,
             "resident_adapter_setup_elapsed_ns": self.setup_ns,
-            "setup_in_timed_call": self.scope == "api",
+            "setup_in_timed_call": self.scope in ("api", "session"),
             "setup_measurement": "single untimed completed GPU setup probe",
             "setup_probe_scope": "operator snapshot and Jacobi probe; reusable output/workspace only for prepared scope",
             "api_setup_scope": "output/workspace allocations and per-call Jacobi; matrix upload/snapshot excluded",
@@ -147,14 +165,24 @@ class CudaNativeExecutor:
             + " with residual_refresh="
             + str(self.options["residual_refresh"]),
         }
+        if self.scope == "session":
+            metadata.update(
+                session_construction_elapsed_ns=self.session_setup_ns,
+                workspace_reused=True,
+                workspace_in_timed_call=False,
+                output_reused=False,
+                output_in_timed_call=True,
+                preconditioner_reused=False,
+                preconditioner_in_timed_call=self.preconditioner == "jacobi",
+                api_setup_scope="fresh output and per-call Jacobi; session workspace reused; matrix upload excluded",
+                setup_probe_scope="untimed operator snapshot/Jacobi probe and completed Session construction; no retained matrix/M cache",
+            )
+        return metadata
 
 
 class TorchCudaExecutor(engine.ReferenceExecutor):
     def __init__(self, arrays, options, scope, threads, device):
-        if scope not in ("prepared", "api"):
-            raise ValueError(
-                "CUDA supports prepared/api device-resident scopes"
-            )
+        validation.validate_scope(scope, "cuda")
         self.native_execution_mode = validation.validate_execution_mode(
             options, "cuda"
         )
@@ -176,7 +204,7 @@ class TorchCudaExecutor(engine.ReferenceExecutor):
         return _host_outcome(outcome, self.ops.export(outcome.x).copy())
 
     def benchmark_metadata(self):
-        return {
+        metadata = {
             **super().benchmark_metadata(),
             "device": "cuda",
             "cuda_device": self.ops.device.index,
@@ -196,3 +224,16 @@ class TorchCudaExecutor(engine.ReferenceExecutor):
             "precision": "float64; TF32 disabled; no mixed precision",
             "workspace_policy": "preallocated prepared tensors; API uses PyTorch caching allocator",
         }
+        if self.scope == "session":
+            metadata.update(
+                workspace_reused=True,
+                workspace_in_timed_call=False,
+                output_reused=False,
+                output_in_timed_call=True,
+                preconditioner_reused=False,
+                preconditioner_in_timed_call=self.preconditioner == "jacobi",
+                api_setup_scope="fresh output tensor and per-call Jacobi; session workvectors reused; matrix upload excluded",
+                workspace_policy="cached iteration vectors; fresh output/inverse per call; PyTorch caching allocator",
+                setup_probe_scope="untimed iteration-vector allocation and Jacobi probe; no matrix/M cache",
+            )
+        return metadata
