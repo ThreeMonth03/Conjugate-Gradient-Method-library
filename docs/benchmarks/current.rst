@@ -28,8 +28,8 @@ On the four scaled sparse GPU inputs, Jacobi reduces native updates from
 575/1498/261/444 to 48/115/25/37, with 7.42–8.72× lower prepared medians.
 The neutral case stays at 50 updates and adds work. Some unpreconditioned
 GPU CG counts differ between native and Torch, as explicitly retained below.
-CPU LU reuse remains faster than native PCG on the five default strategy
-fixtures after its prior factorization. All these rankings are descriptive,
+After prior factorization, CPU LU reuse has lower medians than native PCG
+on 3/5 prepared and 4/5 API default strategy fixtures. All these rankings are descriptive,
 with the two-process uncertainty limits given below.
 
 
@@ -308,14 +308,16 @@ what was actually loaded; rebuilds on another host need not have identical bytes
 Reproduce
 ---------
 
-Use CPython 3.12, a compatible NVIDIA driver and existing GNU C++20 toolchains.
-For the original baseline, check out the full measured source revision above
-before the builds. These commands use project-local dependencies and toolkit.
+Use a fresh checkout, CPython 3.12, a compatible NVIDIA driver and existing
+GNU C++20 toolchains. These commands use project-local dependencies and toolkit.
 Choose compatible architecture/affinity/compiler values on another host; keep
 that changed environment visible in its JSON.
 
 .. code-block:: bash
 
+   git clone https://github.com/ThreeMonth03/Conjugate-Gradient-Method-library.git cgpy-cleanup-baseline
+   cd cgpy-cleanup-baseline
+   git checkout --detach d34036f5668559612766cb5d8872a41f3097ffdc
    python3.12 -m venv .venv
    .venv/bin/python -m pip install --cache-dir .cache/pip -r requirements/benchmark.lock
    python3.12 -m venv .venv-cuda
@@ -333,7 +335,10 @@ count, input hash and binary identity before using a performance comparison.
 .. code-block:: python
 
    from pathlib import Path
+   import json
+   import math
    import subprocess
+   import sys
 
    root = Path.cwd()
    groups = [
@@ -373,8 +378,15 @@ count, input hash and binary identity before using a performance comparison.
            if device == "cuda":
                command += ["CUDA_HOST_COMPILER=/usr/bin/g++-13", "CUDA_ARCHITECTURES=75"]
            subprocess.run(command, check=True)
+           artifact = json.loads(output.read_text())
+           for case in artifact["cases"]:
+               assert {entry["name"] for entry in case["results"]} == set(candidates.split(","))
+               for entry in case["results"]:
+                   assert entry["status"] == "measured" and entry["solver_status"] == "converged"
+                   assert math.isfinite(entry["true_residual_norm"])
+                   assert entry["true_residual_norm"] <= entry["residual_threshold"] * (1 + 64 * sys.float_info.epsilon)
 
-Replay an original local artifact with its saved fixture hashes, candidate
+Replay a newly generated artifact with its saved fixture hashes, candidate
 set and actual sampling schedule. The new environment/binary identity is
 recorded; identical latency is not expected. Replay is a separate validation
 and is not pooled into baseline timings.
@@ -383,8 +395,11 @@ and is not pooled into baseline timings.
 
    taskset -c 0 env PYTHONPATH="$PWD/build/cuda-release/python" \
        .venv-cuda/bin/python -m cgbench replay \
-       build/performance-cleanup/baseline/cuda-release-sparse-solvers-jacobi-prepared-r01.json \
+       build/performance-cleanup/reproduced/cuda-release-sparse-solvers-jacobi-prepared-r01.json \
        --output build/performance-cleanup/replayed-scaled-pcg.json
+
+For the originally collected evidence on this host, use the corresponding
+file under ``build/performance-cleanup/baseline/`` instead.
 
 For later cleanup regression, keep both original process files and compare
 matching new files with ``scripts/compare_performance.py``; its strict
