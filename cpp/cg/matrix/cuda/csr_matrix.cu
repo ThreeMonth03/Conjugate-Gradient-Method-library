@@ -83,32 +83,33 @@ CsrMatrix::CsrMatrix(const cg::CsrMatrix &host, const Context &context)
     detail::DeviceGuard guard(context.device());
     upload_indices(m_impl->indptr.get(), host.indptr(), context);
     upload_indices(m_impl->indices.get(), host.indices(), context);
-    m_impl->values.upload({host.values().data(), host.nnz()}, context);
+    m_impl->values.upload(host.values(), context);
 }
 CsrMatrix::CsrMatrix(CsrMatrixView source, const Context &context)
 {
-    csr_dimensions(source.rows, source.cols, source.nnz);
-    if (source.index_type != IndexType::int32 && source.index_type != IndexType::int64)
+    csr_dimensions(source.rows(), source.cols(), source.nnz());
+    if (source.index_type() != IndexType::int32 && source.index_type() != IndexType::int64)
     {
         throw std::invalid_argument("unsupported CUDA CSR index type");
     }
-    const std::size_t width = source.index_type == IndexType::int32 ? 4 : 8;
-    detail::validate_pointer(source.indptr, detail::checked_product(source.rows + 1, width), width, source.device,
+    const std::size_t width = source.index_type() == IndexType::int32 ? 4 : 8;
+    detail::validate_pointer(source.indptr(), detail::checked_product(source.rows() + 1, width), width, source.device(),
                              context);
-    detail::validate_pointer(source.indices, detail::checked_product(source.nnz, width), width, source.device, context);
-    detail::validate(ConstVectorView{source.data, source.nnz, source.device}, context);
+    detail::validate_pointer(source.indices(), detail::checked_product(source.nnz(), width), width, source.device(),
+                             context);
+    detail::validate(ConstVectorView{source.data(), source.nnz(), source.device()}, context);
     detail::DeviceGuard guard(context.device());
-    const auto rowptr = source.index_type == IndexType::int32
-                            ? download_indices<std::int32_t>(source.indptr, source.rows + 1, context)
-                            : download_indices<std::int64_t>(source.indptr, source.rows + 1, context);
-    const auto columns = source.index_type == IndexType::int32
-                             ? download_indices<std::int32_t>(source.indices, source.nnz, context)
-                             : download_indices<std::int64_t>(source.indices, source.nnz, context);
-    cg::detail::validate_csr_structure(source.rows, source.cols, rowptr, columns, source.nnz);
-    m_impl = std::make_unique<Impl>(source.rows, source.cols, source.nnz, context);
+    const auto rowptr = source.index_type() == IndexType::int32
+                            ? download_indices<std::int32_t>(source.indptr(), source.rows() + 1, context)
+                            : download_indices<std::int64_t>(source.indptr(), source.rows() + 1, context);
+    const auto columns = source.index_type() == IndexType::int32
+                             ? download_indices<std::int32_t>(source.indices(), source.nnz(), context)
+                             : download_indices<std::int64_t>(source.indices(), source.nnz(), context);
+    cg::detail::validate_csr_structure(source.rows(), source.cols(), rowptr, columns, source.nnz());
+    m_impl = std::make_unique<Impl>(source.rows(), source.cols(), source.nnz(), context);
     upload_indices(m_impl->indptr.get(), rowptr, context);
     upload_indices(m_impl->indices.get(), columns, context);
-    m_impl->values.copy_from_device({source.data, source.nnz, source.device}, context);
+    m_impl->values.copy_from_device({source.data(), source.nnz(), source.device()}, context);
 }
 CsrMatrix::~CsrMatrix() = default;
 CsrMatrix::CsrMatrix(CsrMatrix &&) noexcept = default;

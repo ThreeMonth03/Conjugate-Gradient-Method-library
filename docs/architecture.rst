@@ -74,6 +74,16 @@ package root. ``cgpy.__init__`` supplies explicit public re-exports.
 Workspace and ownership
 -----------------------
 
+Views borrow storage without owning or extending its lifetime. CPU vector
+views use ``std::span``. CPU dense and CUDA vector/dense/CSR views keep their
+pointer, extent and layout/device metadata private and expose read-only
+accessors such as ``data()``, ``size()``, ``rows()`` and ``device()``. Replacing
+a view replaces its whole descriptor; callers cannot edit individual fields.
+CUDA views remain trivially copyable descriptors with host/device accessors
+and no allocation or synchronization. Device pointer inspection and stream
+readiness checks remain at operation and foreign-array boundaries. Metadata
+encapsulation cannot establish the underlying allocation's extent or lifetime.
+
 CPU workspace owns five vectors: residual ``r``, direction ``p``, product
 ``Ap``, true-residual scratch and preconditioned residual ``z``. Prepare its
 size before calling the native solver. It is noncopyable and movable; a

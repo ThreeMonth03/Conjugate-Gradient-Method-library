@@ -59,6 +59,14 @@ ownership and ``std::span`` for borrowing. Validate foreign pointers before
 constructing a span. Device storage uses a standard owner with CUDA-aware
 cleanup; host containers cannot own device allocations.
 
+Carry borrowed ranges through host kernels as spans and index the span
+directly. Keep strided matrix and device views lightweight, with private
+metadata and read-only accessors. Views do not share ownership; smart pointers
+belong in resource owners. Raw pointers remain appropriate for native API
+boundaries and device kernels. Keep casts and allocation calls localized to
+those boundaries. CUDA view accessors must work on host and device without
+pulling CUDA SDK headers into public interfaces.
+
 Use value types for options/results and composition for owned state. A
 prepared solver holds a matrix variant and optional Jacobi state; it does
 not need a subclass for each storage/preconditioner combination. The shared

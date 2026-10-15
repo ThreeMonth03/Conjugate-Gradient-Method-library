@@ -53,6 +53,7 @@ target_link_libraries(cg_cuda PUBLIC cg_core CUDA::cudart CUDA::cublas)
 set(CG_CUDA_PUBLIC_HEADERS
     cuda.hpp
     runtime/cuda/context.hpp
+    runtime/cuda/host_device.hpp
     backend/cuda/dense_kernel.hpp
     storage/cuda/vector.hpp
     storage/cuda/device_memory.hpp

@@ -12,7 +12,7 @@ void CpuBackend::copy(ConstVectorView source, VectorView destination) const
     detail::exact_or_disjoint(source, destination);
     if (source.data() != destination.data() && source.size() != 0)
     {
-        std::copy_n(source.data(), source.size(), destination.data());
+        std::ranges::copy(source, destination.begin());
     }
 }
 
@@ -27,7 +27,7 @@ void CpuBackend::multiply(ConstVectorView x, ConstVectorView y, VectorView outpu
 #endif
     for (std::size_t i = 0; i < x.size(); ++i)
     {
-        output.data()[i] = x.data()[i] * y.data()[i];
+        output[i] = x[i] * y[i];
     }
 }
 
@@ -49,9 +49,9 @@ double CpuBackend::multiply_and_dot(ConstVectorView factors, ConstVectorView r, 
 #endif
     for (std::size_t i = 0; i < r.size(); ++i)
     {
-        const double value = factors.data()[i] * r.data()[i];
-        z.data()[i] = value;
-        product += r.data()[i] * value;
+        const double value = factors[i] * r[i];
+        z[i] = value;
+        product += r[i] * value;
     }
     return product;
 }
@@ -65,7 +65,7 @@ void CpuBackend::axpy(double alpha, ConstVectorView x, VectorView y) const
 #endif
     for (std::size_t i = 0; i < x.size(); ++i)
     {
-        y.data()[i] += alpha * x.data()[i];
+        y[i] += alpha * x[i];
     }
 }
 
@@ -80,7 +80,7 @@ void CpuBackend::axpby(double alpha, ConstVectorView x, double beta, ConstVector
 #endif
     for (std::size_t i = 0; i < x.size(); ++i)
     {
-        output.data()[i] = alpha * x.data()[i] + beta * y.data()[i];
+        output[i] = alpha * x[i] + beta * y[i];
     }
 }
 
@@ -108,9 +108,9 @@ double CpuBackend::update_x_r_squared_norm(VectorView x, VectorView r, ConstVect
 #endif
     for (std::size_t i = 0; i < x.size(); ++i)
     {
-        x.data()[i] += alpha * p.data()[i];
-        r.data()[i] -= alpha * ap.data()[i];
-        squared_norm += r.data()[i] * r.data()[i];
+        x[i] += alpha * p[i];
+        r[i] -= alpha * ap[i];
+        squared_norm += r[i] * r[i];
     }
     return squared_norm;
 }

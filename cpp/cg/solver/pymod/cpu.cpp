@@ -105,9 +105,9 @@ cg::DenseMatrix snapshot_dense_matrix(const py::array &A)
     std::vector<double> values(count);
     if (count != 0)
     {
-        std::copy_n(view.data, count, values.data());
+        std::copy_n(view.data(), count, values.data());
     }
-    return {view.rows, view.cols, std::move(values)};
+    return {view.rows(), view.cols(), std::move(values)};
 }
 
 auto bind_prepared(py::module_ &m)

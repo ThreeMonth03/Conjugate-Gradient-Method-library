@@ -9,7 +9,7 @@ namespace cg
 {
 
 DenseMatrixView::DenseMatrixView(const double *data, std::size_t rows, std::size_t cols, std::size_t row_stride)
-    : data(data), rows(rows), cols(cols), row_stride(row_stride == 0 ? cols : row_stride)
+    : m_data(data), m_rows(rows), m_cols(cols), m_row_stride(row_stride == 0 ? cols : row_stride)
 {
     detail::validate(*this);
 }
@@ -68,32 +68,32 @@ namespace
 {
 std::size_t matrix_span(DenseMatrixView view)
 {
-    if (view.rows == 0 || view.cols == 0)
+    if (view.rows() == 0 || view.cols() == 0)
     {
         return 0;
     }
-    const auto preceding = checked_product(view.rows - 1, view.row_stride);
-    if (preceding > std::numeric_limits<std::size_t>::max() - view.cols)
+    const auto preceding = checked_product(view.rows() - 1, view.row_stride());
+    if (preceding > std::numeric_limits<std::size_t>::max() - view.cols())
     {
         throw std::invalid_argument("matrix span overflows size_t");
     }
-    return preceding + view.cols;
+    return preceding + view.cols();
 }
 
 } // namespace
 void validate(DenseMatrixView view)
 {
-    if (view.row_stride < view.cols)
+    if (view.row_stride() < view.cols())
     {
         throw std::invalid_argument("matrix row stride is smaller than its columns");
     }
-    validate_raw_vector(view.data, matrix_span(view));
+    validate_raw_vector(view.data(), matrix_span(view));
 }
 
 bool overlaps(DenseMatrixView a, ConstVectorView b)
 {
     validate(a);
-    return overlaps_raw(a.data, matrix_span(a), b.data(), b.size());
+    return overlaps_raw(a.data(), matrix_span(a), b.data(), b.size());
 }
 
 } // namespace detail

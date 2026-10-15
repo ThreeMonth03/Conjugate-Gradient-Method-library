@@ -12,7 +12,7 @@ namespace cg
 class JacobiPreconditioner;
 
 // x is an initial guess and output. The output and workspace must be disjoint
-// from A and b. The workspace must match A.rows; prepare it outside timing.
+// from A and b. The workspace must match A.rows(); prepare it outside timing.
 // Inputs are validated once, and no vector storage is allocated by the solve.
 // M is an optional prepared Jacobi preconditioner; it requires recurrence CG.
 SolveInfo solve_into(DenseMatrixView A, ConstVectorView b, VectorView x, Workspace &workspace,

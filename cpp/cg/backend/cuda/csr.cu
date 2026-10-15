@@ -16,22 +16,22 @@ namespace
 __global__ void csr_kernel(CsrMatrixView A, ConstVectorView x, ConstVectorView b, VectorView output, int mode,
                            bool b_minus_ax, double *partials)
 {
-    const auto *indptr = static_cast<const std::int64_t *>(A.indptr);
-    const auto *indices = static_cast<const std::int64_t *>(A.indices);
+    const auto *indptr = static_cast<const std::int64_t *>(A.indptr());
+    const auto *indices = static_cast<const std::int64_t *>(A.indices());
     double metric = 0.0;
-    for (std::size_t row = blockIdx.x * blockDim.x + threadIdx.x; row < A.rows;
+    for (std::size_t row = blockIdx.x * blockDim.x + threadIdx.x; row < A.rows();
          row += static_cast<std::size_t>(gridDim.x) * blockDim.x)
     {
         double product = 0.0;
         for (std::int64_t entry = indptr[row]; entry < indptr[row + 1]; ++entry)
         {
-            product += A.data[entry] * x.data[indices[entry]];
+            product += A.data()[entry] * x.data()[indices[entry]];
         }
-        const double value = mode == 2 ? (b_minus_ax ? b.data[row] - product : product - b.data[row]) : product;
-        output.data[row] = value;
+        const double value = mode == 2 ? (b_minus_ax ? b.data()[row] - product : product - b.data()[row]) : product;
+        output.data()[row] = value;
         if (mode == 1)
         {
-            metric += x.data[row] * value;
+            metric += x.data()[row] * value;
         }
         else if (mode == 2)
         {

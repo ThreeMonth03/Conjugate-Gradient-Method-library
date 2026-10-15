@@ -30,14 +30,14 @@ double checked_inverse(double diagonal)
 std::vector<double> dense_inverse(DenseMatrixView A)
 {
     detail::validate(A);
-    if (A.rows == 0 || A.rows != A.cols)
+    if (A.rows() == 0 || A.rows() != A.cols())
     {
         throw std::invalid_argument("Jacobi requires a nonempty square matrix");
     }
-    std::vector<double> inverse(A.rows);
-    for (std::size_t row = 0; row < A.rows; ++row)
+    std::vector<double> inverse(A.rows());
+    for (std::size_t row = 0; row < A.rows(); ++row)
     {
-        inverse[row] = checked_inverse(A.data[row * A.row_stride + row]);
+        inverse[row] = checked_inverse(A.data()[row * A.row_stride() + row]);
     }
     return inverse;
 }

@@ -11,24 +11,24 @@ namespace
 
 __global__ void dense_jacobi_kernel(DenseMatrixView A, VectorView inverse, int *invalid)
 {
-    for (std::size_t i = blockIdx.x * blockDim.x + threadIdx.x; i < A.rows;
+    for (std::size_t i = blockIdx.x * blockDim.x + threadIdx.x; i < A.rows();
          i += static_cast<std::size_t>(gridDim.x) * blockDim.x)
     {
-        const double diagonal = A.data[i * A.row_stride + i];
+        const double diagonal = A.data()[i * A.row_stride() + i];
         const double value = 1.0 / diagonal;
         if (!isfinite(diagonal) || diagonal <= 0.0 || !isfinite(value) || value <= 0.0)
         {
             atomicExch(invalid, 1);
         }
-        inverse.data[i] = value;
+        inverse.data()[i] = value;
     }
 }
 
 __global__ void csr_jacobi_kernel(CsrMatrixView A, VectorView inverse, int *invalid)
 {
-    const auto *indptr = static_cast<const std::int64_t *>(A.indptr);
-    const auto *indices = static_cast<const std::int64_t *>(A.indices);
-    for (std::size_t row = blockIdx.x * blockDim.x + threadIdx.x; row < A.rows;
+    const auto *indptr = static_cast<const std::int64_t *>(A.indptr());
+    const auto *indices = static_cast<const std::int64_t *>(A.indices());
+    for (std::size_t row = blockIdx.x * blockDim.x + threadIdx.x; row < A.rows();
          row += static_cast<std::size_t>(gridDim.x) * blockDim.x)
     {
         double diagonal = 0.0;
@@ -36,7 +36,7 @@ __global__ void csr_jacobi_kernel(CsrMatrixView A, VectorView inverse, int *inva
         {
             if (indices[entry] == static_cast<std::int64_t>(row))
             {
-                diagonal = A.data[entry];
+                diagonal = A.data()[entry];
                 break;
             }
         }
@@ -45,7 +45,7 @@ __global__ void csr_jacobi_kernel(CsrMatrixView A, VectorView inverse, int *inva
         {
             atomicExch(invalid, 1);
         }
-        inverse.data[row] = value;
+        inverse.data()[row] = value;
     }
 }
 
@@ -72,12 +72,12 @@ template <class Launch> void prepare_jacobi(const Context &context, Launch launc
 void initialize_jacobi(DenseMatrixView A, VectorView inverse, const Context &context)
 {
     prepare_jacobi(context, [&](int *invalid)
-                   { dense_jacobi_kernel<<<blocks(A.rows), block_size, 0, stream(context)>>>(A, inverse, invalid); });
+                   { dense_jacobi_kernel<<<blocks(A.rows()), block_size, 0, stream(context)>>>(A, inverse, invalid); });
 }
 void initialize_jacobi(CsrMatrixView A, VectorView inverse, const Context &context)
 {
     prepare_jacobi(context, [&](int *invalid)
-                   { csr_jacobi_kernel<<<blocks(A.rows), block_size, 0, stream(context)>>>(A, inverse, invalid); });
+                   { csr_jacobi_kernel<<<blocks(A.rows()), block_size, 0, stream(context)>>>(A, inverse, invalid); });
 }
 } // namespace detail
 

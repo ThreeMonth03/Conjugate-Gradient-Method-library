@@ -19,6 +19,15 @@ namespace
 using cg::ConstVectorView;
 using cg::VectorView;
 
+template <class View>
+constexpr bool writable_dense_metadata = requires(View view) { view.data = nullptr; } || requires(View view) {
+    view.rows = std::size_t{1};
+} || requires(View view) { view.cols = std::size_t{1}; } || requires(View view) { view.row_stride = std::size_t{1}; };
+
+static_assert(!writable_dense_metadata<cg::DenseMatrixView>);
+static_assert(std::is_trivially_copyable_v<cg::DenseMatrixView>);
+static_assert(std::is_standard_layout_v<cg::DenseMatrixView>);
+
 cg::DenseMatrix tridiagonal(std::size_t n)
 {
     cg::DenseMatrix A(n, n);
@@ -44,6 +53,29 @@ TEST(Storage, ChecksShapeAndOverflowBeforeAccess)
     double value = 0.0;
     EXPECT_THROW((cg::DenseMatrixView(&value, 2, 3, 2)), std::invalid_argument);
     EXPECT_THROW((cg::DenseMatrixView(&value, std::numeric_limits<std::size_t>::max(), 2)), std::invalid_argument);
+}
+
+TEST(Storage, DenseMatrixViewsCopyBorrowedStorageWithReadOnlyMetadata)
+{
+    const cg::DenseMatrixView empty;
+    EXPECT_EQ(empty.data(), nullptr);
+    EXPECT_EQ(empty.rows(), 0u);
+    EXPECT_EQ(empty.cols(), 0u);
+    EXPECT_EQ(empty.row_stride(), 0u);
+
+    std::array<double, 6> values{1, 2, 99, 3, 4, 99};
+    const cg::DenseMatrixView padded(values.data(), 2, 2, 3);
+    auto copied = padded;
+    EXPECT_EQ(copied.data(), values.data());
+    EXPECT_EQ(copied.rows(), 2u);
+    EXPECT_EQ(copied.cols(), 2u);
+    EXPECT_EQ(copied.row_stride(), 3u);
+    values[0] = 7;
+    EXPECT_DOUBLE_EQ(copied.data()[0], 7);
+
+    copied = cg::DenseMatrixView(values.data(), 2, 3);
+    EXPECT_EQ(copied.row_stride(), 3u);
+    EXPECT_EQ(padded.cols(), 2u);
 }
 
 TEST(Storage, RejectsUnalignedViewsBeforeReadingTheirData)

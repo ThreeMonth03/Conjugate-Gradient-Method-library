@@ -2,6 +2,7 @@
 #include <cg/matrix/csr_matrix.hpp>
 #include <cg/storage/detail/validation.hpp>
 
+#include <span>
 #include <stdexcept>
 
 namespace cg
@@ -9,8 +10,8 @@ namespace cg
 
 namespace
 {
-inline double row_dot(const std::size_t *indices, const double *values, const double *x, std::size_t begin,
-                      std::size_t end)
+inline double row_dot(std::span<const std::size_t> indices, ConstVectorView values, ConstVectorView x,
+                      std::size_t begin, std::size_t end)
 {
     double sum = 0.0;
     for (std::size_t entry = begin; entry < end; ++entry)
@@ -42,16 +43,16 @@ void CpuBackend::apply(const CsrMatrix &A, ConstVectorView x, VectorView output)
         throw std::invalid_argument("BLAS dense kernels do not support CSR matrices");
     }
     validate_apply(A, x, output);
-    const auto *indptr = A.indptr().data();
-    const auto *indices = A.indices().data();
-    const auto *values = A.values().data();
+    const std::span<const std::size_t> indptr = A.indptr();
+    const std::span<const std::size_t> indices = A.indices();
+    const ConstVectorView values = A.values();
 #ifdef _OPENMP
 #pragma omp parallel for schedule(static) num_threads(m_threads) if (m_threads > 1 && A.rows() >= 4096)
 #endif
     for (std::size_t row = 0; row < A.rows(); ++row)
     {
-        const double sum = row_dot(indices, values, x.data(), indptr[row], indptr[row + 1]);
-        output.data()[row] = sum;
+        const double sum = row_dot(indices, values, x, indptr[row], indptr[row + 1]);
+        output[row] = sum;
     }
 }
 
@@ -71,9 +72,9 @@ double CpuBackend::apply_and_dot(const CsrMatrix &A, ConstVectorView p, VectorVi
         apply(A, p, ap);
         return dot(p, ap);
     }
-    const auto *indptr = A.indptr().data();
-    const auto *indices = A.indices().data();
-    const auto *values = A.values().data();
+    const std::span<const std::size_t> indptr = A.indptr();
+    const std::span<const std::size_t> indices = A.indices();
+    const ConstVectorView values = A.values();
     double product = 0.0;
 #ifdef _OPENMP
 #pragma omp parallel for reduction(+ : product) schedule(static)                                                       \
@@ -81,9 +82,9 @@ double CpuBackend::apply_and_dot(const CsrMatrix &A, ConstVectorView p, VectorVi
 #endif
     for (std::size_t row = 0; row < A.rows(); ++row)
     {
-        const double sum = row_dot(indices, values, p.data(), indptr[row], indptr[row + 1]);
-        ap.data()[row] = sum;
-        product += p.data()[row] * sum;
+        const double sum = row_dot(indices, values, p, indptr[row], indptr[row + 1]);
+        ap[row] = sum;
+        product += p[row] * sum;
     }
     return product;
 }
@@ -108,9 +109,9 @@ double CpuBackend::residual_squared_norm(const CsrMatrix &A, ConstVectorView b, 
         axpby(b_minus_ax ? 1.0 : -1.0, b, b_minus_ax ? -1.0 : 1.0, r, r);
         return squared_norm(r);
     }
-    const auto *indptr = A.indptr().data();
-    const auto *indices = A.indices().data();
-    const auto *values = A.values().data();
+    const std::span<const std::size_t> indptr = A.indptr();
+    const std::span<const std::size_t> indices = A.indices();
+    const ConstVectorView values = A.values();
     double squared_norm = 0.0;
 #ifdef _OPENMP
 #pragma omp parallel for reduction(+ : squared_norm) schedule(static)                                                  \
@@ -118,9 +119,9 @@ double CpuBackend::residual_squared_norm(const CsrMatrix &A, ConstVectorView b, 
 #endif
     for (std::size_t row = 0; row < A.rows(); ++row)
     {
-        const double sum = row_dot(indices, values, x.data(), indptr[row], indptr[row + 1]);
-        const double value = b_minus_ax ? b.data()[row] - sum : sum - b.data()[row];
-        r.data()[row] = value;
+        const double sum = row_dot(indices, values, x, indptr[row], indptr[row + 1]);
+        const double value = b_minus_ax ? b[row] - sum : sum - b[row];
+        r[row] = value;
         squared_norm += value * value;
     }
     return squared_norm;

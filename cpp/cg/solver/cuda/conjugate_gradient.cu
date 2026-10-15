@@ -15,7 +15,7 @@ namespace
 
 std::size_t rows(DenseMatrixView A)
 {
-    return A.rows;
+    return A.rows();
 }
 std::size_t rows(const CsrMatrix &A)
 {
@@ -23,7 +23,7 @@ std::size_t rows(const CsrMatrix &A)
 }
 std::size_t cols(DenseMatrixView A)
 {
-    return A.cols;
+    return A.cols();
 }
 std::size_t cols(const CsrMatrix &A)
 {
@@ -48,7 +48,7 @@ void validate_solve(const Matrix &A, ConstVectorView b, VectorView x, Workspace 
     validate_matrix(A, context);
     detail::validate(b, context);
     detail::validate(x, context);
-    if (rows(A) == 0 || rows(A) != cols(A) || b.size != rows(A) || x.size != rows(A))
+    if (rows(A) == 0 || rows(A) != cols(A) || b.size() != rows(A) || x.size() != rows(A))
     {
         throw std::invalid_argument("CUDA CG requires a nonempty square matrix and matching vectors");
     }
