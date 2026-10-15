@@ -4,6 +4,9 @@
 
 #include <cublas_v2.h>
 
+#include <memory>
+#include <type_traits>
+
 namespace cg
 {
 namespace cuda
@@ -19,29 +22,25 @@ inline void check(cublasStatus_t status, const char *operation)
                                  std::to_string(static_cast<int>(status)));
     }
 }
-struct BlasHandle
+struct BlasDeleter
 {
-    explicit BlasHandle(const Context &context) : device(context.device())
+    int device = -1;
+    void operator()(cublasHandle_t handle) const noexcept
     {
-        DeviceGuard guard(device);
-        check(cublasCreate(&value), "cublasCreate");
-        const auto status = cublasSetStream(value, stream(context));
-        if (status != CUBLAS_STATUS_SUCCESS)
-        {
-            (void)cublasDestroy(value);
-            value = nullptr;
-            check(status, "cublasSetStream");
-        }
+        on_device_noexcept(device, [&] { (void)cublasDestroy(handle); });
     }
-    BlasHandle(const BlasHandle &) = delete;
-    BlasHandle &operator=(const BlasHandle &) = delete;
-    ~BlasHandle()
-    {
-        on_device_noexcept(device, [&] { (void)cublasDestroy(value); });
-    }
-    int device;
-    cublasHandle_t value = nullptr;
 };
+using BlasHandle = std::unique_ptr<std::remove_pointer_t<cublasHandle_t>, BlasDeleter>;
+
+inline BlasHandle blas_handle(const Context &context)
+{
+    DeviceGuard guard(context.device());
+    cublasHandle_t value = nullptr;
+    check(cublasCreate(&value), "cublasCreate");
+    BlasHandle handle(value, BlasDeleter{context.device()});
+    check(cublasSetStream(handle.get(), stream(context)), "cublasSetStream");
+    return handle;
+}
 
 } // namespace detail
 } // namespace cuda

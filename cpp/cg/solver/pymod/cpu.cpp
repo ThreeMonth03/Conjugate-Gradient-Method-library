@@ -8,10 +8,10 @@
 #include <cg/python/module.hpp>
 #include <cg/solver/pymod/options.hpp>
 
-#include <algorithm>
 #include <atomic>
 #include <memory>
 #include <utility>
+#include <vector>
 
 namespace py = pybind11;
 
@@ -102,11 +102,7 @@ cg::DenseMatrix snapshot_dense_matrix(const py::array &A)
     // The view contract guarantees contiguous storage; the core validates the
     // prepared operator's dimensions independently of the Python boundary.
     const auto count = static_cast<std::size_t>(A.size());
-    std::vector<double> values(count);
-    if (count != 0)
-    {
-        std::copy_n(view.data(), count, values.data());
-    }
+    auto values = count == 0 ? std::vector<double>{} : std::vector<double>(view.data(), view.data() + count);
     return {view.rows(), view.cols(), std::move(values)};
 }
 

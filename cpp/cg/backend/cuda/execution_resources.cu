@@ -9,12 +9,12 @@ namespace detail
 {
 
 CublasResources::CublasResources(const Context &context)
-    : workspace(device_allocation<unsigned char>(workspace_bytes, context)), handle(context)
+    : workspace(device_allocation<unsigned char>(workspace_bytes, context)), handle(blas_handle(context))
 {
     DeviceGuard guard(context.device());
-    check(cublasSetPointerMode(handle.value, CUBLAS_POINTER_MODE_HOST), "cublasSetPointerMode");
-    check(cublasSetAtomicsMode(handle.value, CUBLAS_ATOMICS_NOT_ALLOWED), "cublasSetAtomicsMode");
-    check(cublasSetWorkspace(handle.value, workspace.get(), workspace_bytes), "cublasSetWorkspace");
+    check(cublasSetPointerMode(handle.get(), CUBLAS_POINTER_MODE_HOST), "cublasSetPointerMode");
+    check(cublasSetAtomicsMode(handle.get(), CUBLAS_ATOMICS_NOT_ALLOWED), "cublasSetAtomicsMode");
+    check(cublasSetWorkspace(handle.get(), workspace.get(), workspace_bytes), "cublasSetWorkspace");
 }
 ExecutionResources::ExecutionResources(const Context &ctx, DenseKernel selected)
     : context(ctx), partials(device_allocation<double>(max_blocks, ctx)), scalar(device_allocation<double>(1, ctx)),
