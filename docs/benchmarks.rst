@@ -17,6 +17,7 @@ correctness checks and sampling.
    :maxdepth: 1
 
    benchmarks/current
+   benchmarks/api-lifecycle-20261016
    benchmarks/optimization-20261016
    benchmarks/main-20261016
    benchmarks/cub
