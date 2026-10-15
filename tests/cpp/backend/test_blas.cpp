@@ -1,4 +1,6 @@
+#include <cg/backend/cpu/blas.hpp>
 #include <cg/cg.hpp>
+#include <cg/storage/validation.hpp>
 
 #include <gtest/gtest.h>
 
@@ -49,9 +51,9 @@ double independent_residual(cg::DenseMatrixView A, cg::ConstVectorView b, cg::Co
         for (std::size_t column = 0; column < A.cols; ++column)
         {
             product += static_cast<long double>(A.data[row * A.row_stride + column]) *
-                       static_cast<long double>(x.data[column]);
+                       static_cast<long double>(x.data()[column]);
         }
-        norm = std::hypot(norm, static_cast<double>(static_cast<long double>(b.data[row]) - product));
+        norm = std::hypot(norm, static_cast<double>(static_cast<long double>(b.data()[row]) - product));
     }
     return norm;
 }
@@ -84,7 +86,7 @@ TEST_F(Blas, HandlesRectangularOddDimensionsAndPaddedRowsWithoutReadingOutput)
 {
     const std::size_t rows = 3, columns = 17, stride = columns + 3;
     std::vector<double> storage(rows * stride, std::numeric_limits<double>::quiet_NaN());
-    cg::Vector x(columns), output(rows);
+    std::vector<double> x(columns), output(rows);
     for (std::size_t column = 0; column < columns; ++column)
     {
         x.data()[column] = static_cast<double>(column % 7) - 3.0;
@@ -98,7 +100,7 @@ TEST_F(Blas, HandlesRectangularOddDimensionsAndPaddedRowsWithoutReadingOutput)
     {
         const cg::CpuBackend backend(1, fused, cg::DenseKernel::blas);
         std::fill_n(output.data(), rows, std::numeric_limits<double>::quiet_NaN());
-        backend.apply(A, x.view(), output.view());
+        backend.apply(A, x, output);
         for (std::size_t row = 0; row < rows; ++row)
         {
             long double expected = 0.0L;
@@ -115,20 +117,20 @@ TEST_F(Blas, HandlesRectangularOddDimensionsAndPaddedRowsWithoutReadingOutput)
 TEST_F(Blas, ReducesTheActualProductAndPreservesBothResidualSigns)
 {
     const cg::DenseMatrix A(3, 3, {4, 1, 0, 1, 5, -1, 0, -1, 3});
-    const cg::Vector p({2, -1, 3}), b({8, -2, 11});
-    cg::Vector output(3);
+    const std::vector<double> p({2, -1, 3}), b({8, -2, 11});
+    std::vector<double> output(3);
     for (const bool fused : {false, true})
     {
         const cg::CpuBackend backend(1, fused, cg::DenseKernel::blas);
-        EXPECT_DOUBLE_EQ(backend.apply_dot(A.view(), p.view(), output.view()), 50);
+        EXPECT_DOUBLE_EQ(backend.apply_dot(A.view(), p, output), 50);
         EXPECT_DOUBLE_EQ(output.data()[0], 7);
         EXPECT_DOUBLE_EQ(output.data()[1], -6);
         EXPECT_DOUBLE_EQ(output.data()[2], 10);
-        EXPECT_DOUBLE_EQ(backend.residual(A.view(), b.view(), p.view(), output.view()), 18);
+        EXPECT_DOUBLE_EQ(backend.residual(A.view(), b, p, output), 18);
         EXPECT_DOUBLE_EQ(output.data()[0], 1);
         EXPECT_DOUBLE_EQ(output.data()[1], 4);
         EXPECT_DOUBLE_EQ(output.data()[2], 1);
-        EXPECT_DOUBLE_EQ(backend.residual(A.view(), b.view(), p.view(), output.view(), false), 18);
+        EXPECT_DOUBLE_EQ(backend.residual(A.view(), b, p, output, false), 18);
         EXPECT_DOUBLE_EQ(output.data()[0], -1);
         EXPECT_DOUBLE_EQ(output.data()[1], -4);
         EXPECT_DOUBLE_EQ(output.data()[2], -1);
@@ -138,21 +140,21 @@ TEST_F(Blas, ReducesTheActualProductAndPreservesBothResidualSigns)
 TEST_F(Blas, EmptyMatricesDoNotPassNullStorageToTheProvider)
 {
     const cg::DenseMatrixView no_columns(nullptr, 3, 0), no_rows(nullptr, 0, 4), empty(nullptr, 0, 0);
-    const cg::Vector b({1, -2, 3}), x(4);
-    cg::Vector output({9, 9, 9});
+    const std::vector<double> b({1, -2, 3}), x(4);
+    std::vector<double> output({9, 9, 9});
     for (const bool fused : {false, true})
     {
         const cg::CpuBackend backend(1, fused, cg::DenseKernel::blas);
-        backend.apply(no_columns, {}, output.view());
+        backend.apply(no_columns, {}, output);
         for (std::size_t i = 0; i < output.size(); ++i)
         {
             EXPECT_DOUBLE_EQ(output.data()[i], 0);
         }
-        EXPECT_DOUBLE_EQ(backend.residual(no_columns, b.view(), {}, output.view()), 14);
+        EXPECT_DOUBLE_EQ(backend.residual(no_columns, b, {}, output), 14);
         EXPECT_DOUBLE_EQ(output.data()[1], -2);
-        EXPECT_DOUBLE_EQ(backend.residual(no_columns, b.view(), {}, output.view(), false), 14);
+        EXPECT_DOUBLE_EQ(backend.residual(no_columns, b, {}, output, false), 14);
         EXPECT_DOUBLE_EQ(output.data()[1], 2);
-        EXPECT_NO_THROW(backend.apply(no_rows, x.view(), {}));
+        EXPECT_NO_THROW(backend.apply(no_rows, x, {}));
         EXPECT_DOUBLE_EQ(backend.apply_dot(empty, {}, {}), 0);
         EXPECT_DOUBLE_EQ(backend.residual(empty, {}, {}, {}), 0);
     }
@@ -161,14 +163,14 @@ TEST_F(Blas, EmptyMatricesDoNotPassNullStorageToTheProvider)
 TEST_F(Blas, RejectsInvalidShapesAndAliasingBeforeChangingOutput)
 {
     cg::DenseMatrix A(2, 2, {2, 0, 0, 3});
-    cg::Vector x({1, 2}), output({7, 8});
+    std::vector<double> x({1, 2}), output({7, 8});
     const cg::CpuBackend backend(1, true, cg::DenseKernel::blas);
-    EXPECT_THROW(backend.apply(A.view(), {x.data(), 1}, output.view()), std::invalid_argument);
-    EXPECT_THROW(backend.apply(A.view(), x.view(), {nullptr, 2}), std::invalid_argument);
-    EXPECT_THROW(backend.apply(A.view(), x.view(), x.view()), std::invalid_argument);
-    EXPECT_THROW(backend.apply(A.view(), x.view(), {A.data(), 2}), std::invalid_argument);
-    EXPECT_THROW(backend.apply_dot(A.view(), x.view(), x.view()), std::invalid_argument);
-    EXPECT_THROW(backend.residual(A.view(), output.view(), x.view(), output.view()), std::invalid_argument);
+    EXPECT_THROW(backend.apply(A.view(), {x.data(), 1}, output), std::invalid_argument);
+    EXPECT_THROW(cg::detail::validate_raw_vector(nullptr, 2), std::invalid_argument);
+    EXPECT_THROW(backend.apply(A.view(), x, x), std::invalid_argument);
+    EXPECT_THROW(backend.apply(A.view(), x, {A.data(), 2}), std::invalid_argument);
+    EXPECT_THROW(backend.apply_dot(A.view(), x, x), std::invalid_argument);
+    EXPECT_THROW(backend.residual(A.view(), output, x, output), std::invalid_argument);
     EXPECT_DOUBLE_EQ(output.data()[0], 7);
     EXPECT_DOUBLE_EQ(output.data()[1], 8);
 }
@@ -189,22 +191,22 @@ TEST_F(Blas, RejectsInt32DimensionAndStrideOverflowBeforeAnyProviderAccess)
     // These intentionally oversized views must be rejected without reading
     // their data, including when the other matrix dimension is zero.
     const cg::DenseMatrixView wide(nullptr, 0, too_large), tall(nullptr, too_large, 0);
-    EXPECT_THROW(backend.apply(wide, {&x, too_large}, {}), std::invalid_argument);
-    EXPECT_THROW(backend.apply(tall, {}, {&output, too_large}), std::invalid_argument);
+    EXPECT_THROW(cg::detail::blas_apply(wide, {}, {}), std::invalid_argument);
+    EXPECT_THROW(cg::detail::blas_apply(tall, {}, {}), std::invalid_argument);
     EXPECT_DOUBLE_EQ(output, 7);
 }
 
 TEST_F(Blas, KeepsVectorFusionIndependentOfTheDenseKernel)
 {
-    const cg::Vector p({2, -1, 3}), ap({7, -6, 10});
+    const std::vector<double> p({2, -1, 3}), ap({7, -6, 10});
     for (const bool fused : {false, true})
     {
-        cg::Vector x({0, 0, 0}), r({8, -2, 11});
+        std::vector<double> x({0, 0, 0}), r({8, -2, 11});
         const cg::CpuBackend backend(1, fused, cg::DenseKernel::blas);
-        EXPECT_DOUBLE_EQ(backend.update_x_r_norm2(x.view(), r.view(), p.view(), ap.view(), 1), 18);
+        EXPECT_DOUBLE_EQ(backend.update_x_r_norm2(x, r, p, ap, 1), 18);
         EXPECT_DOUBLE_EQ(x.data()[0], 2);
         EXPECT_DOUBLE_EQ(r.data()[1], 4);
-        backend.update_direction(r.view(), x.view(), 2);
+        backend.update_direction(r, x, 2);
         EXPECT_DOUBLE_EQ(x.data()[0], 5);
         EXPECT_DOUBLE_EQ(x.data()[1], 2);
         EXPECT_DOUBLE_EQ(x.data()[2], 7);
@@ -215,23 +217,23 @@ TEST_F(Blas, PrivateProviderPreservesNonfiniteProductsEvenForZeroInputs)
 {
     const std::size_t size = 33;
     cg::DenseMatrix A(size, size);
-    cg::Vector zero(size), b(std::vector<double>(size, 1.0)), output(size);
+    std::vector<double> zero(size), b(std::vector<double>(size, 1.0)), output(size);
     for (const double invalid : {std::numeric_limits<double>::infinity(), std::numeric_limits<double>::quiet_NaN()})
     {
         A.data()[16] = invalid;
         for (const bool fused : {false, true})
         {
             const cg::CpuBackend backend(1, fused, cg::DenseKernel::blas);
-            backend.apply(A.view(), zero.view(), output.view());
+            backend.apply(A.view(), zero, output);
             EXPECT_TRUE(std::isnan(output.data()[0]));
-            EXPECT_TRUE(std::isnan(backend.apply_dot(A.view(), zero.view(), output.view())));
-            EXPECT_TRUE(std::isnan(backend.residual(A.view(), b.view(), zero.view(), output.view())));
+            EXPECT_TRUE(std::isnan(backend.apply_dot(A.view(), zero, output)));
+            EXPECT_TRUE(std::isnan(backend.residual(A.view(), b, zero, output)));
             cg::Workspace workspace(size);
             for (const auto algorithm : {cg::Algorithm::explicit_residual, cg::Algorithm::recurrence})
             {
                 cg::CgOptions options;
                 options.algorithm = algorithm;
-                const auto info = cg::solve_into(A.view(), b.view(), zero.view(), workspace, backend, options);
+                const auto info = cg::solve_into(A.view(), b, zero, workspace, backend, options);
                 EXPECT_EQ(info.status, cg::Status::non_finite);
                 EXPECT_EQ(info.iterations, 0u);
             }
@@ -244,10 +246,10 @@ TEST_F(Blas, DenseCgAndJacobiPcgPassIndependentTrueResidualChecksWithWorkspaceRe
     const std::size_t size = 17;
     const auto A = diagonal_spd(size);
     const cg::JacobiPreconditioner M(A.view());
-    const cg::Vector b(std::vector<double>(size, 1.0));
-    cg::Vector x(size);
+    const std::vector<double> b(std::vector<double>(size, 1.0));
+    std::vector<double> x(size);
     cg::Workspace workspace(size);
-    const auto *allocation = workspace.residual().data;
+    const auto *allocation = workspace.residual().data();
     for (const bool fused : {false, true})
     {
         const cg::CpuBackend backend(1, fused, cg::DenseKernel::blas);
@@ -265,14 +267,13 @@ TEST_F(Blas, DenseCgAndJacobiPcgPassIndependentTrueResidualChecksWithWorkspaceRe
                 options.rtol = 1e-10;
                 options.maxiter = 200;
                 options.residual_refresh = 7;
-                const auto info = cg::solve_into(A.view(), b.view(), x.view(), workspace, backend, options,
-                                                 preconditioned ? &M : nullptr);
+                const auto info =
+                    cg::solve_into(A.view(), b, x, workspace, backend, options, preconditioned ? &M : nullptr);
                 ASSERT_EQ(info.status, cg::Status::converged);
-                EXPECT_LE(independent_residual(A.view(), b.view(), x.view()),
-                          options.rtol * std::sqrt(static_cast<double>(size)));
-                EXPECT_EQ(workspace.residual().data, allocation);
-                const auto repeated = cg::solve_into(A.view(), b.view(), x.view(), workspace, backend, options,
-                                                     preconditioned ? &M : nullptr);
+                EXPECT_LE(independent_residual(A.view(), b, x), options.rtol * std::sqrt(static_cast<double>(size)));
+                EXPECT_EQ(workspace.residual().data(), allocation);
+                const auto repeated =
+                    cg::solve_into(A.view(), b, x, workspace, backend, options, preconditioned ? &M : nullptr);
                 EXPECT_EQ(repeated.status, cg::Status::converged);
                 EXPECT_EQ(repeated.iterations, 0u);
                 EXPECT_EQ(repeated.matvecs, 1u);
@@ -288,20 +289,19 @@ TEST_F(Blas, PreservesStableNormAndNumericalRangeStatuses)
     const cg::CpuBackend backend(1, true, cg::DenseKernel::blas);
     for (const double magnitude : {1e-200, 1e-160, 1e200})
     {
-        const cg::Vector b({magnitude, -magnitude});
-        cg::Vector x(2);
+        const std::vector<double> b({magnitude, -magnitude});
+        std::vector<double> x(2);
         cg::Workspace workspace(2);
         cg::CgOptions options;
         options.algorithm = cg::Algorithm::recurrence;
         for (const auto *preconditioner : {static_cast<const cg::JacobiPreconditioner *>(nullptr), &M})
         {
-            const auto info =
-                cg::solve_into(identity.view(), b.view(), x.view(), workspace, backend, options, preconditioner);
+            const auto info = cg::solve_into(identity.view(), b, x, workspace, backend, options, preconditioner);
             EXPECT_EQ(info.status, cg::Status::non_finite);
             EXPECT_NEAR(info.residual_norm, std::hypot(magnitude, magnitude), magnitude * 1e-14);
         }
         options.maxiter = 0;
-        const auto limited = cg::solve_into(identity.view(), b.view(), x.view(), workspace, backend, options);
+        const auto limited = cg::solve_into(identity.view(), b, x, workspace, backend, options);
         EXPECT_EQ(limited.status, cg::Status::max_iterations);
         EXPECT_NEAR(limited.residual_norm, std::hypot(magnitude, magnitude), magnitude * 1e-14);
     }
@@ -317,22 +317,22 @@ TEST_F(Blas, AcceptsActualConvergenceAndUsableResidualScaling)
         options.algorithm = algorithm;
         for (const double magnitude : {1e-150, 1e150})
         {
-            const cg::Vector b({magnitude, -magnitude});
-            cg::Vector x(2);
+            const std::vector<double> b({magnitude, -magnitude});
+            std::vector<double> x(2);
             cg::Workspace workspace(2);
-            const auto info = cg::solve_into(identity.view(), b.view(), x.view(), workspace, backend, options);
+            const auto info = cg::solve_into(identity.view(), b, x, workspace, backend, options);
             EXPECT_EQ(info.status, cg::Status::converged);
             EXPECT_DOUBLE_EQ(info.residual_norm, 0);
         }
-        const cg::Vector tiny({1e-200, -1e-200}), zero(2);
-        cg::Vector x(2);
+        const std::vector<double> tiny({1e-200, -1e-200}), zero(2);
+        std::vector<double> x(2);
         cg::Workspace workspace(2);
         options.atol = 1e-199;
-        const auto accepted = cg::solve_into(identity.view(), tiny.view(), x.view(), workspace, backend, options);
+        const auto accepted = cg::solve_into(identity.view(), tiny, x, workspace, backend, options);
         EXPECT_EQ(accepted.status, cg::Status::converged);
         EXPECT_GT(accepted.residual_norm, 0);
         EXPECT_EQ(accepted.iterations, 0u);
-        const auto exact = cg::solve_into(identity.view(), zero.view(), x.view(), workspace, backend, options);
+        const auto exact = cg::solve_into(identity.view(), zero, x, workspace, backend, options);
         EXPECT_EQ(exact.status, cg::Status::converged);
         EXPECT_DOUBLE_EQ(exact.residual_norm, 0);
     }
@@ -344,15 +344,15 @@ TEST_F(Blas, SharesAnImmutableBackendAcrossIndependentConcurrentSolves)
     const cg::CpuBackend backend(1, true, cg::DenseKernel::blas);
     auto run = [&](double rhs)
     {
-        const cg::Vector b(std::vector<double>(A.rows(), rhs));
-        cg::Vector x(A.rows());
+        const std::vector<double> b(std::vector<double>(A.rows(), rhs));
+        std::vector<double> x(A.rows());
         cg::Workspace workspace(A.rows());
         cg::CgOptions options;
         options.algorithm = cg::Algorithm::recurrence;
         options.rtol = 1e-10;
         options.maxiter = 200;
-        const auto info = cg::solve_into(A.view(), b.view(), x.view(), workspace, backend, options);
-        return std::make_pair(info.status, independent_residual(A.view(), b.view(), x.view()));
+        const auto info = cg::solve_into(A.view(), b, x, workspace, backend, options);
+        return std::make_pair(info.status, independent_residual(A.view(), b, x));
     };
     auto first = std::async(std::launch::async, run, 1.0);
     auto second = std::async(std::launch::async, run, -2.0);
@@ -367,14 +367,14 @@ TEST_F(Blas, SharesAnImmutableBackendAcrossIndependentConcurrentSolves)
 TEST_F(Blas, RejectsCsrInsteadOfSilentlySelectingNativeKernels)
 {
     const cg::CsrMatrix A(2, 2, {0, 1, 2}, {0, 1}, {2, 3});
-    const cg::Vector b({1, 2}), x({0, 0});
-    cg::Vector output({7, 8});
+    const std::vector<double> b({1, 2}), x({0, 0});
+    std::vector<double> output({7, 8});
     cg::Workspace workspace(2);
     const cg::CpuBackend backend(1, true, cg::DenseKernel::blas);
-    EXPECT_THROW(backend.apply(A, x.view(), output.view()), std::invalid_argument);
-    EXPECT_THROW(backend.apply_dot(A, x.view(), output.view()), std::invalid_argument);
-    EXPECT_THROW(backend.residual(A, b.view(), x.view(), output.view()), std::invalid_argument);
-    EXPECT_THROW(cg::solve_into(A, b.view(), output.view(), workspace, backend), std::invalid_argument);
+    EXPECT_THROW(backend.apply(A, x, output), std::invalid_argument);
+    EXPECT_THROW(backend.apply_dot(A, x, output), std::invalid_argument);
+    EXPECT_THROW(backend.residual(A, b, x, output), std::invalid_argument);
+    EXPECT_THROW(cg::solve_into(A, b, output, workspace, backend), std::invalid_argument);
     EXPECT_DOUBLE_EQ(output.data()[0], 7);
     EXPECT_DOUBLE_EQ(output.data()[1], 8);
 }

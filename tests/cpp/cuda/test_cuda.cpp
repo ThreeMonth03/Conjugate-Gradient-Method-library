@@ -71,26 +71,23 @@ double true_norm(cg::DenseMatrixView A, cg::ConstVectorView b, cg::ConstVectorVi
         long double sum = 0;
         for (std::size_t column = 0; column < A.cols; ++column)
         {
-            sum += static_cast<long double>(A.data[row * A.row_stride + column]) * x.data[column];
+            sum += static_cast<long double>(A.data[row * A.row_stride + column]) * x.data()[column];
         }
-        norm = std::hypot(norm, static_cast<double>(static_cast<long double>(b.data[row]) - sum));
+        norm = std::hypot(norm, static_cast<double>(static_cast<long double>(b.data()[row]) - sum));
     }
     return norm;
 }
 template <class T> struct DeviceIndices
 {
     explicit DeviceIndices(const std::vector<T> &host)
+        : storage(gpu::detail::device_allocation<T>(host.size(), gpu::Context{})), data(storage.get())
     {
-        if (cudaMalloc(reinterpret_cast<void **>(&data), host.size() * sizeof(T)) != cudaSuccess)
-        {
-            throw std::runtime_error("test cudaMalloc failed");
-        }
         if (cudaMemcpy(data, host.data(), host.size() * sizeof(T), cudaMemcpyHostToDevice) != cudaSuccess)
         {
             throw std::runtime_error("test cudaMemcpy failed");
         }
     }
-    ~DeviceIndices() { (void)cudaFree(data); }
+    gpu::detail::DeviceAllocation<T> storage;
     T *data = nullptr;
 };
 
@@ -108,28 +105,39 @@ TEST_F(Cuda, ReportsVersionsAndRejectsInvalidContextAndKernel)
     EXPECT_FALSE(info.name.empty());
     EXPECT_GT(info.total_memory, 0u);
     EXPECT_THROW(gpu::Context(-1), std::invalid_argument);
-    EXPECT_THROW(gpu::Context(gpu::device_count()), std::invalid_argument);
+    EXPECT_THROW(gpu::Context{gpu::device_count()}, std::invalid_argument);
     gpu::Workspace workspace(2, *context);
     EXPECT_THROW(gpu::Backend(*context, workspace, true, static_cast<gpu::DenseKernel>(-1)), std::invalid_argument);
 }
 
 TEST_F(Cuda, OwnsUploadsAndDeviceSnapshotsAndSupportsDeviceOnlyReset)
 {
-    cg::Vector host({1, 2, 3}), downloaded(3);
-    gpu::Vector source(host.view(), *context), output(3, *context);
+    std::vector<double> host({1, 2, 3}), downloaded(3);
+    gpu::Vector source(host, *context), output(3, *context);
     host.data()[0] = 99;
     output.copy_from_device(source.view(), *context);
-    output.download(downloaded.view(), *context);
+    output.download(downloaded, *context);
     EXPECT_DOUBLE_EQ(downloaded.data()[0], 1);
     output.fill(-2, *context);
-    output.download(downloaded.view(), *context);
+    output.download(downloaded, *context);
     EXPECT_DOUBLE_EQ(downloaded.data()[2], -2);
     output.copy_from_device(source.view(), *context);
-    output.download(downloaded.view(), *context);
+    output.download(downloaded, *context);
     EXPECT_DOUBLE_EQ(downloaded.data()[2], 3);
     gpu::Vector moved(std::move(output));
     EXPECT_EQ(output.size(), 0u);
+    EXPECT_EQ(output.data(), nullptr);
+    EXPECT_EQ(output.device(), -1);
     EXPECT_EQ(moved.size(), 3u);
+    EXPECT_EQ(moved.device(), context->device());
+    auto &same = moved;
+    moved = std::move(same);
+    EXPECT_EQ(moved.size(), 3u);
+    output = std::move(moved);
+    EXPECT_EQ(moved.size(), 0u);
+    EXPECT_EQ(moved.device(), -1);
+    output.download(downloaded, *context);
+    EXPECT_DOUBLE_EQ(downloaded[2], 3);
     EXPECT_THROW(source.copy_from_device({source.data() + 1, 3, 0}, *context), std::invalid_argument);
     gpu::Vector empty(0, *context);
     EXPECT_NO_THROW(empty.fill(0, *context));
@@ -140,36 +148,38 @@ TEST_F(Cuda, DenseProductsHandlePaddingOddTailsAndBothResidualSigns)
 {
     const std::vector<double> storage{4, 1, 0, NAN, 1, 5, -1, NAN, 0, -1, 3, NAN};
     const gpu::DenseMatrix A(cg::DenseMatrixView(storage.data(), 3, 3, 4), *context);
-    const cg::Vector host_p({2, -1, 3}), host_b({8, -2, 11});
-    gpu::Vector p(host_p.view(), *context), b(host_b.view(), *context), output(3, *context);
-    cg::Vector host_output(3);
+    const std::vector<double> host_p({2, -1, 3}), host_b({8, -2, 11});
+    gpu::Vector p(host_p, *context), b(host_b, *context), output(3, *context);
+    std::vector<double> host_output(3);
     gpu::Workspace workspace(3, *context);
     for (const auto kernel : {gpu::DenseKernel::native, gpu::DenseKernel::cublas})
     {
+        gpu::Workspace selected_workspace(workspace.size(), *context, kernel);
+
         for (const bool fused : {false, true})
         {
-            const gpu::Backend backend(*context, workspace, fused, kernel);
+            const gpu::Backend backend(*context, selected_workspace, fused, kernel);
             output.fill(NAN, *context);
             EXPECT_DOUBLE_EQ(backend.apply_dot(A.view(), p.view(), output.view()), 50);
-            output.download(host_output.view(), *context);
+            output.download(host_output, *context);
             EXPECT_DOUBLE_EQ(host_output.data()[0], 7);
             EXPECT_DOUBLE_EQ(host_output.data()[1], -6);
             EXPECT_DOUBLE_EQ(backend.residual(A.view(), b.view(), p.view(), output.view()), 18);
-            output.download(host_output.view(), *context);
+            output.download(host_output, *context);
             EXPECT_DOUBLE_EQ(host_output.data()[1], 4);
             EXPECT_DOUBLE_EQ(backend.residual(A.view(), b.view(), p.view(), output.view(), false), 18);
-            output.download(host_output.view(), *context);
+            output.download(host_output, *context);
             EXPECT_DOUBLE_EQ(host_output.data()[1], -4);
         }
     }
-    const cg::Vector raw_host({4, 1, 1, 3}), two_host({1, 2});
-    gpu::Vector raw(raw_host.view(), *context), two(two_host.view(), *context), out(2, *context);
+    const std::vector<double> raw_host({4, 1, 1, 3}), two_host({1, 2});
+    gpu::Vector raw(raw_host, *context), two(two_host, *context), out(2, *context);
     const gpu::DenseMatrix snapshot({raw.data(), 2, 2, 2, 0}, *context);
     raw.fill(99, *context);
     const gpu::Backend backend(*context, workspace);
     backend.apply(snapshot.view(), two.view(), out.view());
-    cg::Vector downloaded(2);
-    out.download(downloaded.view(), *context);
+    std::vector<double> downloaded(2);
+    out.download(downloaded, *context);
     EXPECT_DOUBLE_EQ(downloaded.data()[0], 6);
     EXPECT_DOUBLE_EQ(downloaded.data()[1], 7);
 }
@@ -178,20 +188,22 @@ TEST_F(Cuda, RectangularAndEmptyProductsAvoidInvalidDeviceAccess)
 {
     const cg::DenseMatrix host(2, 3, {1, 2, 3, -1, 0, 1});
     const gpu::DenseMatrix A(host.view(), *context);
-    const cg::Vector hx({2, 3, 4}), hb({1, -2});
-    gpu::Vector x(hx.view(), *context), b(hb.view(), *context), out(2, *context);
-    cg::Vector result(2);
-    gpu::Workspace workspace(2, *context);
+    const std::vector<double> hx({2, 3, 4}), hb({1, -2});
+    gpu::Vector x(hx, *context), b(hb, *context), out(2, *context);
+    std::vector<double> result(2);
+
     for (const auto kernel : {gpu::DenseKernel::native, gpu::DenseKernel::cublas})
     {
-        const gpu::Backend backend(*context, workspace, true, kernel);
+        gpu::Workspace selected_workspace(2, *context, kernel);
+
+        const gpu::Backend backend(*context, selected_workspace, true, kernel);
         backend.apply(A.view(), x.view(), out.view());
-        out.download(result.view(), *context);
+        out.download(result, *context);
         EXPECT_DOUBLE_EQ(result.data()[0], 20);
         EXPECT_DOUBLE_EQ(result.data()[1], 2);
         const gpu::DenseMatrixView empty_columns{nullptr, 2, 0, 0, 0};
         backend.apply(empty_columns, {}, out.view());
-        out.download(result.view(), *context);
+        out.download(result, *context);
         EXPECT_DOUBLE_EQ(result.data()[0], 0);
         EXPECT_DOUBLE_EQ(backend.residual(empty_columns, b.view(), {}, out.view()), 5);
         EXPECT_NO_THROW(backend.apply({nullptr, 0, 3, 3, 0}, x.view(), {}));
@@ -203,8 +215,8 @@ TEST_F(Cuda, RejectsShapePointerDeviceWorkspaceAndStorageAliasing)
 {
     const cg::DenseMatrix host(2, 2, {2, 0, 0, 3});
     const gpu::DenseMatrix A(host.view(), *context);
-    const cg::Vector hb({1, 2});
-    gpu::Vector b(hb.view(), *context), x(2, *context);
+    const std::vector<double> hb({1, 2});
+    gpu::Vector b(hb, *context), x(2, *context);
     x.fill(0, *context);
     gpu::Workspace workspace(2, *context), wrong(3, *context);
     EXPECT_THROW(gpu::solve_into(A.view(), b.view(), b.view(), workspace, *context), std::invalid_argument);
@@ -227,6 +239,27 @@ TEST_F(Cuda, RejectsShapePointerDeviceWorkspaceAndStorageAliasing)
               cg::Status::converged);
 }
 
+TEST_F(Cuda, WorkspaceKernelSelectionIsPreparedBeforeSolving)
+{
+    const cg::DenseMatrix host(2, 2, {2, 0, 0, 3});
+    const gpu::DenseMatrix A(host.view(), *context);
+    const std::vector<double> rhs{1, 2};
+    gpu::Vector b(rhs, *context), x(2, *context);
+    gpu::Workspace native(2, *context), blas(2, *context, gpu::DenseKernel::cublas);
+    EXPECT_EQ(native.dense_kernel(), gpu::DenseKernel::native);
+    EXPECT_EQ(blas.dense_kernel(), gpu::DenseKernel::cublas);
+    EXPECT_THROW(gpu::Workspace(2, *context, static_cast<gpu::DenseKernel>(-1)), std::invalid_argument);
+    EXPECT_THROW(gpu::solve_into(A.view(), b.view(), x.view(), native, *context, {}, true, gpu::DenseKernel::cublas),
+                 std::invalid_argument);
+    EXPECT_THROW(gpu::solve_into(A.view(), b.view(), x.view(), blas, *context), std::invalid_argument);
+    // Rejected calls release the workspace; a subsequent correct solve is safe.
+    x.fill(0, *context);
+    EXPECT_EQ(gpu::solve_into(A.view(), b.view(), x.view(), native, *context).status, cg::Status::converged);
+    x.fill(0, *context);
+    EXPECT_EQ(gpu::solve_into(A.view(), b.view(), x.view(), blas, *context, {}, true, gpu::DenseKernel::cublas).status,
+              cg::Status::converged);
+}
+
 TEST_F(Cuda, DenseCgAndPcgVerifyTrueResidualAcrossKernelsFusionAndRefresh)
 {
     for (const std::size_t size : {17u, 257u})
@@ -234,12 +267,14 @@ TEST_F(Cuda, DenseCgAndPcgVerifyTrueResidualAcrossKernelsFusionAndRefresh)
         const auto host = system_matrix(size);
         const gpu::DenseMatrix A(host.view(), *context);
         const gpu::JacobiPreconditioner M(A.view(), *context);
-        const cg::Vector hb(std::vector<double>(size, 1)), initial(std::vector<double>(size, 0.125));
-        gpu::Vector b(hb.view(), *context), x(initial.view(), *context);
-        gpu::Workspace workspace(size, *context);
-        const auto *allocation = workspace.residual().data;
+        const std::vector<double> hb(size, 1), initial(size, 0.125);
+        gpu::Vector b(hb, *context), x(initial, *context);
+
         for (const auto kernel : {gpu::DenseKernel::native, gpu::DenseKernel::cublas})
         {
+            gpu::Workspace selected_workspace(size, *context, kernel);
+            const auto *allocation = selected_workspace.residual().data;
+
             for (const bool fused : {false, true})
             {
                 for (const auto algorithm : {cg::Algorithm::explicit_residual, cg::Algorithm::recurrence})
@@ -250,22 +285,23 @@ TEST_F(Cuda, DenseCgAndPcgVerifyTrueResidualAcrossKernelsFusionAndRefresh)
                         {
                             continue;
                         }
-                        x.upload(initial.view(), *context);
+                        x.upload(initial, *context);
                         cg::CgOptions options;
                         options.algorithm = algorithm;
                         options.rtol = 1e-9;
                         options.maxiter = 300;
                         options.residual_refresh = 7;
-                        const auto info = gpu::solve_into(A.view(), b.view(), x.view(), workspace, *context, options,
-                                                          fused, kernel, preconditioned ? &M : nullptr);
+                        const auto info = gpu::solve_into(A.view(), b.view(), x.view(), selected_workspace, *context,
+                                                          options, fused, kernel, preconditioned ? &M : nullptr);
                         ASSERT_EQ(info.status, cg::Status::converged);
-                        cg::Vector result(size);
-                        x.download(result.view(), *context);
-                        EXPECT_LE(true_norm(host.view(), hb.view(), result.view()),
+                        std::vector<double> result(size);
+                        x.download(result, *context);
+                        EXPECT_LE(true_norm(host.view(), hb, result),
                                   options.rtol * std::sqrt(static_cast<double>(size)));
-                        EXPECT_EQ(workspace.residual().data, allocation);
-                        const auto repeated = gpu::solve_into(A.view(), b.view(), x.view(), workspace, *context,
-                                                              options, fused, kernel, preconditioned ? &M : nullptr);
+                        EXPECT_EQ(selected_workspace.residual().data, allocation);
+                        const auto repeated =
+                            gpu::solve_into(A.view(), b.view(), x.view(), selected_workspace, *context, options, fused,
+                                            kernel, preconditioned ? &M : nullptr);
                         EXPECT_EQ(repeated.iterations, 0u);
                         EXPECT_EQ(repeated.matvecs, 1u);
                     }
@@ -280,8 +316,8 @@ TEST_F(Cuda, CsrCgAndPcgMatchDenseAndRejectCublas)
     const auto host = system_matrix(33);
     const gpu::CsrMatrix A(as_csr(host.view()), *context);
     const gpu::JacobiPreconditioner M(A, *context);
-    const cg::Vector hb(std::vector<double>(33, 1));
-    gpu::Vector b(hb.view(), *context), x(33, *context);
+    const std::vector<double> hb(33, 1);
+    gpu::Vector b(hb, *context), x(33, *context);
     gpu::Workspace workspace(33, *context);
     for (const bool fused : {false, true})
     {
@@ -301,22 +337,23 @@ TEST_F(Cuda, CsrCgAndPcgMatchDenseAndRejectCublas)
                 const auto info = gpu::solve_into(A, b.view(), x.view(), workspace, *context, options, fused,
                                                   gpu::DenseKernel::native, preconditioned ? &M : nullptr);
                 ASSERT_EQ(info.status, cg::Status::converged);
-                cg::Vector result(33);
-                x.download(result.view(), *context);
-                EXPECT_LE(true_norm(host.view(), hb.view(), result.view()), options.rtol * std::sqrt(33.0));
+                std::vector<double> result(33);
+                x.download(result, *context);
+                EXPECT_LE(true_norm(host.view(), hb, result), options.rtol * std::sqrt(33.0));
             }
         }
     }
     EXPECT_THROW(gpu::solve_into(A, b.view(), x.view(), workspace, *context, {}, true, gpu::DenseKernel::cublas),
                  std::invalid_argument);
-    const gpu::Backend backend(*context, workspace, true, gpu::DenseKernel::cublas);
+    gpu::Workspace cublas_workspace(33, *context, gpu::DenseKernel::cublas);
+    const gpu::Backend backend(*context, cublas_workspace, true, gpu::DenseKernel::cublas);
     EXPECT_THROW(backend.apply(A, b.view(), x.view()), std::invalid_argument);
 }
 
 TEST_F(Cuda, CsrDeviceSnapshotsValidateCanonicalInt32AndInt64Indices)
 {
-    const cg::Vector values({2, 3}), hb({1, 1});
-    gpu::Vector data(values.view(), *context), b(hb.view(), *context), x(2, *context);
+    const std::vector<double> values({2, 3}), hb({1, 1});
+    gpu::Vector data(values, *context), b(hb, *context), x(2, *context);
     DeviceIndices<std::int32_t> ptr32({0, 1, 2}), idx32({0, 1}), bad32({0, 0});
     DeviceIndices<std::int64_t> ptr64({0, 1, 2}), idx64({0, 1});
     const gpu::CsrMatrixView views[] = {{ptr32.data, idx32.data, data.data(), 2, 2, 2, gpu::IndexType::int32, 0},
@@ -329,14 +366,25 @@ TEST_F(Cuda, CsrDeviceSnapshotsValidateCanonicalInt32AndInt64Indices)
         cg::CgOptions options;
         options.algorithm = cg::Algorithm::recurrence;
         ASSERT_EQ(gpu::solve_into(A, b.view(), x.view(), workspace, *context, options).status, cg::Status::converged);
-        cg::Vector result(2);
-        x.download(result.view(), *context);
+        std::vector<double> result(2);
+        x.download(result, *context);
         EXPECT_NEAR(result.data()[0], 0.5, 1e-14);
         EXPECT_NEAR(result.data()[1], 1.0 / 3.0, 1e-14);
     }
     DeviceIndices<std::int32_t> duplicate_ptr({0, 2, 2});
     const gpu::CsrMatrixView bad{duplicate_ptr.data, bad32.data, data.data(), 2, 2, 2, gpu::IndexType::int32, 0};
     EXPECT_THROW(gpu::CsrMatrix(bad, *context), std::invalid_argument);
+    DeviceIndices<std::int32_t> negative32({0, -1}), out_of_range32({0, 2});
+    DeviceIndices<std::int64_t> negative64({0, -1});
+    const gpu::CsrMatrixView invalid[] = {
+        {ptr32.data, negative32.data, data.data(), 2, 2, 2, gpu::IndexType::int32, 0},
+        {ptr64.data, negative64.data, data.data(), 2, 2, 2, gpu::IndexType::int64, 0},
+        {ptr32.data, out_of_range32.data, data.data(), 2, 2, 2, gpu::IndexType::int32, 0},
+    };
+    for (const auto view : invalid)
+    {
+        EXPECT_THROW(gpu::CsrMatrix(view, *context), std::invalid_argument);
+    }
 }
 
 TEST_F(Cuda, JacobiRejectsInvalidMissingAndUnrepresentableDiagonals)
@@ -359,31 +407,35 @@ TEST_F(Cuda, StableNormAndRangeFailuresNeverClaimFalseConvergence)
 {
     const cg::DenseMatrix host(2, 2, {1, 0, 0, 1});
     const gpu::DenseMatrix A(host.view(), *context);
-    gpu::Workspace workspace(2, *context);
+
     for (const auto kernel : {gpu::DenseKernel::native, gpu::DenseKernel::cublas})
     {
+        gpu::Workspace selected_workspace(2, *context, kernel);
+
         for (const auto algorithm : {cg::Algorithm::explicit_residual, cg::Algorithm::recurrence})
         {
             for (const double magnitude : {1e-200, 1e-160, 1e200})
             {
-                const cg::Vector hb({magnitude, -magnitude});
-                gpu::Vector b(hb.view(), *context), x(2, *context);
+                const std::vector<double> hb({magnitude, -magnitude});
+                gpu::Vector b(hb, *context), x(2, *context);
                 x.fill(0, *context);
                 cg::CgOptions options;
                 options.algorithm = algorithm;
                 const auto info =
-                    gpu::solve_into(A.view(), b.view(), x.view(), workspace, *context, options, true, kernel);
+                    gpu::solve_into(A.view(), b.view(), x.view(), selected_workspace, *context, options, true, kernel);
                 EXPECT_EQ(info.status, cg::Status::non_finite);
                 EXPECT_EQ(info.iterations, 0u);
                 EXPECT_NEAR(info.residual_norm, std::hypot(magnitude, magnitude), magnitude * 1e-14);
                 options.maxiter = 0;
                 EXPECT_EQ(
-                    gpu::solve_into(A.view(), b.view(), x.view(), workspace, *context, options, true, kernel).status,
+                    gpu::solve_into(A.view(), b.view(), x.view(), selected_workspace, *context, options, true, kernel)
+                        .status,
                     cg::Status::max_iterations);
                 if (magnitude == 1e-200)
                 {
                     options.atol = 1e-199;
-                    EXPECT_EQ(gpu::solve_into(A.view(), b.view(), x.view(), workspace, *context, options, true, kernel)
+                    EXPECT_EQ(gpu::solve_into(A.view(), b.view(), x.view(), selected_workspace, *context, options, true,
+                                              kernel)
                                   .status,
                               cg::Status::converged);
                 }
@@ -394,24 +446,28 @@ TEST_F(Cuda, StableNormAndRangeFailuresNeverClaimFalseConvergence)
 
 TEST_F(Cuda, NonfiniteProductsAndNegativeCurvatureReportNumericalStatuses)
 {
-    const cg::Vector hb({1, 2});
-    gpu::Vector b(hb.view(), *context), x(2, *context);
-    gpu::Workspace workspace(2, *context);
+    const std::vector<double> hb({1, 2});
+    gpu::Vector b(hb, *context), x(2, *context);
+
     for (const auto kernel : {gpu::DenseKernel::native, gpu::DenseKernel::cublas})
     {
+        gpu::Workspace selected_workspace(2, *context, kernel);
+
         for (const auto algorithm : {cg::Algorithm::explicit_residual, cg::Algorithm::recurrence})
         {
             cg::CgOptions options;
             options.algorithm = algorithm;
             const gpu::DenseMatrix negative(cg::DenseMatrix(2, 2, {-1, 0, 0, -1}).view(), *context);
             x.fill(0, *context);
-            EXPECT_EQ(
-                gpu::solve_into(negative.view(), b.view(), x.view(), workspace, *context, options, true, kernel).status,
-                cg::Status::non_positive_curvature);
+            EXPECT_EQ(gpu::solve_into(negative.view(), b.view(), x.view(), selected_workspace, *context, options, true,
+                                      kernel)
+                          .status,
+                      cg::Status::non_positive_curvature);
             const gpu::DenseMatrix invalid(cg::DenseMatrix(2, 2, {1, INFINITY, 0, 1}).view(), *context);
             x.fill(0, *context);
             EXPECT_EQ(
-                gpu::solve_into(invalid.view(), b.view(), x.view(), workspace, *context, options, true, kernel).status,
+                gpu::solve_into(invalid.view(), b.view(), x.view(), selected_workspace, *context, options, true, kernel)
+                    .status,
                 cg::Status::non_finite);
         }
     }
@@ -425,8 +481,8 @@ TEST_F(Cuda, NondefaultStreamIsBorrowedAndWorkspacesCannotCrossStreams)
         const gpu::Context selected(0, reinterpret_cast<std::uintptr_t>(stream));
         const auto host = system_matrix(17);
         const gpu::DenseMatrix A(host.view(), selected);
-        const cg::Vector hb(std::vector<double>(17, 1));
-        gpu::Vector b(hb.view(), selected), x(17, selected);
+        const std::vector<double> hb(17, 1);
+        gpu::Vector b(hb, selected), x(17, selected);
         x.fill(0, selected);
         gpu::Workspace workspace(17, selected);
         EXPECT_EQ(workspace.stream(), reinterpret_cast<std::uintptr_t>(stream));
@@ -457,17 +513,17 @@ TEST_F(Cuda, ImmutableMatrixSupportsConcurrentSolvesOnIndependentStreams)
         cg::Status status = cg::Status::max_iterations;
         {
             const gpu::Context selected(0, reinterpret_cast<std::uintptr_t>(stream));
-            const cg::Vector hb(std::vector<double>(33, rhs));
-            gpu::Vector b(hb.view(), selected), x(33, selected);
+            const std::vector<double> hb(33, rhs);
+            gpu::Vector b(hb, selected), x(33, selected);
             x.fill(0, selected);
             gpu::Workspace workspace(33, selected);
             cg::CgOptions options;
             options.algorithm = cg::Algorithm::recurrence;
             options.rtol = 1e-9;
             status = gpu::solve_into(A.view(), b.view(), x.view(), workspace, selected, options).status;
-            cg::Vector downloaded(33);
-            x.download(downloaded.view(), selected);
-            residual = true_norm(host.view(), hb.view(), downloaded.view());
+            std::vector<double> downloaded(33);
+            x.download(downloaded, selected);
+            residual = true_norm(host.view(), hb, downloaded);
         }
         (void)cudaStreamDestroy(stream);
         return std::make_pair(status, residual);

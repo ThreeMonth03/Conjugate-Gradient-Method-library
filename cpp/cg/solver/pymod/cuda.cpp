@@ -4,9 +4,8 @@
 #include <cg/python/module.hpp>
 #include <cg/cuda.hpp>
 
-#include <memory>
-
 #include <chrono>
+#include <memory>
 
 namespace cg
 {
@@ -30,7 +29,8 @@ gpu::DenseKernel kernel(const std::string &name)
 
 struct CudaWorkspace
 {
-    CudaWorkspace(std::size_t size, int device, std::uintptr_t stream) : context(device, stream), value(size, context)
+    CudaWorkspace(std::size_t size, int device, std::uintptr_t stream, const std::string &kernel_name)
+        : context(device, stream), value(size, context, kernel(kernel_name))
     {
     }
     gpu::Context context;
@@ -176,11 +176,14 @@ cg::SolveInfo solve(py::object matrix, py::object b, py::object x, CudaWorkspace
 void register_cuda_solver(py::module_ &m)
 {
     py::class_<CudaWorkspace>(m, "Workspace")
-        .def(py::init<std::size_t, int, std::uintptr_t>(), py::arg("size"), py::arg("device") = 0,
-             py::arg("stream") = 0)
+        .def(py::init<std::size_t, int, std::uintptr_t, const std::string &>(), py::arg("size"), py::arg("device") = 0,
+             py::arg("stream") = 0, py::arg("dense_kernel") = "native")
         .def_property_readonly("size", [](const CudaWorkspace &value) { return value.value.size(); })
         .def_property_readonly("device", [](const CudaWorkspace &value) { return value.context.device(); })
-        .def_property_readonly("stream", [](const CudaWorkspace &value) { return value.context.stream(); });
+        .def_property_readonly("stream", [](const CudaWorkspace &value) { return value.context.stream(); })
+        .def_property_readonly(
+            "dense_kernel", [](const CudaWorkspace &value)
+            { return value.value.dense_kernel() == gpu::DenseKernel::native ? "native" : "cublas"; });
     py::class_<PreparedCudaSolver>(m, "PreparedSolver")
         .def(py::init<py::object, int, std::uintptr_t, const std::string &, const std::string &>(), py::arg("matrix"),
              py::arg("device") = 0, py::arg("stream") = 0, py::arg("dense_kernel") = "native",

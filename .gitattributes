@@ -1,2 +1,0 @@
-# Keep raw measurements available while collapsing generated JSON in PR diffs.
-benchmarks/results/**/*.json linguist-generated=true

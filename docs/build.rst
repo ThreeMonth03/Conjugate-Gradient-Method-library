@@ -1,7 +1,7 @@
 Build, test and document
 ========================
 
-Run from the repository root with CPython 3.12.x and a C++17 compiler. Install the local test tools before using Make:
+Run from the repository root with CPython 3.12.x and a C++20 compiler. Install the local test tools before using Make:
 
 .. code-block:: bash
 

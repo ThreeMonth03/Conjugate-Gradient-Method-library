@@ -117,7 +117,8 @@ CUDA execution
 CUDA owns explicit device matrices/vectors and borrows a device stream. The
 shared solver engine invokes CUDA adapters; it preserves the same recurrence,
 true-residual policy and failure statuses. Device workspace owns vectors,
-reductions, pinned scalars and a cuBLAS handle on one device/stream.
+reductions and pinned scalars on one device/stream. Only a workspace prepared
+for the cuBLAS kernel also owns its handle and 4 MiB scratch allocation.
 
 Calls synchronize before returning and restore the caller's current device.
 CPU pointers are never treated as device pointers. External device arrays

@@ -53,11 +53,11 @@ void blas_apply(DenseMatrixView A, ConstVectorView x, VectorView output)
     }
     if (A.cols == 0)
     {
-        std::fill_n(output.data, output.size, 0.0);
+        std::fill_n(output.data(), output.size(), 0.0);
         return;
     }
     cblas_dgemv(CblasRowMajor, CblasNoTrans, static_cast<int>(A.rows), static_cast<int>(A.cols), 1.0, A.data,
-                static_cast<int>(A.row_stride), x.data, 1, 0.0, output.data, 1);
+                static_cast<int>(A.row_stride), x.data(), 1, 0.0, output.data(), 1);
 #else
     (void)A;
     (void)x;

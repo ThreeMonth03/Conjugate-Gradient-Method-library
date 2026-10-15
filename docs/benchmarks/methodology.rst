@@ -105,3 +105,74 @@ residuals/counts, revision, hardware, package versions, threads and the loaded
 native binary identity. Keep separate process runs separate. Replay verifies
 regenerated inputs and the saved schedule while recording the current
 environment; it does not promise identical elapsed times.
+
+Compare two builds
+------------------
+
+Build the baseline revision and current checkout separately with matching
+compiler, optimization and backend settings. Generate fresh artifacts for
+each build with the commands above, alternating their launch order across
+several process runs. Compare the new files using the staged package:
+
+.. code-block:: bash
+
+   PYTHONPATH=build/cpu-release/python .venv/bin/python scripts/compare_performance.py \
+       --baseline build/benchmarks/baseline-*.json \
+       --current build/benchmarks/current-*.json \
+       --output build/benchmarks/comparison.json
+
+Its bootstrap resamples artifact blocks and rounds within each block; few
+process runs provide limited evidence about process variance.
+
+The paired runner generates fresh fixtures directly from a suite. Each case
+starts two fresh interpreters and keeps them for that case's adjacent solves,
+so previous cases cannot change its allocator history. It needs neither
+previous JSON nor recorded iteration counts.
+
+When comparing native cores across a benchmark-harness change, stage the
+same Python harness and wrapper for both extensions. This isolates the core;
+it does not measure changes to the Python wrapper. The following example
+preserves each extension's real path for build metadata:
+
+.. code-block:: bash
+
+   .venv/bin/python - /absolute/baseline/build/cpu-release/python \
+       "$PWD/build/cpu-release/python" <<'PY'
+   import pathlib
+   import shutil
+   import sys
+
+   current = pathlib.Path(sys.argv[2])
+   for label, native in zip(("baseline", "current"), sys.argv[1:], strict=True):
+       stage = pathlib.Path("build/comparison") / label
+       for package in ("cgbench", "cgpy"):
+           shutil.copytree(current / package, stage / package, dirs_exist_ok=True,
+                           ignore=shutil.ignore_patterns("*.so", "*.pyd", "__pycache__"))
+       binary, = pathlib.Path(native).glob("cgpy/_core*.so")
+       link = stage / "cgpy" / binary.name
+       link.unlink(missing_ok=True)
+       link.symlink_to(binary.resolve())
+   PY
+
+.. code-block:: bash
+
+   PYTHONPATH=build/cpu-release/python .venv/bin/python scripts/run_paired_performance.py \
+       --baseline-pythonpath "$PWD/build/comparison/baseline" \
+       --current-pythonpath "$PWD/build/comparison/current" \
+       --suite cpu-csr-f64-v1 --scope prepared --implementations native \
+       --output build/benchmarks/paired-csr.json
+
+Both builds must match input hashes, solver options and numerical work, and
+pass the independent residual gate. The default protocol uses five warmup
+pairs and 50 alternating pairs, batching toward 10 ms per sample with a cap
+of 1000 solves. It checks the last solve's status and counts in each timed
+batch, with residual and input checks before and after sampling.
+The 95% interval resamples ten contiguous blocks of five pairs. These
+intervals are conditional on the two worker processes and do not establish
+variation across process launches or hosts. Per-case coverage is not adjusted
+for simultaneous comparisons.
+
+Both comparison scripts use a 5% material-regression budget: an interval
+entirely at or below 1.05 supports no material regression, one entirely above
+1.05 indicates regression, and an interval crossing 1.05 is inconclusive.
+Preserve both fresh-process and paired results when their conclusions differ.

@@ -128,14 +128,14 @@ The native source interface uses feature headers under `cpp/cg/` and the CMake `
 int main()
 {
     cg::DenseMatrix A(2, 2, {4.0, 1.0, 1.0, 3.0});
-    cg::Vector b(std::vector<double>{1.0, 2.0});
-    cg::Vector x(2);
+    std::vector<double> b{1.0, 2.0};
+    std::vector<double> x(2);
     cg::Workspace workspace(2);
     cg::CpuBackend backend(1, true);
     cg::CgOptions options;
     options.algorithm = cg::Algorithm::recurrence;
     cg::JacobiPreconditioner preconditioner(A.view());
-    auto info = cg::solve_into(A.view(), b.view(), x.view(), workspace,
+    auto info = cg::solve_into(A.view(), b, x, workspace,
                                backend, options, &preconditioner);
     return info.status == cg::Status::converged ? 0 : 1;
 }

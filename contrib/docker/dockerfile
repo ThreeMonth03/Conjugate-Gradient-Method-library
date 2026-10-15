@@ -20,7 +20,7 @@ RUN if [ "$CG_WITH_BENCHMARKS" = "1" ]; then \
         .venv/bin/python -m pip install -r requirements/benchmark.lock; \
     fi
 
-COPY CMakeLists.txt CMakePresets.json Makefile pyproject.toml README.md STYLE.md .clang-format .clang-tidy .python-version ./
+COPY CMakeLists.txt CMakePresets.json Makefile pyproject.toml README.md .clang-format .clang-tidy .python-version ./
 COPY cpp/ cpp/
 COPY cmake/ cmake/
 COPY python/ python/

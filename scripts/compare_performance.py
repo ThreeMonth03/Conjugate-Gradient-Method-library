@@ -13,7 +13,8 @@ import math
 import pathlib
 import random
 import statistics
-import sys
+
+from cgbench import json_io, validation
 
 
 @dataclasses.dataclass(frozen=True)
@@ -71,33 +72,20 @@ def _read_artifact(path: pathlib.Path) -> Artifact:
             if candidate in candidates:
                 raise ValueError(f"{path}: duplicate candidate {candidate}")
             candidates.add(candidate)
-            if (
-                result["status"] != "measured"
-                or result.get("solver_status") != "converged"
-            ):
+            if result["status"] != "measured":
+                raise ValueError(f"{path}: {name}/{candidate} is not measured")
+            try:
+                validation.validate_converged_result(result)
+            except ValueError as error:
                 raise ValueError(
-                    f"{path}: {name}/{candidate} is not measured/converged"
-                )
-            residual = result["true_residual_norm"]
-            threshold = result["residual_threshold"]
-            if (
-                not math.isfinite(residual)
-                or not math.isfinite(threshold)
-                or residual < 0
-                or threshold < 0
-                or residual > threshold * (1 + 64 * sys.float_info.epsilon)
-            ):
-                raise ValueError(f"{path}: {name} failed true-residual gate")
+                    f"{path}: {name}/{candidate}: {error}"
+                ) from error
             elapsed = result["round_elapsed_ns"]
             if len(elapsed) != rounds or any(
                 type(value) is not int or value <= 0 for value in elapsed
             ):
                 raise ValueError(f"{path}: {name} has invalid timing rounds")
             counts = result["iterations"], result["matvecs"]
-            if any(type(value) is not int or value < 0 for value in counts):
-                raise ValueError(
-                    f"{path}: {name} has invalid operation counts"
-                )
             digest = case["input_sha256"]
             if (
                 not isinstance(digest, str)
@@ -142,14 +130,6 @@ def _verify_comparable(artifacts: list[Artifact]) -> None:
                 )
 
 
-def _quantile(ordered: list[float], probability: float) -> float:
-    position = (len(ordered) - 1) * probability
-    lower = int(position)
-    upper = min(lower + 1, len(ordered) - 1)
-    fraction = position - lower
-    return ordered[lower] * (1 - fraction) + ordered[upper] * fraction
-
-
 def _resampled_median(
     blocks: list[tuple[float, ...]], rng: random.Random
 ) -> float:
@@ -172,8 +152,8 @@ def _bootstrap_interval(
         old = _resampled_median(baseline, rng)
         new = _resampled_median(current, rng)
         ratios.append(new / old)
-    ratios.sort()
-    return _quantile(ratios, 0.025), _quantile(ratios, 0.975)
+    quantiles = statistics.quantiles(ratios, n=40, method="inclusive")
+    return quantiles[0], quantiles[-1]
 
 
 def _summary(blocks: list[tuple[float, ...]]) -> dict:
@@ -316,11 +296,7 @@ def main(argv: list[str] | None = None) -> int:
         )
     except (OSError, ValueError, KeyError, TypeError) as error:
         parser.error(str(error))
-    options.output.parent.mkdir(parents=True, exist_ok=True)
-    options.output.write_text(
-        json.dumps(report, indent=2, sort_keys=True, allow_nan=False) + "\n",
-        encoding="utf8",
-    )
+    json_io.write_json(report, options.output)
     for case in report["cases"]:
         interval = case["ratio_ci95"]
         print(

@@ -12,8 +12,6 @@
       "binaryDir": "${sourceDir}/build/${presetName}",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_MAKE_PROGRAM": "${sourceDir}/.venv/bin/ninja",
-        "Python_EXECUTABLE": "${sourceDir}/.venv/bin/python",
         "CG_ENABLE_OPENMP": "OFF",
         "CG_ENABLE_BLAS": "OFF",
         "BUILD_TESTING": "ON",
@@ -23,7 +21,6 @@
     {
       "name": "cpu-debug",
       "inherits": "cpu-release",
-      "binaryDir": "${sourceDir}/build/${presetName}",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug"
       }
@@ -31,7 +28,6 @@
     {
       "name": "cpu-openmp",
       "inherits": "cpu-release",
-      "binaryDir": "${sourceDir}/build/${presetName}",
       "cacheVariables": {
         "CG_ENABLE_OPENMP": "ON"
       }
@@ -39,7 +35,6 @@
     {
       "name": "cpu-blas",
       "inherits": "cpu-release",
-      "binaryDir": "${sourceDir}/build/${presetName}",
       "cacheVariables": {
         "CG_ENABLE_BLAS": "ON"
       }
@@ -47,7 +42,6 @@
     {
       "name": "cpu-asan",
       "inherits": "cpu-debug",
-      "binaryDir": "${sourceDir}/build/${presetName}",
       "cacheVariables": {
         "CG_BUILD_PYTHON": "OFF",
         "CG_ENABLE_SANITIZERS": "ON"
@@ -56,86 +50,9 @@
     {
       "name": "cuda-release",
       "inherits": "cpu-release",
-      "binaryDir": "${sourceDir}/build/${presetName}",
       "cacheVariables": {
         "CG_ENABLE_CUDA": "ON",
-        "CUDAToolkit_ROOT": "${sourceDir}/.deps/cuda-12.8",
-        "CMAKE_CUDA_COMPILER": "${sourceDir}/.deps/cuda-12.8/bin/nvcc",
-        "CMAKE_CUDA_HOST_COMPILER": "/usr/bin/g++-13",
-        "CMAKE_CUDA_ARCHITECTURES": "75",
-        "CMAKE_CXX_COMPILER": "/usr/bin/g++-13",
-        "CMAKE_MAKE_PROGRAM": "${sourceDir}/.venv-cuda/bin/ninja",
-        "Python_EXECUTABLE": "${sourceDir}/.venv-cuda/bin/python"
-      }
-    }
-  ],
-  "buildPresets": [
-    {
-      "name": "cpu-release",
-      "configurePreset": "cpu-release"
-    },
-    {
-      "name": "cpu-debug",
-      "configurePreset": "cpu-debug"
-    },
-    {
-      "name": "cpu-openmp",
-      "configurePreset": "cpu-openmp"
-    },
-    {
-      "name": "cpu-blas",
-      "configurePreset": "cpu-blas"
-    },
-    {
-      "name": "cpu-asan",
-      "configurePreset": "cpu-asan"
-    },
-    {
-      "name": "cuda-release",
-      "configurePreset": "cuda-release"
-    }
-  ],
-  "testPresets": [
-    {
-      "name": "cpu-release",
-      "configurePreset": "cpu-release",
-      "output": {
-        "outputOnFailure": true
-      }
-    },
-    {
-      "name": "cpu-debug",
-      "configurePreset": "cpu-debug",
-      "output": {
-        "outputOnFailure": true
-      }
-    },
-    {
-      "name": "cpu-openmp",
-      "configurePreset": "cpu-openmp",
-      "output": {
-        "outputOnFailure": true
-      }
-    },
-    {
-      "name": "cpu-blas",
-      "configurePreset": "cpu-blas",
-      "output": {
-        "outputOnFailure": true
-      }
-    },
-    {
-      "name": "cpu-asan",
-      "configurePreset": "cpu-asan",
-      "output": {
-        "outputOnFailure": true
-      }
-    },
-    {
-      "name": "cuda-release",
-      "configurePreset": "cuda-release",
-      "output": {
-        "outputOnFailure": true
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/CGCudaToolchain.cmake"
       }
     }
   ]

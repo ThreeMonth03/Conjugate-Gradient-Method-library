@@ -100,6 +100,7 @@ def test_prepared_snapshot_and_workspace_reuse(gpu, system, kernel):
     x = plan.create_vector()
     workspace = plan.create_workspace()
     assert plan.dense_kernel == kernel
+    assert workspace.dense_kernel == kernel
     assert plan.preconditioner == "jacobi"
     assert plan.preconditioner_nbytes == rhs.nbytes
     assert plan.preconditioner_setup_ns > 0
@@ -112,6 +113,27 @@ def test_prepared_snapshot_and_workspace_reuse(gpu, system, kernel):
         assert (
             reused.converged and reused.iterations == 0 and reused.matvecs == 1
         )
+
+
+@pytest.mark.parametrize("kernel", ["native", "cublas"])
+def test_workspace_backend_mismatch_rejects_before_writes(gpu, system, kernel):
+    matrix, rhs, truth = system
+    plan = gpu.prepare_host(matrix, dense_kernel=kernel)
+    operator = gpu.DenseMatrix.from_host(matrix)
+    other = "cublas" if kernel == "native" else "native"
+    mismatched = gpu.Workspace(rhs.size, dense_kernel=other)
+    b, x = gpu.Vector.from_host(rhs), plan.create_vector()
+    with pytest.raises(ValueError, match="kernel"):
+        plan.solve_into(b, x, workspace=mismatched)
+    np.testing.assert_array_equal(x.to_host(), np.zeros_like(rhs))
+    with pytest.raises(ValueError, match="kernel"):
+        gpu.solve_into(
+            operator, b, x, workspace=mismatched, dense_kernel=kernel
+        )
+    np.testing.assert_array_equal(x.to_host(), np.zeros_like(rhs))
+    workspace = plan.create_workspace()
+    assert plan.solve_into(b, x, workspace=workspace, rtol=1e-10).converged
+    np.testing.assert_allclose(x.to_host(), truth, rtol=1e-7, atol=1e-8)
 
 
 def test_unsupported_modes_layouts_aliases_and_workspaces_reject_before_writes(

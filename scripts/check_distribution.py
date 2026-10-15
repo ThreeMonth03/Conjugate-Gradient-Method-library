@@ -50,8 +50,14 @@ def check_sdist(path):
         ".clang-tidy",
         "cmake/CGOpenBLAS.cmake",
         "cmake/NamespaceOpenBLAS.cmake",
+        "cmake/CGCuda.cmake",
+        "cmake/CGPython.cmake",
+        "cmake/CGCudaToolchain.cmake",
         "cpp/cg/backend/cpu/blas.cpp",
         "cpp/cg/backend/cuda/backend.cu",
+        "cpp/cg/backend/cuda/detail/reduction.cuh",
+        "cpp/cg/storage/cuda/allocation.cu",
+        "cpp/cg/storage/cuda/device_memory.hpp",
         "cpp/cg/storage/cuda/vector.cu",
         "cpp/cg/matrix/cuda/csr_matrix.cu",
         "cpp/cg/solver/cuda/conjugate_gradient.cu",
@@ -63,6 +69,7 @@ def check_sdist(path):
         "python/cgpy/cuda/__init__.py",
         "python/cgbench/cli.py",
         "docs/conf.py",
+        "docs/style.rst",
         "docs/_static/docs.css",
         "docs/benchmarks.rst",
         "docs/benchmarks/methodology.rst",
@@ -82,6 +89,10 @@ def check_sdist(path):
             f"sdist missing sources: {sorted(required - names)}"
         )
     retired = {
+        "STYLE.md",
+        "docs/refactor_validation.rst",
+        "cpp/cg/storage/vector.hpp",
+        "cpp/cg/storage/vector.cpp",
         "python/utils.py",
         "cpp/matrix/_matrix.cpp",
         "cpp/pybind/_pybind.cpp",
@@ -104,8 +115,8 @@ def main():
     parser.add_argument("--blas", choices=("OFF", "ON"), default="OFF")
     parser.add_argument("--cuda", choices=("OFF", "ON"), default="OFF")
     parser.add_argument("--cuda-root", type=pathlib.Path)
-    parser.add_argument("--cuda-host-compiler", default="/usr/bin/g++-13")
-    parser.add_argument("--cuda-architectures", default="75")
+    parser.add_argument("--cuda-host-compiler")
+    parser.add_argument("--cuda-architectures")
     parser.add_argument("--jobs", type=int, default=2)
     options = parser.parse_args()
     if options.jobs < 1:
@@ -153,17 +164,19 @@ def main():
             build_command.extend(
                 [
                     "--config-settings",
+                    "cmake.define.CMAKE_TOOLCHAIN_FILE=cmake/CGCudaToolchain.cmake",
+                    "--config-settings",
                     f"cmake.define.CUDAToolkit_ROOT={toolkit}",
-                    "--config-settings",
-                    f"cmake.define.CMAKE_CUDA_COMPILER={toolkit / 'bin/nvcc'}",
-                    "--config-settings",
-                    f"cmake.define.CMAKE_CUDA_HOST_COMPILER={options.cuda_host_compiler}",
-                    "--config-settings",
-                    f"cmake.define.CMAKE_CXX_COMPILER={options.cuda_host_compiler}",
-                    "--config-settings",
-                    f"cmake.define.CMAKE_CUDA_ARCHITECTURES={options.cuda_architectures}",
                 ]
             )
+            for name, value in (
+                ("CMAKE_CUDA_HOST_COMPILER", options.cuda_host_compiler),
+                ("CMAKE_CUDA_ARCHITECTURES", options.cuda_architectures),
+            ):
+                if value:
+                    build_command.extend(
+                        ["--config-settings", f"cmake.define.{name}={value}"]
+                    )
         build_command.append(str(moved_sdist))
         subprocess.run(
             build_command,

@@ -1,4 +1,3 @@
-#include <cg/matrix/validation.hpp>
 #include <cg/storage/validation.hpp>
 
 #include <cstdint>
@@ -33,29 +32,39 @@ std::uintptr_t end_address(const double *data, std::size_t size)
 }
 
 } // namespace
-void validate(ConstVectorView view)
+void validate_raw_vector(const double *data, std::size_t size)
 {
-    if (view.size != 0 && view.data == nullptr)
+    if (size != 0 && data == nullptr)
     {
         throw std::invalid_argument("nonempty vector has a null data pointer");
     }
-    if (view.size != 0 && reinterpret_cast<std::uintptr_t>(view.data) % alignof(double) != 0)
+    if (size != 0 && reinterpret_cast<std::uintptr_t>(data) % alignof(double) != 0)
     {
         throw std::invalid_argument("float64 storage must be aligned for double access");
     }
-    end_address(view.data, view.size);
+    end_address(data, size);
+}
+
+void validate(ConstVectorView view)
+{
+    validate_raw_vector(view.data(), view.size());
+}
+
+bool overlaps_raw(const double *a, std::size_t a_size, const double *b, std::size_t b_size)
+{
+    validate_raw_vector(a, a_size);
+    validate_raw_vector(b, b_size);
+    if (a_size == 0 || b_size == 0)
+    {
+        return false;
+    }
+    return reinterpret_cast<std::uintptr_t>(a) < end_address(b, b_size) &&
+           reinterpret_cast<std::uintptr_t>(b) < end_address(a, a_size);
 }
 
 bool overlaps(ConstVectorView a, ConstVectorView b)
 {
-    validate(a);
-    validate(b);
-    if (a.size == 0 || b.size == 0)
-    {
-        return false;
-    }
-    return reinterpret_cast<std::uintptr_t>(a.data) < end_address(b.data, b.size) &&
-           reinterpret_cast<std::uintptr_t>(b.data) < end_address(a.data, a.size);
+    return overlaps_raw(a.data(), a.size(), b.data(), b.size());
 }
 
 } // namespace detail

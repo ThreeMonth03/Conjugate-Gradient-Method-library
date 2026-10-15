@@ -37,11 +37,7 @@ struct BlasHandle
     BlasHandle &operator=(const BlasHandle &) = delete;
     ~BlasHandle()
     {
-        int previous = 0;
-        (void)cudaGetDevice(&previous);
-        (void)cudaSetDevice(device);
-        (void)cublasDestroy(value);
-        (void)cudaSetDevice(previous);
+        on_device_noexcept(device, [&] { (void)cublasDestroy(value); });
     }
     int device;
     cublasHandle_t value = nullptr;

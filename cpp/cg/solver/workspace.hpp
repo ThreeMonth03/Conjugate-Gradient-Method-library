@@ -1,6 +1,8 @@
 #pragma once
 
-#include <cg/storage/vector.hpp>
+#include <cg/storage/vector_view.hpp>
+
+#include <vector>
 
 namespace cg
 {
@@ -14,18 +16,18 @@ class Workspace
     void prepare(std::size_t size);
     std::size_t size() const noexcept { return m_r.size(); }
     std::size_t capacity() const noexcept { return m_r.capacity(); }
-    VectorView residual() noexcept { return m_r.view(); }
-    VectorView direction() noexcept { return m_p.view(); }
-    VectorView product() noexcept { return m_ap.view(); }
-    VectorView scratch() noexcept { return m_scratch.view(); }
-    VectorView preconditioned() noexcept { return m_z.view(); }
+    VectorView residual() noexcept { return m_r; }
+    VectorView direction() noexcept { return m_p; }
+    VectorView product() noexcept { return m_ap; }
+    VectorView scratch() noexcept { return m_scratch; }
+    VectorView preconditioned() noexcept { return m_z; }
 
     private:
-    Vector m_r;
-    Vector m_p;
-    Vector m_ap;
-    Vector m_scratch;
-    Vector m_z;
+    std::vector<double> m_r;
+    std::vector<double> m_p;
+    std::vector<double> m_ap;
+    std::vector<double> m_scratch;
+    std::vector<double> m_z;
 };
 
 } // namespace cg

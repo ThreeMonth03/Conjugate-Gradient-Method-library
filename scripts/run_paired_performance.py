@@ -1,4 +1,4 @@
-"""Measure paired CPU runs in persistent baseline/current worker processes.
+"""Measure paired CPU runs with fresh baseline/current workers for each case.
 
 Generate fixtures from cgbench suites and derive numerical work from both builds.
 Only execution inside each worker is timed; IPC is outside the interval.
@@ -183,10 +183,13 @@ def _verify_work(job: dict, response: dict, *, require_hash=False) -> None:
     if response["solver_status"] != "converged":
         raise ValueError(f"{job['case']['name']}: solve did not converge")
     if "eligible" in response:
+        from cgbench import validation
+
         if not response["eligible"]:
             raise ValueError(
                 f"{job['case']['name']}: true-residual gate failed"
             )
+        validation.validate_converged_result(response)
         if response["residual_threshold"] != job["residual_threshold"]:
             raise ValueError(
                 f"{job['case']['name']}: residual threshold differs"
@@ -245,11 +248,9 @@ def _interval(
 
 
 def _write_report(report: dict, path: pathlib.Path) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(report, indent=2, sort_keys=True, allow_nan=False) + "\n",
-        encoding="utf8",
-    )
+    from cgbench import json_io
+
+    json_io.write_json(report, path)
 
 
 def parser() -> argparse.ArgumentParser:
@@ -303,7 +304,8 @@ def main(argv: list[str] | None = None) -> int:
             "max_repetitions": options.max_repetitions,
             "order": "alternating baseline/current, current/baseline",
             "timing": "worker-local clock; includes adapter output reset",
-            "workers": "two persistent interpreters; one native CPU thread",
+            "workers": "two fresh interpreters per case; one native CPU thread",
+            "metadata": "per case, after preparation and final numerical verification",
             "bootstrap": "percentile resampling of contiguous paired blocks",
             "bootstrap_samples": options.bootstrap_samples,
             "bootstrap_blocks": options.rounds // options.block_length,
@@ -317,7 +319,7 @@ def main(argv: list[str] | None = None) -> int:
             "current": options.current_pythonpath,
         },
         "limitations": [
-            "Intervals are conditional on these two persistent worker processes.",
+            "Intervals are conditional on each case's two worker processes.",
             "Alternating adjacent pairs limits drift but does not remove all "
             "thermal, scheduler, cache or background-load effects.",
             "Finite blocks cover only short serial dependence; longer "
@@ -327,24 +329,32 @@ def main(argv: list[str] | None = None) -> int:
         "cases": [],
         "verdict": "running",
     }
-    with contextlib.ExitStack() as cleanup:
-        workers = {}
-        for variant, pythonpath in report["pythonpaths"].items():
-            workers[variant] = Worker(pythonpath)
-            cleanup.callback(workers[variant].close)
-        for index, job in enumerate(jobs):
+    for index, job in enumerate(jobs):
+        with contextlib.ExitStack() as cleanup:
+            workers = {}
+            for variant, pythonpath in report["pythonpaths"].items():
+                workers[variant] = Worker(pythonpath)
+                cleanup.callback(workers[variant].close)
             job, preparation = _prepare_job(workers, job)
+            metadata = {
+                variant: worker.request("metadata")
+                for variant, worker in workers.items()
+            }
             if not index:
-                report["metadata"] = {
-                    variant: worker.request("metadata")
-                    for variant, worker in workers.items()
-                }
-                hashes = {
-                    data["native"]["module_sha256"]
-                    for data in report["metadata"].values()
-                }
-                if len(hashes) != 2:
-                    raise ValueError("workers loaded the same native binary")
+                report["metadata"] = metadata
+            for variant in workers:
+                if (
+                    metadata[variant]["native"]["module_sha256"]
+                    != report["metadata"][variant]["native"]["module_sha256"]
+                ):
+                    raise ValueError(
+                        "native binary changed between paired cases"
+                    )
+            hashes = {
+                data["native"]["module_sha256"] for data in metadata.values()
+            }
+            if len(hashes) != 2:
+                raise ValueError("workers loaded the same native binary")
             warmups = [
                 _paired_round(workers, job, count, 1)
                 for count in range(options.warmups)
@@ -367,6 +377,18 @@ def main(argv: list[str] | None = None) -> int:
             for variant, worker in workers.items():
                 verification[variant] = worker.request("verify")
                 _verify_work(job, verification[variant], require_hash=True)
+            final_metadata = {
+                variant: worker.request("metadata")
+                for variant, worker in workers.items()
+            }
+            for variant in workers:
+                before = metadata[variant]["native"]["module_sha256"]
+                after = final_metadata[variant]["native"]["module_sha256"]
+                if before != after:
+                    raise ValueError(
+                        "native binary changed during paired measurement"
+                    )
+            report["final_metadata"] = final_metadata
             ratios = [
                 row["current_elapsed_ns"] / row["baseline_elapsed_ns"]
                 for row in rounds
@@ -404,6 +426,8 @@ def main(argv: list[str] | None = None) -> int:
                     "ratio_ci95": {"lower": lower, "upper": upper},
                     "preparation": preparation,
                     "verification": verification,
+                    "metadata": metadata,
+                    "final_metadata": final_metadata,
                     "verdict": verdict,
                 }
             )
@@ -414,19 +438,6 @@ def main(argv: list[str] | None = None) -> int:
                 f"95%=[{lower:.4f}, {upper:.4f}], {verdict}",
                 flush=True,
             )
-        report["final_metadata"] = {
-            variant: worker.request("metadata")
-            for variant, worker in workers.items()
-        }
-        for variant in workers:
-            before = report["metadata"][variant]["native"]["module_sha256"]
-            after = report["final_metadata"][variant]["native"][
-                "module_sha256"
-            ]
-            if before != after:
-                raise ValueError(
-                    "native binary changed during paired measurement"
-                )
     verdicts = {case["verdict"] for case in report["cases"]}
     report["verdict"] = (
         "regression"

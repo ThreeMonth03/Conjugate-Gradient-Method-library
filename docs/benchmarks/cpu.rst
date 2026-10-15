@@ -1,9 +1,90 @@
 CPU implementation results
 ==========================
 
-These historical measurements were made on 2026-10-15. The native dense
-kernel loses to BLAS-backed references on several larger cases; CSR has lower
-medians in the measured cases. Rankings apply to these inputs and environments.
+Measurements below cover a C++20 baseline comparison and historical
+implementation comparisons. The native dense kernel loses to BLAS-backed
+references on several larger cases. Rankings apply to the named inputs and
+environments.
+
+C++20 CPU comparison
+--------------------
+
+Measured on 2026-10-15 against baseline
+``abdba2421a06b6fcdef5cb4439c6dbc9c4eeb394``. This comparison covers the
+C++20 implementation delivered with this page, using an Apple M1 on
+macOS 26.6.2, CPython 3.12.9, NumPy 2.2.6 and SciPy 1.15.3.
+Both builds use AppleClang 21.0.0.21000334, Release ``-O3 -DNDEBUG``,
+one native thread, and no OpenMP, BLAS or CUDA. macOS affinity is not pinned.
+Source and loaded-binary hashes were checked before and after measurement.
+
+All 22 cases agree on input hashes, solver options and iteration/matvec
+counts, and pass the independent true-residual gate. The common
+:doc:`methodology` defines inputs, tolerances and timing boundaries.
+Fresh-process sampling uses four blocks per build in A-B-B-A-B-A-A-B order,
+with five warmups, 20 rounds and three solves per sample. The paired protocol
+uses identical Python harness/wrapper files for both native cores, a new
+worker pair per case, five warmup pairs and 50 alternating pairs, batching
+toward 10 ms. The CPU wrapper is unchanged by the C++20 update.
+Both intervals use 10,000 bootstrap resamples and a 5% regression budget.
+
+Fresh-process intervals support no material regression in 17 cases;
+5 remain inconclusive.
+All 22 paired intervals support no material regression; the largest upper
+bound is 1.0312. Paired intervals are conditional on two persistent workers
+per case. Neither protocol establishes performance on another host, with
+other backend settings or on a GPU. Ratios are current/baseline; the
+milliseconds below are fresh-process medians, and brackets are per-case
+95% intervals without simultaneous coverage adjustment.
+
+.. csv-table:: Dense prepared
+   :class: benchmark-results
+   :header: "Case / candidate","Iter/matvec","Baseline ms","C++20 ms","Fresh ratio (95%)","Paired ratio (95%)"
+
+   "dense-64","49/51","0.0810","0.0810","1.0001 [0.9760, 1.0107]","0.9962 [0.9931, 0.9974]"
+   "dense-256","67/70","1.5141","1.5131","0.9993 [0.9661, 1.0091]","1.0009 [0.9997, 1.0025]"
+   "dense-1024","70/73","25.3936","25.3741","0.9992 [0.9485, 1.0057]","1.0131 [1.0071, 1.0312]"
+   "dense-2048","70/73","100.0581","100.2743","1.0022 [0.9959, 1.0061]","1.0039 [1.0032, 1.0070]"
+
+.. csv-table:: Dense API
+   :class: benchmark-results
+   :header: "Case / candidate","Iter/matvec","Baseline ms","C++20 ms","Fresh ratio (95%)","Paired ratio (95%)"
+
+   "dense-64","49/51","0.0869","0.0878","1.0104 [0.9586, 1.1171]","0.9979 [0.9967, 0.9988]"
+   "dense-256","67/70","1.5194","1.5411","1.0143 [1.0014, 1.0666]","1.0017 [0.9993, 1.0071]"
+   "dense-1024","70/73","25.2638","25.4025","1.0055 [0.9937, 1.0744]","0.9896 [0.9877, 0.9929]"
+   "dense-2048","70/73","100.3082","100.5569","1.0025 [0.9982, 1.0066]","1.0074 [1.0045, 1.0132]"
+
+.. csv-table:: CSR prepared
+   :class: benchmark-results
+   :header: "Case / candidate","Iter/matvec","Baseline ms","C++20 ms","Fresh ratio (95%)","Paired ratio (95%)"
+
+   "poisson-8","26/28","0.0113","0.0115","1.0135 [0.9854, 1.0895]","1.0046 [1.0036, 1.0060]"
+   "poisson-32","129/133","0.5852","0.5780","0.9877 [0.9525, 1.0156]","0.9611 [0.9610, 0.9614]"
+   "poisson-64","290/297","4.9544","4.9965","1.0085 [1.0007, 1.0158]","1.0143 [1.0110, 1.0177]"
+   "poisson-128","395/404","26.0298","26.2076","1.0068 [1.0015, 1.0128]","0.9998 [0.9987, 1.0019]"
+
+.. csv-table:: Sparse CG/PCG API
+   :class: benchmark-results
+   :header: "Case / candidate","Iter/matvec","Baseline ms","C++20 ms","Fresh ratio (95%)","Paired ratio (95%)"
+
+   "scaled-poisson-2d-16 / CG","568/581","0.6132","0.6123","0.9984 [0.9896, 1.0041]","0.9985 [0.9975, 1.0026]"
+   "scaled-poisson-2d-16 / PCG","48/50","0.0729","0.0725","0.9946 [0.9773, 1.0027]","0.9920 [0.9858, 0.9954]"
+   "scaled-poisson-2d-32 / CG","1498/1529","6.7173","6.8584","1.0210 [0.9335, 1.0737]","1.0197 [1.0182, 1.0220]"
+   "scaled-poisson-2d-32 / PCG","115/119","0.6638","0.6514","0.9813 [0.9568, 1.0219]","0.9944 [0.9919, 0.9998]"
+   "scaled-poisson-3d-6 / CG","252/259","0.2764","0.2717","0.9829 [0.9621, 0.9969]","0.9954 [0.9930, 0.9994]"
+   "scaled-poisson-3d-6 / PCG","25/27","0.0421","0.0413","0.9814 [0.9608, 1.0007]","0.9861 [0.9827, 0.9873]"
+   "scaled-poisson-3d-10 / CG","444/454","2.1775","2.1611","0.9925 [0.9647, 1.0089]","0.9948 [0.9923, 0.9970]"
+   "scaled-poisson-3d-10 / PCG","37/39","0.2385","0.2385","1.0000 [0.9766, 1.0129]","0.9973 [0.9947, 0.9990]"
+   "poisson-2d-16-neutral / CG","50/52","0.0618","0.0611","0.9878 [0.9760, 0.9986]","1.0009 [0.9956, 1.0084]"
+   "poisson-2d-16-neutral / PCG","50/52","0.0758","0.0751","0.9906 [0.9759, 0.9976]","0.9853 [0.9834, 0.9871]"
+
+An earlier protocol kept the same workers across the entire CSR suite.
+Nine worker-pair runs gave grid 32/64 intervals of [1.0050, 1.0574] and
+[1.0053, 1.0560], both inconclusive. Between-case metadata and retained
+executors created different allocation histories. The revised protocol
+isolates cases and uses a common Python harness; those earlier samples
+remain separate and are not pooled with the table above. Neither protocol
+proves allocation or scheduling effects have been eliminated.
 
 Native dense and CSR
 --------------------

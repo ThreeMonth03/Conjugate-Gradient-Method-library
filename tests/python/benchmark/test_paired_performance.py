@@ -68,6 +68,7 @@ def test_numerical_or_input_mismatches_abort_before_accepting_samples(
         **expected,
         "solver_status": "converged",
         "eligible": True,
+        "true_residual_norm": 1e-9,
     }
     if mismatch == "hash":
         response["input_sha256"] = "b" * 64
@@ -249,6 +250,119 @@ def test_launcher_records_new_expected_work_without_comparison_files(
     assert case["ratio"] == pytest.approx(1.01)
     assert len(case["rounds"]) == 10
     assert result["metadata"] == result["final_metadata"]
+    assert case["metadata"] == case["final_metadata"] == result["metadata"]
+    assert "per case" in result["protocol"]["workers"]
+
+
+def test_each_case_uses_fresh_workers_and_checks_metadata_around_sampling(
+    tmp_path, monkeypatch
+):
+    workers = []
+
+    class TrackedWorker(ProtocolWorker):
+        def __init__(self, name):
+            super().__init__(name)
+            if len(workers) % 2 == 0:
+                assert all(worker.closed for worker in workers)
+            self.identity = len(workers)
+            self.operations = []
+            self.closed = False
+            workers.append(self)
+
+        def request(self, operation, **arguments):
+            assert not self.closed
+            self.operations.append(operation)
+            response = super().request(operation, **arguments)
+            if operation == "metadata":
+                response["worker_identity"] = self.identity
+            return response
+
+        def close(self):
+            self.closed = True
+
+    monkeypatch.setattr(run_paired_performance, "Worker", TrackedWorker)
+    assert (
+        run_paired_performance.main(
+            paired_arguments(
+                tmp_path,
+                "--suite",
+                "smoke-sparse-solvers",
+                "--rounds",
+                "10",
+                "--block-length",
+                "1",
+                "--bootstrap-samples",
+                "100",
+                "--warmups",
+                "1",
+                "--target-sample-ms",
+                "0.001",
+                "--max-repetitions",
+                "1",
+            )
+        )
+        == 0
+    )
+    report = json.loads((tmp_path / "paired.json").read_text())
+    assert len(report["cases"]) == 3
+    assert len(workers) == 6
+    for worker in workers:
+        assert worker.closed
+        assert worker.operations == [
+            "prepare",
+            "metadata",
+            *(["sample"] * 11),
+            "verify",
+            "metadata",
+        ]
+    for index, case in enumerate(report["cases"]):
+        assert case["metadata"] == case["final_metadata"]
+        assert case["metadata"]["baseline"]["worker_identity"] == 2 * index
+        assert case["metadata"]["current"]["worker_identity"] == 2 * index + 1
+    assert report["metadata"] == report["cases"][0]["metadata"]
+    assert report["final_metadata"] == report["cases"][-1]["final_metadata"]
+
+
+def test_fresh_workers_still_reject_binary_changes_between_cases(
+    tmp_path, monkeypatch
+):
+    workers = []
+
+    class RebuiltWorker(ProtocolWorker):
+        def __init__(self, name):
+            super().__init__(name)
+            self.case_index = len(workers) // 2
+            workers.append(self)
+
+        def request(self, operation, **arguments):
+            response = super().request(operation, **arguments)
+            if operation == "metadata":
+                response["native"]["module_sha256"] += str(self.case_index)
+            return response
+
+    monkeypatch.setattr(run_paired_performance, "Worker", RebuiltWorker)
+    with pytest.raises(
+        ValueError, match="binary changed between paired cases"
+    ):
+        run_paired_performance.main(
+            paired_arguments(
+                tmp_path,
+                "--suite",
+                "smoke-sparse-solvers",
+                "--rounds",
+                "10",
+                "--block-length",
+                "1",
+                "--bootstrap-samples",
+                "100",
+                "--warmups",
+                "1",
+                "--target-sample-ms",
+                "0.001",
+                "--max-repetitions",
+                "1",
+            )
+        )
 
 
 @pytest.mark.parametrize("mismatch", ["hash", "work", "gate", "threshold"])

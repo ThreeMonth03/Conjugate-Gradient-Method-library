@@ -3,7 +3,6 @@
 #include <cg/matrix/validation.hpp>
 
 #include <utility>
-#include <vector>
 
 namespace cg
 {

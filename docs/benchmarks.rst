@@ -23,8 +23,7 @@ correctness checks and sampling.
 
 The tables summarize measurements made on 2026-10-15 at the source revisions
 named on each page. They are historical results, not fresh measurements of
-the current checkout. :doc:`refactor_validation` separately records the CPU
-comparison made during the feature-layout refactor.
+the current checkout.
 
 Version control keeps the scripts and summary tables. New raw samples,
 input hashes and environment metadata go under ``build/``; CI publishes its

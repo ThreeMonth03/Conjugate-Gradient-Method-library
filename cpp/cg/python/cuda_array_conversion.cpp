@@ -1,29 +1,12 @@
 #include <pybind11/pybind11.h>
 
 #include <cg/python/cuda_array_conversion.hpp>
+#include <cg/backend/cuda/detail/event.hpp>
 
 namespace cg
 {
 namespace python
 {
-
-void check(cudaError_t error)
-{
-    if (error != cudaSuccess)
-    {
-        throw std::runtime_error(std::string("CUDA: ") + cudaGetErrorString(error));
-    }
-}
-
-DeviceScope::DeviceScope(int device)
-{
-    check(cudaGetDevice(&m_previous));
-    check(cudaSetDevice(device));
-}
-DeviceScope::~DeviceScope()
-{
-    (void)cudaSetDevice(m_previous);
-}
 
 DeviceArray device_array(py::object object, int ndim, const gpu::Context &context, bool writable, bool integer)
 {
@@ -125,19 +108,9 @@ DeviceArray device_array(py::object object, int ndim, const gpu::Context &contex
         const auto consumer = context.stream() == 0 ? std::uintptr_t{1} : context.stream();
         if (producer != consumer)
         {
-            cudaEvent_t ready = nullptr;
-            check(cudaEventCreateWithFlags(&ready, cudaEventDisableTiming));
-            try
-            {
-                check(cudaEventRecord(ready, reinterpret_cast<cudaStream_t>(producer)));
-                check(cudaStreamWaitEvent(reinterpret_cast<cudaStream_t>(context.stream()), ready));
-            }
-            catch (...)
-            {
-                cudaEventDestroy(ready);
-                throw;
-            }
-            check(cudaEventDestroy(ready));
+            const gpu::detail::Event ready(context.device());
+            ready.record(reinterpret_cast<cudaStream_t>(producer));
+            ready.wait(gpu::detail::stream(context));
         }
     }
     return {std::move(object), reinterpret_cast<void *>(address), shape, itemsize, context.device(), typestr};

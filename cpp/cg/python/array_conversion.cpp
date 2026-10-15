@@ -1,8 +1,8 @@
 #include <pybind11/pybind11.h>
 
 #include <cg/python/array_conversion.hpp>
+#include <cg/storage/validation.hpp>
 
-#include <cstdint>
 #include <stdexcept>
 
 namespace cg
@@ -20,10 +20,7 @@ void vector_array(const py::array &value, bool writable)
     {
         throw std::invalid_argument("Output array must be writable");
     }
-    if (value.size() != 0 && reinterpret_cast<std::uintptr_t>(value.data()) % alignof(double) != 0)
-    {
-        throw std::invalid_argument("Expected an aligned float64 array");
-    }
+    detail::validate_raw_vector(static_cast<const double *>(value.data()), static_cast<std::size_t>(value.size()));
 }
 
 cg::DenseMatrixView matrix_view(const py::array &value)

@@ -237,10 +237,11 @@ class TorchOps:
     def empty_vector(self):
         return self.torch.empty_like(self.initial)
 
+    def _diagonal(self):
+        return self.torch.from_numpy(self.original_matrix.diagonal().copy())
+
     def inverse_diagonal(self):
-        diagonal = self.torch.from_numpy(
-            self.original_matrix.diagonal().copy()
-        )
+        diagonal = self._diagonal()
         if not bool(self.torch.isfinite(diagonal).all()) or not bool(
             (diagonal > 0).all()
         ):
