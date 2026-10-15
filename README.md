@@ -1,6 +1,6 @@
 # Conjugate Gradient Method Library
 
-A C++17 library with Python bindings for solving real symmetric
+A C++20 library with Python bindings for solving real symmetric
 positive-definite systems using CG and Jacobi PCG.
 
 - Dense and canonical CSR matrices with float64 arithmetic.
@@ -14,7 +14,7 @@ positive-definite systems using CG and Jacobi PCG.
 
 ## Quick start
 
-Building from source requires **CPython 3.12.x** and a C++17 compiler.
+Building from source requires **CPython 3.12.x** and a C++20 compiler.
 Run from the repository root:
 
 ```bash
@@ -47,4 +47,4 @@ make test lint docs doctest
 
 See the [build guide](https://ThreeMonth03.github.io/Conjugate-Gradient-Method-library/build.html)
 for optional backends, sanitizer and distribution checks, and
-[STYLE.md](STYLE.md) for coding conventions.
+[coding conventions](https://ThreeMonth03.github.io/Conjugate-Gradient-Method-library/style.html) for coding conventions.

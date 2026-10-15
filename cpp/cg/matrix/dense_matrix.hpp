@@ -13,9 +13,10 @@ class DenseMatrix
     DenseMatrix(std::size_t rows, std::size_t cols);
     DenseMatrix(std::size_t rows, std::size_t cols, std::vector<double> values);
     DenseMatrix(const DenseMatrix &) = default;
-    DenseMatrix &operator=(const DenseMatrix &) = default;
+    DenseMatrix &operator=(const DenseMatrix &other);
     DenseMatrix(DenseMatrix &&other) noexcept;
     DenseMatrix &operator=(DenseMatrix &&other) noexcept;
+    void swap(DenseMatrix &other) noexcept;
     std::size_t rows() const noexcept { return m_rows; }
     std::size_t cols() const noexcept { return m_cols; }
     double *data() noexcept { return m_values.data(); }

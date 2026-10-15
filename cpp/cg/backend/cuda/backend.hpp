@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cg/backend/cuda/context.hpp>
+#include <cg/backend/cuda/dense_kernel.hpp>
 #include <cg/matrix/cuda/csr_matrix.hpp>
 #include <cg/matrix/cuda/dense_matrix_view.hpp>
 #include <cg/solver/cuda/workspace.hpp>
@@ -9,12 +10,6 @@ namespace cg
 {
 namespace cuda
 {
-
-enum class DenseKernel
-{
-    native,
-    cublas
-};
 
 // Execution adapter for the shared solver engine. Public solve_into validates
 // allocation/device attributes once; its kernels reuse the validated views.

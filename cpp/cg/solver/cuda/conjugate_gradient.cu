@@ -2,8 +2,7 @@
 #include <cg/preconditioner/cuda/jacobi.hpp>
 #include <cg/solver/cuda/conjugate_gradient.hpp>
 #include <cg/solver/detail/engine.hpp>
-
-#include <cmath>
+#include <cg/solver/detail/validation.hpp>
 
 namespace cg
 {
@@ -55,20 +54,9 @@ void validate_solve(const Matrix &A, ConstVectorView b, VectorView x, Workspace 
     {
         throw std::invalid_argument("CUDA workspace must match the system size, device and stream");
     }
-    if (!std::isfinite(options.rtol) || !std::isfinite(options.atol) || options.rtol < 0.0 || options.atol < 0.0)
-    {
-        throw std::invalid_argument("tolerances must be finite and nonnegative");
-    }
-    if (options.algorithm != Algorithm::explicit_residual && options.algorithm != Algorithm::recurrence)
-    {
-        throw std::invalid_argument("unsupported CG algorithm");
-    }
+    cg::detail::validate_options(options, M != nullptr);
     if (M != nullptr)
     {
-        if (options.algorithm != Algorithm::recurrence)
-        {
-            throw std::invalid_argument("Jacobi preconditioning requires recurrence CG");
-        }
         if (M->size() != rows(A) || M->device() != context.device())
         {
             throw std::invalid_argument("CUDA Jacobi dimension or device does not match");

@@ -5,7 +5,10 @@ namespace cg
 namespace cuda
 {
 
-Workspace::Workspace(std::size_t size, const Context &context) : m_impl(std::make_unique<Impl>(size, context)) {}
+Workspace::Workspace(std::size_t size, const Context &context, DenseKernel kernel)
+    : m_impl(std::make_unique<Impl>(size, context, kernel))
+{
+}
 Workspace::~Workspace() = default;
 std::size_t Workspace::size() const noexcept
 {
@@ -18,6 +21,10 @@ int Workspace::device() const noexcept
 std::uintptr_t Workspace::stream() const noexcept
 {
     return m_impl->context.stream();
+}
+DenseKernel Workspace::dense_kernel() const noexcept
+{
+    return m_impl->kernel;
 }
 VectorView Workspace::residual() noexcept
 {

@@ -79,14 +79,14 @@ JacobiPreconditioner::JacobiPreconditioner(const CsrMatrix &A) : m_inverse(csr_i
 
 void JacobiPreconditioner::apply(ConstVectorView r, VectorView z, const CpuBackend &backend) const
 {
-    validate_output(m_inverse.view(), z);
-    backend.multiply(m_inverse.view(), r, z);
+    validate_output(m_inverse, z);
+    backend.multiply(m_inverse, r, z);
 }
 
 double JacobiPreconditioner::apply_dot(ConstVectorView r, VectorView z, const CpuBackend &backend) const
 {
-    validate_output(m_inverse.view(), z);
-    return backend.multiply_dot(m_inverse.view(), r, z);
+    validate_output(m_inverse, z);
+    return backend.multiply_dot(m_inverse, r, z);
 }
 
 } // namespace cg

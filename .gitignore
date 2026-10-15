@@ -14,5 +14,4 @@ __pycache__/
 .ruff_cache/
 .coverage
 htmlcov/
-benchmark-results/
 CMakeUserPresets.json

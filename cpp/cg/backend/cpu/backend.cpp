@@ -16,7 +16,7 @@ void same_size(ConstVectorView x, ConstVectorView y)
 {
     detail::validate(x);
     detail::validate(y);
-    if (x.size != y.size)
+    if (x.size() != y.size())
     {
         throw std::invalid_argument("vector dimensions do not match");
     }
@@ -32,7 +32,7 @@ void no_overlap(ConstVectorView x, ConstVectorView y)
 
 void exact_or_disjoint(ConstVectorView input, ConstVectorView output)
 {
-    if (input.data != output.data)
+    if (input.data() != output.data())
     {
         no_overlap(input, output);
     }
@@ -43,7 +43,7 @@ void validate_apply(DenseMatrixView A, ConstVectorView x, VectorView output)
     detail::validate(A);
     detail::validate(x);
     detail::validate(output);
-    if (A.cols != x.size || A.rows != output.size)
+    if (A.cols != x.size() || A.rows != output.size())
     {
         throw std::invalid_argument("matrix-vector dimensions do not match");
     }
@@ -133,9 +133,9 @@ void CpuBackend::copy(ConstVectorView source, VectorView destination) const
 {
     same_size(source, destination);
     exact_or_disjoint(source, destination);
-    if (source.data != destination.data && source.size != 0)
+    if (source.data() != destination.data() && source.size() != 0)
     {
-        std::copy_n(source.data, source.size, destination.data);
+        std::copy_n(source.data(), source.size(), destination.data());
     }
 }
 
@@ -145,11 +145,11 @@ double CpuBackend::dot(ConstVectorView x, ConstVectorView y) const
     double sum = 0.0;
 #ifdef _OPENMP
 #pragma omp parallel for simd reduction(+ : sum) schedule(static)                                                      \
-    num_threads(m_threads) if (m_threads > 1 && x.size >= 16384)
+    num_threads(m_threads) if (m_threads > 1 && x.size() >= 16384)
 #endif
-    for (std::size_t i = 0; i < x.size; ++i)
+    for (std::size_t i = 0; i < x.size(); ++i)
     {
-        sum += x.data[i] * y.data[i];
+        sum += x.data()[i] * y.data()[i];
     }
     return sum;
 }
@@ -177,9 +177,9 @@ double norm_from_squared(ConstVectorView x, double squared_norm)
     // Scaling prevents both overflow and underflow in the norm evaluation.
     double scale = 0.0;
     double sum = 1.0;
-    for (std::size_t i = 0; i < x.size; ++i)
+    for (std::size_t i = 0; i < x.size(); ++i)
     {
-        const double magnitude = std::abs(x.data[i]);
+        const double magnitude = std::abs(x.data()[i]);
         if (!std::isfinite(magnitude))
         {
             return magnitude;
@@ -211,11 +211,11 @@ void CpuBackend::multiply(ConstVectorView x, ConstVectorView y, VectorView outpu
     exact_or_disjoint(x, output);
     exact_or_disjoint(y, output);
 #ifdef _OPENMP
-#pragma omp parallel for simd schedule(static) num_threads(m_threads) if (m_threads > 1 && x.size >= 16384)
+#pragma omp parallel for simd schedule(static) num_threads(m_threads) if (m_threads > 1 && x.size() >= 16384)
 #endif
-    for (std::size_t i = 0; i < x.size; ++i)
+    for (std::size_t i = 0; i < x.size(); ++i)
     {
-        output.data[i] = x.data[i] * y.data[i];
+        output.data()[i] = x.data()[i] * y.data()[i];
     }
 }
 
@@ -233,13 +233,13 @@ double CpuBackend::multiply_dot(ConstVectorView factors, ConstVectorView r, Vect
     double product = 0.0;
 #ifdef _OPENMP
 #pragma omp parallel for simd reduction(+ : product) schedule(static)                                                  \
-    num_threads(m_threads) if (m_threads > 1 && r.size >= 16384)
+    num_threads(m_threads) if (m_threads > 1 && r.size() >= 16384)
 #endif
-    for (std::size_t i = 0; i < r.size; ++i)
+    for (std::size_t i = 0; i < r.size(); ++i)
     {
-        const double value = factors.data[i] * r.data[i];
-        z.data[i] = value;
-        product += r.data[i] * value;
+        const double value = factors.data()[i] * r.data()[i];
+        z.data()[i] = value;
+        product += r.data()[i] * value;
     }
     return product;
 }
@@ -249,11 +249,11 @@ void CpuBackend::axpy(double alpha, ConstVectorView x, VectorView y) const
     same_size(x, y);
     exact_or_disjoint(x, y);
 #ifdef _OPENMP
-#pragma omp parallel for simd schedule(static) num_threads(m_threads) if (m_threads > 1 && x.size >= 16384)
+#pragma omp parallel for simd schedule(static) num_threads(m_threads) if (m_threads > 1 && x.size() >= 16384)
 #endif
-    for (std::size_t i = 0; i < x.size; ++i)
+    for (std::size_t i = 0; i < x.size(); ++i)
     {
-        y.data[i] += alpha * x.data[i];
+        y.data()[i] += alpha * x.data()[i];
     }
 }
 
@@ -264,11 +264,11 @@ void CpuBackend::axpby(double alpha, ConstVectorView x, double beta, ConstVector
     exact_or_disjoint(x, output);
     exact_or_disjoint(y, output);
 #ifdef _OPENMP
-#pragma omp parallel for simd schedule(static) num_threads(m_threads) if (m_threads > 1 && x.size >= 16384)
+#pragma omp parallel for simd schedule(static) num_threads(m_threads) if (m_threads > 1 && x.size() >= 16384)
 #endif
-    for (std::size_t i = 0; i < x.size; ++i)
+    for (std::size_t i = 0; i < x.size(); ++i)
     {
-        output.data[i] = alpha * x.data[i] + beta * y.data[i];
+        output.data()[i] = alpha * x.data()[i] + beta * y.data()[i];
     }
 }
 
@@ -282,9 +282,9 @@ void CpuBackend::apply(DenseMatrixView A, ConstVectorView x, VectorView output) 
     }
     if (A.cols == 0)
     {
-        if (output.size != 0)
+        if (output.size() != 0)
         {
-            std::fill_n(output.data, output.size, 0.0);
+            std::fill_n(output.data(), output.size(), 0.0);
         }
         return;
     }
@@ -294,7 +294,7 @@ void CpuBackend::apply(DenseMatrixView A, ConstVectorView x, VectorView output) 
     for (std::size_t i = 0; i < A.rows; ++i)
     {
         const auto *row = A.data + i * A.row_stride;
-        output.data[i] = row_dot(row, x.data, A.cols, m_fused);
+        output.data()[i] = row_dot(row, x.data(), A.cols, m_fused);
     }
 }
 
@@ -315,9 +315,9 @@ double CpuBackend::apply_dot(DenseMatrixView A, ConstVectorView p, VectorView ap
     for (std::size_t i = 0; i < A.rows; ++i)
     {
         const auto *row = A.data + i * A.row_stride;
-        const double sum = row_dot(row, p.data, A.cols, true);
-        ap.data[i] = sum;
-        product += p.data[i] * sum;
+        const double sum = row_dot(row, p.data(), A.cols, true);
+        ap.data()[i] = sum;
+        product += p.data()[i] * sum;
     }
     return product;
 }
@@ -337,10 +337,10 @@ double CpuBackend::residual(DenseMatrixView A, ConstVectorView b, ConstVectorVie
             return norm2(r);
         }
         double squared_norm = 0.0;
-        for (std::size_t i = 0; i < r.size; ++i)
+        for (std::size_t i = 0; i < r.size(); ++i)
         {
-            const double value = b_minus_ax ? b.data[i] - r.data[i] : r.data[i] - b.data[i];
-            r.data[i] = value;
+            const double value = b_minus_ax ? b.data()[i] - r.data()[i] : r.data()[i] - b.data()[i];
+            r.data()[i] = value;
             squared_norm += value * value;
         }
         return squared_norm;
@@ -364,9 +364,9 @@ double CpuBackend::residual(DenseMatrixView A, ConstVectorView b, ConstVectorVie
     for (std::size_t i = 0; i < A.rows; ++i)
     {
         const auto *row = A.data + i * A.row_stride;
-        const double sum = row_dot(row, x.data, A.cols, true);
-        const double value = b_minus_ax ? b.data[i] - sum : sum - b.data[i];
-        r.data[i] = value;
+        const double sum = row_dot(row, x.data(), A.cols, true);
+        const double value = b_minus_ax ? b.data()[i] - sum : sum - b.data()[i];
+        r.data()[i] = value;
         squared_norm += value * value;
     }
     return squared_norm;
@@ -392,13 +392,13 @@ double CpuBackend::update_x_r_norm2(VectorView x, VectorView r, ConstVectorView 
     double squared_norm = 0.0;
 #ifdef _OPENMP
 #pragma omp parallel for simd reduction(+ : squared_norm) schedule(static)                                             \
-    num_threads(m_threads) if (m_threads > 1 && x.size >= 16384)
+    num_threads(m_threads) if (m_threads > 1 && x.size() >= 16384)
 #endif
-    for (std::size_t i = 0; i < x.size; ++i)
+    for (std::size_t i = 0; i < x.size(); ++i)
     {
-        x.data[i] += alpha * p.data[i];
-        r.data[i] -= alpha * ap.data[i];
-        squared_norm += r.data[i] * r.data[i];
+        x.data()[i] += alpha * p.data()[i];
+        r.data()[i] -= alpha * ap.data()[i];
+        squared_norm += r.data()[i] * r.data()[i];
     }
     return squared_norm;
 }

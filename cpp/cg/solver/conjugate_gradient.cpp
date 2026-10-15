@@ -1,13 +1,11 @@
 #include <cg/matrix/validation.hpp>
 #include <cg/solver/conjugate_gradient.hpp>
 #include <cg/solver/detail/engine.hpp>
+#include <cg/solver/detail/validation.hpp>
 
 #include <cg/matrix/csr_matrix.hpp>
 #include <cg/preconditioner/jacobi.hpp>
 
-#include <algorithm>
-#include <cmath>
-#include <limits>
 #include <stdexcept>
 
 namespace cg
@@ -44,7 +42,7 @@ void validate_solve(const Matrix &A, ConstVectorView b, VectorView x, Workspace 
     validate_matrix(A);
     detail::validate(b);
     detail::validate(x);
-    if (rows(A) == 0 || rows(A) != cols(A) || b.size != rows(A) || x.size != rows(A))
+    if (rows(A) == 0 || rows(A) != cols(A) || b.size() != rows(A) || x.size() != rows(A))
     {
         throw std::invalid_argument("CG requires a nonempty square matrix and matching vectors");
     }
@@ -52,20 +50,9 @@ void validate_solve(const Matrix &A, ConstVectorView b, VectorView x, Workspace 
     {
         throw std::invalid_argument("prepare the workspace for the matrix dimension before solving");
     }
-    if (!std::isfinite(options.rtol) || !std::isfinite(options.atol) || options.rtol < 0.0 || options.atol < 0.0)
-    {
-        throw std::invalid_argument("tolerances must be finite and nonnegative");
-    }
-    if (options.algorithm != Algorithm::explicit_residual && options.algorithm != Algorithm::recurrence)
-    {
-        throw std::invalid_argument("unsupported CG algorithm");
-    }
+    detail::validate_options(options, M != nullptr);
     if (M != nullptr)
     {
-        if (options.algorithm != Algorithm::recurrence)
-        {
-            throw std::invalid_argument("Jacobi preconditioning requires recurrence CG");
-        }
         if (M->size() != rows(A))
         {
             throw std::invalid_argument("Jacobi preconditioner dimension does not match the matrix");

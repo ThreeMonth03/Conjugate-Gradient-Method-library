@@ -1,3 +1,4 @@
+#include <cg/matrix/csr_validation.hpp>
 #include <cg/matrix/cuda/csr_matrix.hpp>
 #include <cg/matrix/cuda/validation.hpp>
 #include <cg/storage/cuda/detail/allocation.hpp>
@@ -14,8 +15,9 @@ namespace cuda
 struct CsrMatrix::Impl
 {
     Impl(std::size_t r, std::size_t c, std::size_t n, const Context &context)
-        : rows(r), cols(c), nnz(n), device(context.device()), indptr(r + 1, context), indices(n, context),
-          values(n, context)
+        : rows(r), cols(c), nnz(n), device(context.device()),
+          indptr(detail::device_allocation<std::int64_t>(r + 1, context)),
+          indices(detail::device_allocation<std::int64_t>(n, context)), values(n, context)
     {
     }
     std::size_t rows, cols, nnz;
@@ -53,6 +55,10 @@ std::vector<std::size_t> download_indices(const void *source, std::size_t size, 
         {
             throw std::invalid_argument("CUDA CSR indices must be nonnegative");
         }
+        if (!std::in_range<std::size_t>(value))
+        {
+            throw std::invalid_argument("CUDA CSR indices exceed size_t range");
+        }
         result.push_back(static_cast<std::size_t>(value));
     }
     return result;
@@ -75,8 +81,8 @@ CsrMatrix::CsrMatrix(const cg::CsrMatrix &host, const Context &context)
     csr_dimensions(host.rows(), host.cols(), host.nnz());
     m_impl = std::make_unique<Impl>(host.rows(), host.cols(), host.nnz(), context);
     detail::DeviceGuard guard(context.device());
-    upload_indices(m_impl->indptr.data(), host.indptr(), context);
-    upload_indices(m_impl->indices.data(), host.indices(), context);
+    upload_indices(m_impl->indptr.get(), host.indptr(), context);
+    upload_indices(m_impl->indices.get(), host.indices(), context);
     m_impl->values.upload({host.values().data(), host.nnz()}, context);
 }
 CsrMatrix::CsrMatrix(CsrMatrixView source, const Context &context)
@@ -97,10 +103,10 @@ CsrMatrix::CsrMatrix(CsrMatrixView source, const Context &context)
     const auto columns = source.index_type == IndexType::int32
                              ? download_indices<std::int32_t>(source.indices, source.nnz, context)
                              : download_indices<std::int64_t>(source.indices, source.nnz, context);
-    const cg::CsrMatrix validated(source.rows, source.cols, rowptr, columns, std::vector<double>(source.nnz));
+    cg::detail::validate_csr_structure(source.rows, source.cols, rowptr, columns, source.nnz);
     m_impl = std::make_unique<Impl>(source.rows, source.cols, source.nnz, context);
-    upload_indices(m_impl->indptr.data(), validated.indptr(), context);
-    upload_indices(m_impl->indices.data(), validated.indices(), context);
+    upload_indices(m_impl->indptr.get(), rowptr, context);
+    upload_indices(m_impl->indices.get(), columns, context);
     m_impl->values.copy_from_device({source.data, source.nnz, source.device}, context);
 }
 CsrMatrix::~CsrMatrix() = default;
@@ -128,8 +134,8 @@ CsrMatrixView CsrMatrix::view() const noexcept
     {
         return {};
     }
-    return {m_impl->indptr.data(), m_impl->indices.data(), m_impl->values.data(), m_impl->rows, m_impl->cols,
-            m_impl->nnz,           IndexType::int64,       m_impl->device};
+    return {m_impl->indptr.get(), m_impl->indices.get(), m_impl->values.data(), m_impl->rows,
+            m_impl->cols,         m_impl->nnz,           IndexType::int64,      m_impl->device};
 }
 
 } // namespace cuda

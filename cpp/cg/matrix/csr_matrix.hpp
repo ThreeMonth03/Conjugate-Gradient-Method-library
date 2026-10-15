@@ -16,9 +16,10 @@ class CsrMatrix
     CsrMatrix(std::size_t rows, std::size_t cols, std::vector<std::size_t> indptr, std::vector<std::size_t> indices,
               std::vector<double> values);
     CsrMatrix(const CsrMatrix &) = default;
-    CsrMatrix &operator=(const CsrMatrix &) = default;
+    CsrMatrix &operator=(const CsrMatrix &other);
     CsrMatrix(CsrMatrix &&other) noexcept;
     CsrMatrix &operator=(CsrMatrix &&other) noexcept;
+    void swap(CsrMatrix &other) noexcept;
     std::size_t rows() const noexcept { return m_rows; }
     std::size_t cols() const noexcept { return m_cols; }
     std::size_t nnz() const noexcept { return m_values.size(); }

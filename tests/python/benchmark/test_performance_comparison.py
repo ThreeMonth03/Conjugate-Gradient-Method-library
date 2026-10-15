@@ -158,3 +158,14 @@ def test_cli_saves_the_report_and_fails_on_inconclusive_evidence(tmp_path):
     )
     assert code == 1
     assert json.loads(output.read_text())["verdict"] == "inconclusive"
+
+
+def test_bootstrap_keeps_the_original_inclusive_percentile_bounds():
+    interval = compare_performance._bootstrap_interval(
+        [(100.0, 105.0, 110.0), (98.0, 101.0, 108.0)],
+        [(102.0, 106.0, 112.0), (99.0, 107.0, 109.0)],
+        1000,
+        17,
+    )
+    # Recorded before replacing the manual inclusive interpolation helper.
+    assert interval == pytest.approx((0.9577464788732394, 1.0954773869346734))

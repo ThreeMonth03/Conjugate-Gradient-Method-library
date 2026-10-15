@@ -1,7 +1,6 @@
 #include <cg/matrix/dense_matrix.hpp>
 #include <cg/matrix/validation.hpp>
 
-#include <cstdint>
 #include <limits>
 #include <stdexcept>
 #include <utility>
@@ -33,6 +32,23 @@ DenseMatrix::DenseMatrix(DenseMatrix &&other) noexcept
     : m_rows(std::exchange(other.m_rows, 0)), m_cols(std::exchange(other.m_cols, 0)),
       m_values(std::move(other.m_values))
 {
+}
+
+DenseMatrix &DenseMatrix::operator=(const DenseMatrix &other)
+{
+    if (this != &other)
+    {
+        DenseMatrix copy(other);
+        swap(copy);
+    }
+    return *this;
+}
+
+void DenseMatrix::swap(DenseMatrix &other) noexcept
+{
+    std::swap(m_rows, other.m_rows);
+    std::swap(m_cols, other.m_cols);
+    m_values.swap(other.m_values);
 }
 
 DenseMatrix &DenseMatrix::operator=(DenseMatrix &&other) noexcept
@@ -71,13 +87,13 @@ void validate(DenseMatrixView view)
     {
         throw std::invalid_argument("matrix row stride is smaller than its columns");
     }
-    validate(ConstVectorView{view.data, matrix_span(view)});
+    validate_raw_vector(view.data, matrix_span(view));
 }
 
 bool overlaps(DenseMatrixView a, ConstVectorView b)
 {
     validate(a);
-    return overlaps(ConstVectorView{a.data, matrix_span(a)}, b);
+    return overlaps_raw(a.data, matrix_span(a), b.data(), b.size());
 }
 
 } // namespace detail

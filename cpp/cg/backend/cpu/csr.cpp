@@ -1,6 +1,5 @@
 #include <cg/backend/cpu/backend.hpp>
 #include <cg/matrix/csr_matrix.hpp>
-#include <cg/matrix/validation.hpp>
 #include <cg/storage/validation.hpp>
 
 #include <stdexcept>
@@ -10,11 +9,22 @@ namespace cg
 
 namespace
 {
+inline double row_dot(const std::size_t *indices, const double *values, const double *x, std::size_t begin,
+                      std::size_t end)
+{
+    double sum = 0.0;
+    for (std::size_t entry = begin; entry < end; ++entry)
+    {
+        sum += values[entry] * x[indices[entry]];
+    }
+    return sum;
+}
+
 void validate_apply(const CsrMatrix &A, ConstVectorView x, VectorView output)
 {
     detail::validate(x);
     detail::validate(output);
-    if (A.cols() != x.size || A.rows() != output.size)
+    if (A.cols() != x.size() || A.rows() != output.size())
     {
         throw std::invalid_argument("CSR matrix-vector dimensions do not match");
     }
@@ -40,12 +50,8 @@ void CpuBackend::apply(const CsrMatrix &A, ConstVectorView x, VectorView output)
 #endif
     for (std::size_t row = 0; row < A.rows(); ++row)
     {
-        double sum = 0.0;
-        for (std::size_t entry = indptr[row]; entry < indptr[row + 1]; ++entry)
-        {
-            sum += values[entry] * x.data[indices[entry]];
-        }
-        output.data[row] = sum;
+        const double sum = row_dot(indices, values, x.data(), indptr[row], indptr[row + 1]);
+        output.data()[row] = sum;
     }
 }
 
@@ -56,7 +62,7 @@ double CpuBackend::apply_dot(const CsrMatrix &A, ConstVectorView p, VectorView a
         throw std::invalid_argument("BLAS dense kernels do not support CSR matrices");
     }
     validate_apply(A, p, ap);
-    if (p.size != ap.size)
+    if (p.size() != ap.size())
     {
         throw std::invalid_argument("CSR apply_dot requires a square matrix");
     }
@@ -75,13 +81,9 @@ double CpuBackend::apply_dot(const CsrMatrix &A, ConstVectorView p, VectorView a
 #endif
     for (std::size_t row = 0; row < A.rows(); ++row)
     {
-        double sum = 0.0;
-        for (std::size_t entry = indptr[row]; entry < indptr[row + 1]; ++entry)
-        {
-            sum += values[entry] * p.data[indices[entry]];
-        }
-        ap.data[row] = sum;
-        product += p.data[row] * sum;
+        const double sum = row_dot(indices, values, p.data(), indptr[row], indptr[row + 1]);
+        ap.data()[row] = sum;
+        product += p.data()[row] * sum;
     }
     return product;
 }
@@ -95,7 +97,7 @@ double CpuBackend::residual(const CsrMatrix &A, ConstVectorView b, ConstVectorVi
     }
     detail::validate(b);
     validate_apply(A, x, r);
-    if (b.size != r.size || detail::overlaps(b, r))
+    if (b.size() != r.size() || detail::overlaps(b, r))
     {
         throw std::invalid_argument("CSR residual vectors must match and be disjoint");
     }
@@ -115,13 +117,9 @@ double CpuBackend::residual(const CsrMatrix &A, ConstVectorView b, ConstVectorVi
 #endif
     for (std::size_t row = 0; row < A.rows(); ++row)
     {
-        double sum = 0.0;
-        for (std::size_t entry = indptr[row]; entry < indptr[row + 1]; ++entry)
-        {
-            sum += values[entry] * x.data[indices[entry]];
-        }
-        const double value = b_minus_ax ? b.data[row] - sum : sum - b.data[row];
-        r.data[row] = value;
+        const double sum = row_dot(indices, values, x.data(), indptr[row], indptr[row + 1]);
+        const double value = b_minus_ax ? b.data()[row] - sum : sum - b.data()[row];
+        r.data()[row] = value;
         squared_norm += value * value;
     }
     return squared_norm;

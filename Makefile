@@ -7,7 +7,7 @@ JOBS ?= 2
 RUFF := $(dir $(PYTHON))ruff
 CLANG_FORMAT := $(dir $(PYTHON))clang-format
 recursive_files = $(foreach path,$(wildcard $1/*),$(call recursive_files,$(path),$2) $(filter $2,$(path)))
-CPP_FILES := $(call recursive_files,cpp/cg,%.cpp %.hpp %.cu) $(call recursive_files,tests/cpp,%.cpp)
+CPP_FILES := $(call recursive_files,cpp/cg,%.cpp %.hpp %.cu %.cuh) $(call recursive_files,tests/cpp,%.cpp)
 VERSION = $(shell $(PYTHON) -c 'import pathlib, tomllib; print(tomllib.loads(pathlib.Path("pyproject.toml").read_text())["project"]["version"])')
 CMAKE_ARGS ?=
 PYPROF_SUITE ?= sparse-solvers
@@ -23,10 +23,11 @@ DIST_CUDA ?= OFF
 DIST_ARGS ?=
 DOCS_DIR ?= $(CURDIR)/build/docs
 CUDA_ROOT ?= $(CURDIR)/.deps/cuda-12.8
-CUDA_HOST_COMPILER ?= /usr/bin/g++-13
-CUDA_ARCHITECTURES ?= 75
-CUDA_CONFIGURE_ARGS = $(if $(filter cuda-release,$(PRESET)),-DCUDAToolkit_ROOT=$(CUDA_ROOT) -DCMAKE_CUDA_COMPILER=$(CUDA_ROOT)/bin/nvcc -DCMAKE_CUDA_HOST_COMPILER=$(CUDA_HOST_COMPILER) -DCMAKE_CXX_COMPILER=$(CUDA_HOST_COMPILER) -DCMAKE_CUDA_ARCHITECTURES="$(CUDA_ARCHITECTURES)",)
-CUDA_DIST_ARGS = $(if $(filter ON,$(DIST_CUDA)),-Ccmake.define.CUDAToolkit_ROOT=$(CUDA_ROOT) -Ccmake.define.CMAKE_CUDA_COMPILER=$(CUDA_ROOT)/bin/nvcc -Ccmake.define.CMAKE_CUDA_HOST_COMPILER=$(CUDA_HOST_COMPILER) -Ccmake.define.CMAKE_CXX_COMPILER=$(CUDA_HOST_COMPILER) -Ccmake.define.CMAKE_CUDA_ARCHITECTURES="$(CUDA_ARCHITECTURES)",)
+CUDA_HOST_COMPILER ?=
+CUDA_ARCHITECTURES ?=
+cuda_definitions = $(1)CUDAToolkit_ROOT="$(CUDA_ROOT)" $(if $(CUDA_HOST_COMPILER),$(1)CMAKE_CUDA_HOST_COMPILER="$(CUDA_HOST_COMPILER)") $(if $(CUDA_ARCHITECTURES),$(1)CMAKE_CUDA_ARCHITECTURES="$(CUDA_ARCHITECTURES)")
+CUDA_CONFIGURE_ARGS = $(if $(filter cuda-release,$(PRESET)),$(call cuda_definitions,-D))
+CUDA_DIST_ARGS = $(if $(filter ON,$(DIST_CUDA)),-Ccmake.define.CMAKE_TOOLCHAIN_FILE=cmake/CGCudaToolchain.cmake $(call cuda_definitions,-Ccmake.define.))
 
 .DEFAULT_GOAL := all
 .PHONY: all configure build test pytest gtest lint format wheel sdist dist test-dist docs doctest clean pyprof demo
@@ -70,7 +71,7 @@ dist:
 	PIP_CACHE_DIR=$(CURDIR)/.cache/pip CMAKE_BUILD_PARALLEL_LEVEL=$(JOBS) $(PYTHON) -m build --outdir $(DIST_DIR) -Ccmake.define.CG_ENABLE_BLAS=$(DIST_BLAS) -Ccmake.define.CG_ENABLE_CUDA=$(DIST_CUDA) $(CUDA_DIST_ARGS) $(DIST_ARGS)
 
 test-dist: sdist
-	$(PYTHON) scripts/check_distribution.py --sdist $(DIST_DIR)/cgpy-$(VERSION).tar.gz --blas $(DIST_BLAS) --cuda $(DIST_CUDA) --cuda-root $(CUDA_ROOT) --cuda-host-compiler $(CUDA_HOST_COMPILER) --cuda-architectures "$(CUDA_ARCHITECTURES)" --jobs $(JOBS)
+	$(PYTHON) scripts/check_distribution.py --sdist $(DIST_DIR)/cgpy-$(VERSION).tar.gz --blas $(DIST_BLAS) --cuda $(DIST_CUDA) --cuda-root "$(CUDA_ROOT)" $(if $(CUDA_HOST_COMPILER),--cuda-host-compiler "$(CUDA_HOST_COMPILER)") $(if $(CUDA_ARCHITECTURES),--cuda-architectures "$(CUDA_ARCHITECTURES)") --jobs $(JOBS)
 
 docs: build
 	PYTHONPATH=$(BUILD_DIR)/python $(PYTHON) -m sphinx -W --keep-going -b html docs $(DOCS_DIR)/html

@@ -70,7 +70,10 @@ class PreparedSolver:
     def create_workspace(self, *, stream: int = 0) -> cuda_workspace.Workspace:
         """Allocate reusable solver storage on the selected borrowed stream."""
         return cuda_workspace.Workspace(
-            self.size, device=self.device, stream=stream
+            self.size,
+            device=self.device,
+            stream=stream,
+            dense_kernel=self.dense_kernel,
         )
 
     def create_vector(self, *, stream: int = 0) -> storage.Vector:
@@ -287,7 +290,7 @@ def solve(
         b,
         x,
         workspace=cuda_workspace.Workspace(
-            shape[0], device=device, stream=stream
+            shape[0], device=device, stream=stream, dense_kernel=dense_kernel
         ),
         rtol=rtol,
         atol=atol,

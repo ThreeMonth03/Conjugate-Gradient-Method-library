@@ -11,7 +11,7 @@ trim_trailing_whitespace = true
 [*.py]
 max_line_length = 79
 
-[*.{cpp,hpp,cu}]
+[*.{cpp,hpp,cu,cuh}]
 max_line_length = 120
 
 [*.{yml,yaml}]

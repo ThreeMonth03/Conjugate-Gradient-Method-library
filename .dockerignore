@@ -9,5 +9,3 @@ dist
 **/*.pyc
 **/*.so
 **/*.o
-benchmarks/*.json
-benchmarks/compare_direct.py

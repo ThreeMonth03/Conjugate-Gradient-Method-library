@@ -25,7 +25,7 @@ not require the source checkout or a compiler.
 Build and install from source
 -----------------------------
 
-Use an existing C++17 compiler. From the repository root:
+Use an existing C++20 compiler. From the repository root:
 
 .. code-block:: bash
 

@@ -5,6 +5,7 @@
 #include <cg/python/array_conversion.hpp>
 #include <pybind11/stl.h>
 #include <cg/backend/cuda/context.hpp>
+#include <cg/backend/cuda/detail/runtime.hpp>
 #include <cg/matrix/cuda/dense_matrix_view.hpp>
 #include <cg/storage/cuda/vector_view.hpp>
 #include <cuda_runtime_api.h>
@@ -21,18 +22,11 @@ namespace cg
 namespace python
 {
 
-void check(cudaError_t error);
-class DeviceScope
+inline void check(cudaError_t error)
 {
-    public:
-    explicit DeviceScope(int device);
-    ~DeviceScope();
-    DeviceScope(const DeviceScope &) = delete;
-    DeviceScope &operator=(const DeviceScope &) = delete;
-
-    private:
-    int m_previous = 0;
-};
+    gpu::detail::check(error, "CUDA");
+}
+using DeviceScope = gpu::detail::DeviceGuard;
 
 struct DeviceArray
 {

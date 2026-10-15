@@ -6,4 +6,4 @@
 #include <cg/preconditioner/jacobi.hpp>
 #include <cg/solver/conjugate_gradient.hpp>
 #include <cg/solver/workspace.hpp>
-#include <cg/storage/vector.hpp>
+#include <cg/storage/vector_view.hpp>

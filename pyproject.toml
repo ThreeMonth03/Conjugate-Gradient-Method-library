@@ -27,9 +27,9 @@ install.components = ["python"]
 sdist.exclude = ["**"]
 sdist.include = [
     "/CMakeLists.txt", "/CMakePresets.json", "/Makefile", "/pyproject.toml",
-    "/README.md", "/STYLE.md", "/.python-version", "/.editorconfig",
+    "/README.md", "/.python-version", "/.editorconfig",
     "/.gitignore", "/.clang-format", "/.clang-tidy", "/LICENSE*",
-    "/cmake/*.cmake", "/cpp/cg/**/*.hpp", "/cpp/cg/**/*.cpp", "/cpp/cg/**/*.cu",
+    "/cmake/*.cmake", "/cpp/cg/**/*.hpp", "/cpp/cg/**/*.cpp", "/cpp/cg/**/*.cu", "/cpp/cg/**/*.cuh",
     "/python/cgpy/**/*.py", "/python/cgbench/**/*.py", "/python/README.md",
     "/tests/python/**/*.py", "/tests/cpp/**/*.cpp", "/scripts/*.py", "/examples/*.py",
     "/requirements/*.lock", "/requirements/README.md", "/docs/**/*.rst", "/docs/conf.py",

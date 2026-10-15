@@ -44,6 +44,17 @@ inline cudaStream_t stream(const Context &context)
 {
     return reinterpret_cast<cudaStream_t>(context.stream());
 }
+template <class Cleanup> void on_device_noexcept(int device, Cleanup cleanup) noexcept
+{
+    int previous = 0;
+    const bool restore = cudaGetDevice(&previous) == cudaSuccess;
+    (void)cudaSetDevice(device);
+    cleanup();
+    if (restore)
+    {
+        (void)cudaSetDevice(previous);
+    }
+}
 inline std::size_t product(std::size_t a, std::size_t b)
 {
     if (b != 0 && a > std::numeric_limits<std::size_t>::max() / b)

@@ -34,7 +34,7 @@ system toolkit, shell configuration or PyTorch-private library is changed.
 Initial downloads require network access. Override ``CUDA_ROOT``,
 ``CUDA_HOST_COMPILER`` or a semicolon-separated ``CUDA_ARCHITECTURES`` list
 explicitly when using another compatible local toolchain. CUDA compilation
-uses C++17 without fast-math.
+uses C++20 without fast-math.
 
 ``CG_REQUIRE_CUDA=1`` makes local GPU validation fail if the device or extension
 is unavailable. Hosted compile-only CI leaves it unset and reports GPU skips.
@@ -80,11 +80,9 @@ For a source install with the same local toolkit and public runtime extra:
 
    .venv-cuda/bin/python -m pip install --cache-dir .cache/pip \
        -Ccmake.define.CG_ENABLE_CUDA=ON \
+       -Ccmake.define.CMAKE_TOOLCHAIN_FILE=cmake/CGCudaToolchain.cmake \
        -Ccmake.define.CUDAToolkit_ROOT="$PWD/.deps/cuda-12.8" \
-       -Ccmake.define.CMAKE_CUDA_COMPILER="$PWD/.deps/cuda-12.8/bin/nvcc" \
-       -Ccmake.define.CMAKE_CUDA_HOST_COMPILER=/usr/bin/g++-13 \
-       -Ccmake.define.CMAKE_CXX_COMPILER=/usr/bin/g++-13 \
-       -Ccmake.define.CMAKE_CUDA_ARCHITECTURES=75 '.[cuda]'
+       '.[cuda]'
 
 Replace ``.[cuda]`` with the selected local source archive followed by
 ``[cuda]`` to install from an sdist. Pip's isolated build environment supplies
@@ -160,7 +158,8 @@ before returning; exported native vectors have no pending producer work.
 
 Prepared matrix and Jacobi snapshots can be shared, but each overlapping solve
 needs its own output and workspace. The workspace owns device vectors,
-reduction buffers, pinned scalar storage and a cuBLAS handle; overlapping
+reduction buffers and pinned scalar storage. A cuBLAS workspace additionally
+owns its handle and 4 MiB scratch allocation; overlapping
 reuse raises an error. It fixes the device/stream used for its solve. No API
 reinterprets a NumPy host pointer as a device pointer.
 

@@ -12,24 +12,48 @@ namespace cg
 {
 namespace cuda
 {
+namespace detail
+{
+
+struct CublasResources
+{
+    explicit CublasResources(const Context &context)
+        : workspace(device_allocation<unsigned char>(workspace_bytes, context)), handle(context)
+    {
+        DeviceGuard guard(context.device());
+        check(cublasSetPointerMode(handle.value, CUBLAS_POINTER_MODE_HOST), "cublasSetPointerMode");
+        check(cublasSetAtomicsMode(handle.value, CUBLAS_ATOMICS_NOT_ALLOWED), "cublasSetAtomicsMode");
+        check(cublasSetWorkspace(handle.value, workspace.get(), workspace_bytes), "cublasSetWorkspace");
+    }
+    static constexpr std::size_t workspace_bytes = 4 * 1024 * 1024;
+    DeviceAllocation<unsigned char> workspace;
+    BlasHandle handle;
+};
+
+} // namespace detail
 
 struct Workspace::Impl
 {
-    Impl(std::size_t size, const Context &ctx)
+    Impl(std::size_t size, const Context &ctx, DenseKernel selected)
         : context(ctx), r(size, ctx), p(size, ctx), ap(size, ctx), scratch(size, ctx), z(size, ctx),
-          partials(detail::max_blocks, ctx), scalar(1, ctx), blas_workspace(4 * 1024 * 1024, ctx), handle(ctx)
+          partials(detail::device_allocation<double>(detail::max_blocks, ctx)),
+          scalar(detail::device_allocation<double>(1, ctx)), host(detail::pinned_scalar()), kernel(selected)
     {
-        detail::DeviceGuard guard(ctx.device());
-        detail::check(cublasSetPointerMode(handle.value, CUBLAS_POINTER_MODE_HOST), "cublasSetPointerMode");
-        detail::check(cublasSetAtomicsMode(handle.value, CUBLAS_ATOMICS_NOT_ALLOWED), "cublasSetAtomicsMode");
-        detail::check(cublasSetWorkspace(handle.value, blas_workspace.data(), 4 * 1024 * 1024), "cublasSetWorkspace");
+        if (selected != DenseKernel::native && selected != DenseKernel::cublas)
+        {
+            throw std::invalid_argument("unsupported CUDA dense kernel");
+        }
+        if (selected == DenseKernel::cublas)
+        {
+            cublas = std::make_unique<detail::CublasResources>(ctx);
+        }
     }
     Context context;
     Vector r, p, ap, scratch, z;
     detail::DeviceAllocation<double> partials, scalar;
-    detail::DeviceAllocation<unsigned char> blas_workspace;
     detail::PinnedScalar host;
-    detail::BlasHandle handle;
+    std::unique_ptr<detail::CublasResources> cublas;
+    DenseKernel kernel;
     std::atomic<bool> active{false};
 };
 

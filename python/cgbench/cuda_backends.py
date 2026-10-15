@@ -224,23 +224,12 @@ class TorchCudaOps(backends.TorchOps):
     def synchronize(self):
         self.torch.cuda.synchronize(self.device)
 
-    def inverse_diagonal(self):
-        torch = self.torch
-        diagonal = (
+    def _diagonal(self):
+        return (
             self.matrix.values().index_select(0, self.diagonal_positions)
             if self.sparse
             else self.matrix.diagonal().clone()
         )
-        if not bool(torch.isfinite(diagonal).all()) or not bool(
-            (diagonal > 0).all()
-        ):
-            raise ValueError("Jacobi requires a finite positive diagonal")
-        diagonal.reciprocal_()
-        if not bool(torch.isfinite(diagonal).all()) or not bool(
-            (diagonal > 0).all()
-        ):
-            raise ValueError("Jacobi reciprocal must be finite and positive")
-        return diagonal
 
     @staticmethod
     def outcome_x(x):

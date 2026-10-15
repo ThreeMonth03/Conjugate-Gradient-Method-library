@@ -9,7 +9,7 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 from cgbench.artifacts import load_artifact, validate_artifact, write_artifact
-from cgbench.backends import make_executor
+from cgbench.backends import TorchOps, make_executor
 from cgbench.cases import SUITES, input_hash, make_case
 from cgbench.cli import main
 from cgbench.collector import (
@@ -18,7 +18,11 @@ from cgbench.collector import (
     collect_case,
     time_candidates,
 )
-from cgbench.cuda_backends import CudaNativeExecutor, preflight_cuda
+from cgbench.cuda_backends import (
+    CudaNativeExecutor,
+    TorchCudaOps,
+    preflight_cuda,
+)
 
 
 @pytest.fixture
@@ -296,6 +300,11 @@ def test_cuda_artifact_roundtrip_and_invalid_device_schema(tmp_path, options):
             {
                 "name": "cuda-native",
                 "status": "measured",
+                "solver_status": "converged",
+                "true_residual_norm": 1e-10,
+                "residual_threshold": 1e-8,
+                "iterations": 4,
+                "matvecs": 6,
                 "round_elapsed_ns": [100],
             }
         ],
@@ -352,6 +361,59 @@ def test_cuda_metadata_hashes_only_the_loaded_native_extension(
     )
     assert result["native"]["runtime_info"] == {"name": "GPU", "device": 2}
     assert result["torch"] is None
+
+
+@pytest.mark.parametrize("ops_type", (TorchOps, TorchCudaOps))
+@pytest.mark.parametrize(
+    "diagonal", ([4.0, 3.0], [0.0, 3.0], [float("inf"), 3.0], [1e-320, 3.0])
+)
+def test_torch_jacobi_shares_validation_without_mutating_the_matrix(
+    ops_type, diagonal
+):
+    torch = pytest.importorskip("torch")
+    # The diagonal operations themselves support CPU tensors, so their shared
+    # contract is testable without creating a CUDA context or changing devices.
+    original = np.diag(diagonal)
+    ops = ops_type.__new__(ops_type)
+    ops.torch = torch
+    ops.original_matrix = original.copy()
+    ops.matrix = torch.from_numpy(original.copy())
+    ops.sparse = False
+    if diagonal[0] == 4.0:
+        inverse = ops.inverse_diagonal()
+        torch.testing.assert_close(
+            inverse, torch.tensor([0.25, 1 / 3], dtype=torch.float64)
+        )
+        assert inverse.device == ops.matrix.device
+    else:
+        with pytest.raises(
+            ValueError, match="finite and positive|finite positive"
+        ):
+            ops.inverse_diagonal()
+    np.testing.assert_array_equal(ops.original_matrix, original)
+    np.testing.assert_array_equal(ops.matrix.numpy(), original)
+
+
+def test_torch_cuda_csr_diagonal_uses_the_prepared_device_positions():
+    torch = pytest.importorskip("torch")
+    ops = TorchCudaOps.__new__(TorchCudaOps)
+    ops.torch = torch
+    ops.sparse = True
+    ops.matrix = torch.sparse_csr_tensor(
+        torch.tensor([0, 2, 4]),
+        torch.tensor([0, 1, 0, 1]),
+        torch.tensor([4.0, 1.0, 1.0, 3.0], dtype=torch.float64),
+        size=(2, 2),
+    )
+    ops.diagonal_positions = torch.tensor([0, 3])
+    inverse = ops.inverse_diagonal()
+    torch.testing.assert_close(
+        inverse, torch.tensor([0.25, 1 / 3], dtype=torch.float64)
+    )
+    torch.testing.assert_close(
+        ops.matrix.values(),
+        torch.tensor([4.0, 1.0, 1.0, 3.0], dtype=torch.float64),
+    )
 
 
 def _require_gpu(implementation):

@@ -1,22 +1,11 @@
 #pragma once
 
-#include <cstddef>
+#include <span>
 
 namespace cg
 {
 
-struct ConstVectorView
-{
-    const double *data = nullptr;
-    std::size_t size = 0;
-};
-
-struct VectorView
-{
-    double *data = nullptr;
-    std::size_t size = 0;
-
-    operator ConstVectorView() const noexcept { return {data, size}; }
-};
+using ConstVectorView = std::span<const double>;
+using VectorView = std::span<double>;
 
 } // namespace cg

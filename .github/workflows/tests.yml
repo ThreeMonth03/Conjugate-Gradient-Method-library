@@ -25,18 +25,17 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version-file: .python-version
       - name: Install project-local tooling
         run: |
           python -m venv .venv
           .venv/bin/python -m pip install --cache-dir .cache/pip -r requirements/dev.lock
       - name: Check formatting and Python lint
         run: make lint
-      - name: Check native static analysis when the runner provides clang-tidy
-        run: |
-          if command -v clang-tidy >/dev/null 2>&1; then
-            make build PRESET=cpu-debug BUILD_DIR="$PWD/build/cpu-tidy" CMAKE_ARGS='-DCG_ENABLE_CLANG_TIDY=ON -DCG_BUILD_PYTHON=OFF -DBUILD_TESTING=OFF'
-          fi
+      - name: Install the native static analyzer
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends clang-tidy-18
+      - name: Check native static analysis
+        run: make build PRESET=cpu-debug BUILD_DIR="$PWD/build/cpu-tidy" CMAKE_ARGS='-DCG_ENABLE_CLANG_TIDY=ON -DCG_CLANG_TIDY=clang-tidy-18 -DCG_BUILD_PYTHON=OFF -DBUILD_TESTING=OFF'
 
   correctness:
     runs-on: ubuntu-24.04
@@ -48,11 +47,14 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version-file: .python-version
       - name: Install project-local tooling
         run: |
           python -m venv .venv
           .venv/bin/python -m pip install --cache-dir .cache/pip -r requirements/test.lock
+      - name: Install optional CPU benchmark candidates locally
+        if: matrix.preset == 'cpu-blas'
+        run: .venv/bin/python -m pip install --cache-dir .cache/pip -r requirements/benchmark.lock
       - name: Run native and Python tests
         run: make test PRESET=${{ matrix.preset }} JOBS=2
 
@@ -65,9 +67,6 @@ jobs:
 
       - name: Reproduce sparse CG, PCG and direct-solver smoke comparisons
         run: make pyprof PRESET=${{ matrix.preset }} PYPROF_SUITE=smoke-sparse-solvers PYPROF_ROUNDS=6 PYPROF_REPETITIONS=1 JOBS=2
-      - name: Install optional CPU benchmark candidates locally
-        if: matrix.preset == 'cpu-blas'
-        run: .venv/bin/python -m pip install --cache-dir .cache/pip -r requirements/benchmark.lock
       - name: Exercise explicit native and BLAS dense benchmark adapters
         if: matrix.preset == 'cpu-blas'
         run: |
@@ -91,7 +90,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version-file: .python-version
       - name: Install project-local tooling
         run: |
           python -m venv .venv
@@ -109,7 +108,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version-file: .python-version
       - name: Install project-local tooling
         run: |
           python -m venv .venv
@@ -123,7 +122,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version-file: .python-version
       - name: Install project-local build tools and public CUDA runtime wheels
         run: |
           python -m venv .venv
@@ -147,7 +146,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version-file: .python-version
       - name: Install project-local tools and CUDA comparison dependencies
         run: |
           python -m venv .venv

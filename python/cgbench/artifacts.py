@@ -7,7 +7,8 @@ import pathlib
 import platform
 import subprocess
 import sys
-import tempfile
+
+from . import json_io, validation
 
 THREAD_VARIABLES = (
     "OMP_NUM_THREADS",
@@ -35,7 +36,6 @@ def environment_metadata(*, device="cpu", cuda_device=0):
 
     import numpy as np
 
-    root = pathlib.Path(__file__).resolve().parents[2]
     packages = {}
     for name in ("numpy", "scipy", "torch", "threadpoolctl", "cgpy"):
         try:
@@ -57,6 +57,7 @@ def environment_metadata(*, device="cpu", cuda_device=0):
         }
     cmake = None
     native = None
+    source_root = None
     native_module = sys.modules.get("cgpy._core")
     if native_module is not None and getattr(native_module, "__file__", None):
         binary = pathlib.Path(native_module.__file__).resolve()
@@ -68,9 +69,11 @@ def environment_metadata(*, device="cpu", cuda_device=0):
             "build_info": build_info() if callable(build_info) else None,
             "python_package_path": getattr(package, "__file__", None),
         }
-        # Use only an ancestor cache of the binary actually imported. Installed
-        # wheels may have no adjacent cache; never substitute another build.
+        # CMake stages extensions under <binary-dir>/python/cgpy. A wheel in a
+        # repository's virtual environment must not borrow an ancestor cache.
         for directory in binary.parents:
+            if not binary.parent.is_relative_to(directory / "python/cgpy"):
+                continue
             cache = directory / "CMakeCache.txt"
             if not cache.is_file():
                 continue
@@ -81,12 +84,16 @@ def environment_metadata(*, device="cpu", cuda_device=0):
                         "CMAKE_CXX_COMPILER:",
                         "CMAKE_CXX_FLAGS",
                         "CMAKE_BUILD_TYPE:",
+                        "CMAKE_HOME_DIRECTORY:",
                         "CG_",
                     )
                 ):
                     key, _, value = line.partition("=")
                     fields[key] = value
             cmake = {"path": str(cache), "fields": fields}
+            home = fields.get("CMAKE_HOME_DIRECTORY:INTERNAL")
+            if home and pathlib.Path(home).is_absolute():
+                source_root = pathlib.Path(home).resolve()
             break
     cpu = platform.processor() or platform.machine()
     cpuinfo = pathlib.Path("/proc/cpuinfo")
@@ -107,8 +114,13 @@ def environment_metadata(*, device="cpu", cuda_device=0):
         "python_executable": sys.executable,
         "python_compiler": platform.python_compiler(),
         "packages": packages,
-        "revision": _command(["git", "rev-parse", "HEAD"], root),
-        "git_status": _command(["git", "status", "--short"], root),
+        "source_root": str(source_root) if source_root is not None else None,
+        "revision": _command(["git", "rev-parse", "HEAD"], source_root)
+        if source_root is not None
+        else None,
+        "git_status": _command(["git", "status", "--short"], source_root)
+        if source_root is not None
+        else None,
         "cmake": cmake,
         "native": native,
         "thread_environment": {
@@ -190,6 +202,7 @@ def validate_artifact(data):
         for entry in case["results"]:
             elapsed = entry["round_elapsed_ns"]
             if entry["status"] == "measured":
+                validation.validate_converged_result(entry)
                 if len(elapsed) != rounds or any(
                     isinstance(value, bool)
                     or not isinstance(value, int)
@@ -204,22 +217,7 @@ def validate_artifact(data):
 
 def write_artifact(data, output):
     validate_artifact(data)
-    path = pathlib.Path(output)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = None
-    try:
-        with tempfile.NamedTemporaryFile(
-            mode="w", encoding="utf8", dir=path.parent, delete=False
-        ) as stream:
-            temporary = pathlib.Path(stream.name)
-            json.dump(data, stream, indent=2, sort_keys=True, allow_nan=False)
-            stream.write("\n")
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.replace(temporary, path)
-    finally:
-        if temporary is not None:
-            temporary.unlink(missing_ok=True)
+    json_io.write_json(data, output)
 
 
 def load_artifact(path):
