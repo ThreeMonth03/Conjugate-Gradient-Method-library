@@ -449,7 +449,18 @@ none of those files and generate a separate set of results. Rebuilt binary
 bytes and measured latency need not match the original host.
 
 Compare all four A files against all four B files for each configuration,
-using the existing strict comparison script and the predeclared 5% budget:
+using the existing strict comparison script and the predeclared 5% budget.
+The CLI rejects an entire configuration when any case/candidate changes
+counts, including the four dense-none configurations here. The tables instead
+apply its unchanged gate independently to each case/candidate's measurement
+mapping, preserving the original signatures, inputs, counts and status checks.
+All eight original artifacts remain represented. Row analysis then uses the
+same bootstrap with seed 20261015 plus the zero-based index of the sorted
+``(case name, candidate)`` keys within each configuration. Changed-work rows
+remain separately labeled TTS evidence, never equal-work passes.
+
+The following commands reproduce the CLI's whole-configuration comparisons;
+they do not reproduce the separate row projections in the affected groups:
 
 .. code-block:: bash
 
