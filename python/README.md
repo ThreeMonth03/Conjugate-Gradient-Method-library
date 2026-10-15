@@ -94,7 +94,7 @@ CSR stores row pointers, column indices, and values without converting the opera
 
 ## CUDA interface
 
-`from cgpy import cuda` works with CPU-only wheels. `cuda.enabled()` checks whether the optional extension/runtime loads; `cuda.is_available(device=0)` checks a usable GPU. Both CPU and CUDA interfaces require explicit backend selection. See the [CUDA guide](../docs/cuda.rst) for a project-local toolkit, separate `.venv-cuda`, source/wheel installs and architecture settings.
+`from cgpy import cuda` works with CPU-only wheels. `cuda.enabled()` checks whether the optional extension/runtime loads; `cuda.is_available(device=0)` checks whether the requested GPU is visible. Executing kernels also requires a compatible compiled architecture. Both CPU and CUDA interfaces require explicit backend selection. See the [CUDA guide](../docs/cuda.rst) for a project-local toolkit, separate `.venv-cuda`, source/wheel installs and architecture settings.
 
 ```python
 from cgpy import cuda
