@@ -548,6 +548,146 @@ TEST_F(Cuda, DeviceFailuresPreserveOutputCountsAndPermitWorkspaceReuse)
     }
 }
 
+TEST_F(Cuda, DevicePacketResetPreservesCompletedStepsAcrossBreakdownRestartAndReuse)
+{
+    // The first step has positive curvature; its next direction has negative
+    // curvature. A stale advanced flag must not count the failed second step.
+    const cg::DenseMatrix host(2, 2, {1, 0, 0, -1});
+    const std::vector<double> rhs{2.0, 1.0};
+    gpu::Vector b(rhs, *context), x_host(2, *context), x_device(2, *context);
+    const auto check = [&](const auto &A, gpu::DenseKernel kernel)
+    {
+        gpu::Workspace host_work(2, *context, kernel);
+        gpu::Workspace device_work(2, *context, kernel, gpu::ExecutionMode::device);
+        for (const bool fused : {false, true})
+        {
+            SCOPED_TRACE(fused);
+            for (const auto algorithm : {cg::Algorithm::recurrence, cg::Algorithm::explicit_residual})
+            {
+                SCOPED_TRACE(static_cast<int>(algorithm));
+                // Reuse the same resources after breakdown, a restart, and
+                // iteration-limit exits, then repeat the original breakdown.
+                for (const auto limits : {std::array<std::size_t, 2>{3, 0}, {3, 1}, {1, 0}, {0, 0}, {3, 0}})
+                {
+                    const auto maxiter = limits[0];
+                    const auto refresh = limits[1];
+                    SCOPED_TRACE(maxiter);
+                    SCOPED_TRACE(refresh);
+                    cg::CgOptions options;
+                    options.algorithm = algorithm;
+                    options.rtol = 0.0;
+                    options.atol = 0.0;
+                    options.maxiter = maxiter;
+                    options.residual_refresh = refresh;
+                    x_host.fill(0.0, *context);
+                    x_device.fill(0.0, *context);
+                    const auto reference =
+                        gpu::solve_into(A, b.view(), x_host.view(), host_work, *context, options, fused, kernel);
+                    const auto result =
+                        gpu::solve_into(A, b.view(), x_device.view(), device_work, *context, options, fused, kernel);
+                    const bool restarted = maxiter > 1 && refresh == 1 && algorithm == cg::Algorithm::recurrence;
+                    const auto expected_status =
+                        maxiter > 1 ? cg::Status::non_positive_curvature : cg::Status::max_iterations;
+                    const std::size_t expected_matvecs = maxiter == 0 ? 1 : maxiter == 1 ? 3 : restarted ? 5 : 4;
+                    EXPECT_EQ(result.status, expected_status);
+                    EXPECT_EQ(result.iterations, maxiter == 0 ? 0u : 1u);
+                    EXPECT_EQ(result.matvecs, expected_matvecs);
+                    EXPECT_EQ(result.restarts, restarted ? 1u : 0u);
+                    EXPECT_EQ(result.status, reference.status);
+                    EXPECT_EQ(result.iterations, reference.iterations);
+                    EXPECT_EQ(result.matvecs, reference.matvecs);
+                    EXPECT_EQ(result.restarts, reference.restarts);
+                    EXPECT_NEAR(result.residual_norm, reference.residual_norm, 1e-12);
+                    std::vector<double> expected(2), actual(2);
+                    x_host.download(expected, *context);
+                    x_device.download(actual, *context);
+                    for (std::size_t i = 0; i < actual.size(); ++i)
+                    {
+                        EXPECT_NEAR(actual[i], expected[i], 1e-12);
+                        const double first_step = maxiter == 0 ? 0.0 : (i == 0 ? 10.0 / 3.0 : 5.0 / 3.0);
+                        EXPECT_NEAR(actual[i], first_step, 1e-12);
+                    }
+                    EXPECT_NEAR(result.residual_norm, true_norm(host.view(), rhs, actual), 1e-12);
+                }
+            }
+        }
+    };
+    for (const auto kernel : {gpu::DenseKernel::native, gpu::DenseKernel::cublas})
+    {
+        SCOPED_TRACE(static_cast<int>(kernel));
+        const gpu::DenseMatrix A(host.view(), *context);
+        check(A.view(), kernel);
+    }
+    const gpu::CsrMatrix sparse(as_csr(host.view()), *context);
+    check(sparse, gpu::DenseKernel::native);
+}
+
+TEST_F(Cuda, DeviceResidualExitPrecedesNextRhoFailureRefreshAndIterationLimit)
+{
+    const std::vector<double> rhs{1.0, 0.0};
+    gpu::Vector b(rhs, *context), x(2, *context);
+    for (const double off_diagonal : {0.0, 1e200})
+    {
+        SCOPED_TRACE(off_diagonal);
+        // Both systems take the exact first step x=(1,0). Identity converges
+        // with next-rho=0; the other has finite norm 1e200 but squared norm and
+        // next-rho overflow. Residual policy must win before beta/last/refresh.
+        const cg::DenseMatrix host(2, 2, {1, 0, off_diagonal, 1});
+        const auto check = [&](const auto &A, gpu::DenseKernel kernel)
+        {
+            const gpu::JacobiPreconditioner M(A, *context);
+            gpu::Workspace workspace(2, *context, kernel, gpu::ExecutionMode::device);
+            for (const bool fused : {false, true})
+            {
+                SCOPED_TRACE(fused);
+                for (const auto algorithm : {cg::Algorithm::recurrence, cg::Algorithm::explicit_residual})
+                {
+                    SCOPED_TRACE(static_cast<int>(algorithm));
+                    for (const bool preconditioned : {false, true})
+                    {
+                        if (preconditioned && algorithm != cg::Algorithm::recurrence)
+                        {
+                            continue;
+                        }
+                        SCOPED_TRACE(preconditioned);
+                        for (const std::size_t maxiter : {1u, 2u})
+                        {
+                            SCOPED_TRACE(maxiter);
+                            cg::CgOptions options;
+                            options.algorithm = algorithm;
+                            options.rtol = 0.0;
+                            options.atol = 0.0;
+                            options.maxiter = maxiter;
+                            options.residual_refresh = 1;
+                            x.fill(0.0, *context);
+                            const auto result = gpu::solve_into(A, b.view(), x.view(), workspace, *context, options,
+                                                                fused, kernel, preconditioned ? &M : nullptr);
+                            EXPECT_EQ(result.status,
+                                      off_diagonal == 0.0 ? cg::Status::converged : cg::Status::non_finite);
+                            EXPECT_EQ(result.iterations, 1u);
+                            EXPECT_EQ(result.matvecs, 3u);
+                            EXPECT_EQ(result.restarts, 0u);
+                            EXPECT_DOUBLE_EQ(result.residual_norm, off_diagonal);
+                            std::vector<double> actual(2);
+                            x.download(actual, *context);
+                            EXPECT_EQ(actual, (std::vector<double>{1.0, 0.0}));
+                            EXPECT_DOUBLE_EQ(result.residual_norm, true_norm(host.view(), rhs, actual));
+                        }
+                    }
+                }
+            }
+        };
+        for (const auto kernel : {gpu::DenseKernel::native, gpu::DenseKernel::cublas})
+        {
+            SCOPED_TRACE(static_cast<int>(kernel));
+            const gpu::DenseMatrix A(host.view(), *context);
+            check(A.view(), kernel);
+        }
+        const gpu::CsrMatrix sparse(as_csr(host.view()), *context);
+        check(sparse, gpu::DenseKernel::native);
+    }
+}
+
 TEST_F(Cuda, AsyncMetricsKeepIndependentDeviceResultsAndStableNormFallbacks)
 {
     constexpr std::size_t size = 257;

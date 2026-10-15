@@ -52,17 +52,16 @@ __global__ void initialize_state(DeviceState *state, double rho, double toleranc
     state->packet.residual_norm = norm;
 }
 
-__global__ void begin_iteration(DeviceState *state, bool last, bool refresh)
+__global__ void check_alpha(DeviceState *state, bool explicit_residual, bool last, bool refresh)
 {
+    // Metric kernels only write denominator/numerator, so reset the packet
+    // here after they finish on the workspace stream. Keep the prior residual
+    // norm for an alpha failure, which advances neither x nor the iteration.
     state->packet.status = Status::max_iterations;
     state->packet.decision = IterationDecision::proceed;
     state->packet.advanced = false;
     state->last = last;
     state->refresh = refresh;
-}
-
-__global__ void check_alpha(DeviceState *state, bool explicit_residual)
-{
     const double denominator = state->denominator;
     if (!isfinite(denominator) || (explicit_residual && !isfinite(state->numerator)))
     {
@@ -90,7 +89,7 @@ __global__ void check_alpha(DeviceState *state, bool explicit_residual)
     state->packet.advanced = true;
 }
 
-__global__ void check_residual(DeviceState *state, bool explicit_residual)
+__device__ void check_residual(DeviceState *state, bool explicit_residual)
 {
     if (state->packet.decision != IterationDecision::proceed)
     {
@@ -125,8 +124,12 @@ __global__ void check_residual(DeviceState *state, bool explicit_residual)
     }
 }
 
-__global__ void check_beta(DeviceState *state, bool explicit_residual, bool preconditioned)
+__global__ void check_residual_and_beta(DeviceState *state, bool explicit_residual, bool preconditioned)
 {
+    // Residual exits take priority over an unusable next-rho or beta. The
+    // next-rho kernels do not consume this decision and were always submitted
+    // before the packet read, including candidate/refresh/last/failure paths.
+    check_residual(state, explicit_residual);
     if (state->packet.decision != IterationDecision::proceed)
     {
         return;
@@ -298,15 +301,13 @@ SolveInfo solve_device_impl(const Matrix &A, ConstVectorView b, VectorView x, Wo
     {
         const bool last = iteration + 1 == options.maxiter;
         const bool refresh = options.residual_refresh != 0 && (iteration + 1) % options.residual_refresh == 0;
-        begin_iteration<<<1, 1, 0, stream(context)>>>(state, last, refresh);
-        launch_check();
         backend.apply_and_dot_into(A, p, ap, &state->denominator);
         ++info.matvecs;
         if (explicit_residual)
         {
             backend.dot_into(r, p, &state->numerator);
         }
-        check_alpha<<<1, 1, 0, stream(context)>>>(state, explicit_residual);
+        check_alpha<<<1, 1, 0, stream(context)>>>(state, explicit_residual, last, refresh);
         launch_check();
         if (explicit_residual)
         {
@@ -340,8 +341,6 @@ SolveInfo solve_device_impl(const Matrix &A, ConstVectorView b, VectorView x, Wo
             backend.dot_into(r, r, &state->residual_squared);
         }
         backend.norm_from_squared_into(r, &state->residual_squared, &state->packet.residual_norm);
-        check_residual<<<1, 1, 0, stream(context)>>>(state, explicit_residual);
-        launch_check();
         if (explicit_residual && !last)
         {
             backend.dot_into(r, ap, &state->next_rho);
@@ -350,7 +349,7 @@ SolveInfo solve_device_impl(const Matrix &A, ConstVectorView b, VectorView x, Wo
         {
             backend.multiply_and_dot_into(M->inverse_diagonal(), r, z, &state->next_rho);
         }
-        check_beta<<<1, 1, 0, stream(context)>>>(state, explicit_residual, M != nullptr);
+        check_residual_and_beta<<<1, 1, 0, stream(context)>>>(state, explicit_residual, M != nullptr);
         launch_check();
         guarded_direction<<<blocks(p.size()), block_size, 0, stream(context)>>>(M == nullptr ? r : z, p, state,
                                                                                 explicit_residual ? -1.0 : 1.0);
