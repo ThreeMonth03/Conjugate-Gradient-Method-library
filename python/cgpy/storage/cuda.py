@@ -46,7 +46,7 @@ class Vector:
         """Snapshot a real host vector, normalizing and uploading it once."""
         source = host.normalize_host_array(source, 1)
         result = cls._empty(source.size, device, stream)
-        result.copy_from_host(source, stream=stream)
+        result._native.copy_from_host(source, stream)
         return result
 
     @property

@@ -19,7 +19,7 @@ Run from the repository root:
 
 ```bash
 python3.12 -m venv .venv
-.venv/bin/python -m pip install .
+.venv/bin/python -m pip install --cache-dir .cache/pip .
 ```
 
 ```python
@@ -41,7 +41,8 @@ for sparse matrices, prepared solves and ownership rules.
 ## Development
 
 ```bash
-.venv/bin/python -m pip install -r requirements/test.lock -r requirements/docs.lock
+.venv/bin/python -m pip install --cache-dir .cache/pip \
+    -r requirements/test.lock -r requirements/docs.lock
 make test lint docs doctest
 ```
 

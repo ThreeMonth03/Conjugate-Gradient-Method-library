@@ -7,6 +7,27 @@ from .. import _core
 from .._interop import host
 
 
+def _normalize_index_array(
+    value: npt.ArrayLike, *, allow_empty: bool = False
+) -> np.ndarray:
+    array = np.asarray(value)
+    if array.ndim != 1:
+        raise ValueError("CSR index arrays must be one-dimensional")
+    if array.dtype.kind not in "iu":
+        if allow_empty and array.size == 0:
+            array = np.empty(0, dtype=np.uintp)
+        else:
+            raise ValueError("CSR index arrays must contain integers")
+    # Preserve width/sign so the native copy can reject negative or overflowing
+    # indices before converting to size_t. Normalize only foreign byte order,
+    # alignment and strides; native contiguous buffers remain borrowed here.
+    return np.require(
+        array,
+        dtype=array.dtype.newbyteorder("="),
+        requirements=("C", "A"),
+    )
+
+
 class CsrMatrix:
     """Own a validated canonical compressed sparse row matrix.
 
@@ -35,7 +56,9 @@ class CsrMatrix:
     Notes
     -----
     Construction snapshots the arrays. Later changes to them do not alter the
-    operator. Canonicalize SciPy CSR with ``sum_duplicates()`` and
+    operator. Strided, unaligned, read-only and non-native-endian inputs are
+    normalized when needed. Signed/unsigned integer indices are range-checked
+    before native conversion. Canonicalize SciPy CSR with ``sum_duplicates()`` and
     ``sort_indices()`` before wrapping arrays that need those operations.
 
     Examples
@@ -53,18 +76,9 @@ class CsrMatrix:
         data: npt.ArrayLike,
         shape: tuple[int, int],
     ) -> None:
-        rowptr, columns = np.asarray(indptr), np.asarray(indices)
-        if rowptr.ndim != 1 or columns.ndim != 1:
-            raise ValueError("CSR index arrays must be one-dimensional")
-        if rowptr.dtype.kind not in "iu" or (
-            columns.size and columns.dtype.kind not in "iu"
-        ):
-            raise ValueError("CSR index arrays must contain integers")
-        if np.any(rowptr < 0) or np.any(columns < 0):
-            raise ValueError("CSR indices must be nonnegative")
-        values = host.normalize_real_array(data, "data")
-        if values.ndim != 1:
-            raise ValueError("CSR data must be one-dimensional")
+        rowptr = _normalize_index_array(indptr)
+        columns = _normalize_index_array(indices, allow_empty=True)
+        values = host.normalize_host_array(data, 1, name="data")
         self._native = _core.CsrMatrix(rowptr, columns, values, shape)
 
     @property

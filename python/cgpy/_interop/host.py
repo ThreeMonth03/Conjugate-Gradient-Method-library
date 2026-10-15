@@ -13,21 +13,19 @@ def normalize_real_array(value: npt.ArrayLike, name: str) -> np.ndarray:
     return array
 
 
-def normalize_dense_matrix(A: npt.ArrayLike) -> np.ndarray:
-    A = np.require(
-        normalize_real_array(A, "A"), dtype=np.float64, requirements=("C", "A")
-    )
-    if A.ndim != 2:
-        raise ValueError("A must be a two-dimensional matrix")
-    return A
-
-
-def normalize_host_array(value: npt.ArrayLike, ndim: int) -> np.ndarray:
-    result = np.require(
-        normalize_real_array(value, "source"),
-        dtype=np.float64,
-        requirements=("C", "A"),
+def normalize_host_array(
+    value: npt.ArrayLike,
+    ndim: int,
+    *,
+    name: str = "source",
+    copy: bool = False,
+) -> np.ndarray:
+    array = normalize_real_array(value, name)
+    result = (
+        np.array(array, dtype=np.float64, order="C", copy=True)
+        if copy
+        else np.require(array, dtype=np.float64, requirements=("C", "A"))
     )
     if result.ndim != ndim:
-        raise ValueError(f"source must have {ndim} dimensions")
+        raise ValueError(f"{name} must have {ndim} dimensions")
     return result

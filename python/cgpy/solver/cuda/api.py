@@ -6,7 +6,7 @@ from ..._interop import host
 from ..._runtime import cuda as cuda_runtime
 from ...matrix import csr
 from ...storage import cuda as storage
-from .. import _validation, result
+from .. import result
 from . import prepared
 from . import workspace as workspace_module
 
@@ -92,9 +92,6 @@ def solve_into(
     follow PreparedSolver.solve_into, including the true-residual stopping rule
     max(atol, rtol*||b||2). Callers must supply an SPD matrix.
     """
-    maxiter, residual_refresh = _validation.validate_iteration_limits(
-        maxiter, residual_refresh
-    )
     return cuda_runtime.load().solve_into(
         cuda_interop.native_object(A),
         cuda_interop.native_object(b),
@@ -142,6 +139,9 @@ def solve(
     SolveResult
         GPU Vector and status/counts. Download with result.x.to_host().
     """
+    maxiter, residual_refresh = _core._validate_iteration_limits(
+        maxiter, residual_refresh
+    )
     if not hasattr(b, "__cuda_array_interface__"):
         raise ValueError(
             "b must be a device vector with __cuda_array_interface__"

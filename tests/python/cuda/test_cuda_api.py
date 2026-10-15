@@ -44,6 +44,189 @@ def system():
     return matrix, matrix @ truth, truth
 
 
+class IndexCount:
+    def __init__(self, value):
+        self.value = value
+        self.calls = 0
+
+    def __index__(self):
+        self.calls += 1
+        return self.value
+
+
+@pytest.mark.parametrize("entry", ["convenience", "strict", "prepared"])
+@pytest.mark.parametrize("option", ["maxiter", "residual_refresh"])
+def test_cuda_integer_protocol_is_evaluated_once_per_option(
+    gpu, entry, option
+):
+    A = gpu.DenseMatrix.from_host(np.eye(2))
+    b = gpu.Vector.from_host(np.ones(2))
+    count = IndexCount(2)
+    options = {option: count}
+    if entry == "convenience":
+        assert gpu.solve(A, b, **options).converged
+    else:
+        plan = gpu.prepare(A)
+        workspace = plan.create_workspace()
+        x = plan.create_vector()
+        info = (
+            gpu.solve_into(A, b, x, workspace=workspace, **options)
+            if entry == "strict"
+            else plan.solve_into(b, x, workspace=workspace, **options)
+        )
+        assert info.converged
+    assert count.calls == 1
+
+
+@pytest.mark.parametrize("entry", ["strict", "prepared"])
+@pytest.mark.parametrize("option", ["maxiter", "residual_refresh"])
+def test_cuda_validates_output_after_integer_protocol_callbacks(
+    gpu, entry, option
+):
+    A = gpu.DenseMatrix.from_host(np.eye(2))
+    b = gpu.Vector.from_host(np.ones(2))
+    plan = gpu.prepare(A)
+    workspace = plan.create_workspace()
+    storage = plan.create_vector()
+
+    class OutputView:
+        owner = storage
+        readonly = False
+
+        @property
+        def __cuda_array_interface__(self):
+            interface = dict(self.owner.__cuda_array_interface__)
+            interface["data"] = (interface["data"][0], self.readonly)
+            return interface
+
+    output = OutputView()
+
+    class FreezeOutput(IndexCount):
+        def __index__(self):
+            output.readonly = True
+            return super().__index__()
+
+    count = FreezeOutput(2)
+    with pytest.raises(ValueError, match="writable"):
+        if entry == "strict":
+            gpu.solve_into(
+                A, b, output, workspace=workspace, **{option: count}
+            )
+        else:
+            plan.solve_into(b, output, workspace=workspace, **{option: count})
+    assert count.calls == 1
+    np.testing.assert_array_equal(storage.to_host(), np.zeros(2))
+    output.readonly = False
+    assert plan.solve_into(b, output, workspace=workspace).converged
+    np.testing.assert_array_equal(storage.to_host(), np.ones(2))
+
+
+@pytest.mark.parametrize("option", ["maxiter", "residual_refresh"])
+@pytest.mark.parametrize("value", [-1, 1.5, 1 << 100, None, "1"])
+def test_cuda_iteration_errors_preserve_output_and_workspace(
+    gpu, option, value
+):
+    A = gpu.DenseMatrix.from_host(np.eye(2))
+    b = gpu.Vector.from_host(np.ones(2))
+    plan = gpu.prepare(A)
+    workspace = plan.create_workspace()
+    x = plan.create_vector()
+    with pytest.raises(ValueError, match=option):
+        gpu.solve(A, b, **{option: value})
+    with pytest.raises(ValueError, match=option):
+        gpu.solve_into(A, b, x, workspace=workspace, **{option: value})
+    with pytest.raises(ValueError, match=option):
+        plan.solve_into(b, x, workspace=workspace, **{option: value})
+    np.testing.assert_array_equal(x.to_host(), np.zeros(2))
+    assert plan.solve_into(b, x, workspace=workspace).converged
+
+
+@pytest.mark.parametrize(
+    "count",
+    [
+        np.int64(2),
+        np.uint64(2),
+        IndexCount(2),
+        True,
+        int(np.iinfo(np.uintp).max),
+    ],
+)
+def test_cuda_entry_points_accept_integer_index_protocol_and_native_max(
+    gpu, count
+):
+    A = gpu.DenseMatrix.from_host(np.eye(2))
+    b = gpu.Vector.from_host(np.ones(2))
+    plan = gpu.prepare(A)
+    workspace = plan.create_workspace()
+    x = plan.create_vector()
+    assert gpu.solve(A, b, maxiter=count, residual_refresh=count).converged
+    assert gpu.solve_into(
+        A, b, x, workspace=workspace, maxiter=count, residual_refresh=count
+    ).converged
+    x.fill(0)
+    assert plan.solve_into(
+        b, x, workspace=workspace, maxiter=count, residual_refresh=count
+    ).converged
+    np.testing.assert_allclose(x.to_host(), np.ones(2))
+
+
+@pytest.mark.parametrize("count", [False, np.uint64(0), IndexCount(0)])
+def test_cuda_zero_update_limit_preserves_initial_guess(gpu, count):
+    A = gpu.DenseMatrix.from_host(np.eye(2))
+    b = gpu.Vector.from_host(np.ones(2))
+    plan = gpu.prepare(A)
+    workspace = plan.create_workspace()
+    x = plan.create_vector()
+    results = [
+        gpu.solve(A, b, maxiter=count).info,
+        gpu.solve_into(A, b, x, workspace=workspace, maxiter=count),
+        plan.solve_into(b, x, workspace=workspace, maxiter=count),
+    ]
+    assert all(info.status == "max_iterations" for info in results)
+    assert all(info.iterations == 0 for info in results)
+    np.testing.assert_array_equal(x.to_host(), np.zeros(2))
+
+
+@pytest.mark.parametrize("error", [MemoryError, RuntimeError])
+def test_cuda_iteration_protocol_preserves_unexpected_exceptions(gpu, error):
+    class BrokenIndex:
+        def __index__(self):
+            raise error("index sentinel")
+
+    A = gpu.DenseMatrix.from_host(np.eye(2))
+    b = gpu.Vector.from_host(np.ones(2))
+    plan = gpu.prepare(A)
+    workspace = plan.create_workspace()
+    x = plan.create_vector()
+    for call in (
+        lambda: gpu.solve(A, b, maxiter=BrokenIndex()),
+        lambda: gpu.solve_into(
+            A, b, x, workspace=workspace, maxiter=BrokenIndex()
+        ),
+        lambda: plan.solve_into(
+            b, x, workspace=workspace, maxiter=BrokenIndex()
+        ),
+    ):
+        with pytest.raises(error, match="index sentinel"):
+            call()
+    np.testing.assert_array_equal(x.to_host(), np.zeros(2))
+    assert plan.solve_into(b, x, workspace=workspace).converged
+
+
+def test_cuda_host_upload_normalizes_foreign_storage_and_owns_snapshot(gpu):
+    backing = np.ndarray(
+        (6,), dtype=">f4", buffer=bytearray(6 * 4 + 1), offset=1
+    )
+    backing[:] = [1.0, 99.0, 2.0, 99.0, 3.0, 99.0]
+    source = backing[::2]
+    source.setflags(write=False)
+    vector = gpu.Vector.from_host(source)
+    backing.fill(0)
+    np.testing.assert_array_equal(vector.to_host(), [1.0, 2.0, 3.0])
+    vector.copy_from_host(np.array([3.0, 2.0, 1.0], dtype=np.int16))
+    np.testing.assert_array_equal(vector.to_host(), [3.0, 2.0, 1.0])
+
+
 def cpu_csr(matrix):
     from scipy.sparse import csr_matrix
 
