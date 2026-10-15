@@ -1,0 +1,499 @@
+Main baseline — 2026-10-16
+==========================
+
+Measured compiled source: ``b96e455972b937641cec52fc7fc86e75a058f07c``.
+These measurements precede this performance-optimization round. They are not
+measurements of subsequent optimizations or every later checkout. The report
+commit follows the measured revision. Sampling ran on 2026-10-16 from
+00:17 to 00:28 Asia/Taipei (2026-10-15 16:17–16:28 UTC), with frozen packages,
+no concurrent project builds/tests/profilers, and no tracked source changes.
+The two pre-existing untracked research files were preserved. No failed runs
+were retried or discarded.
+
+All **680 candidate/case results**, across 26 configurations × two fresh
+processes, passed independent stable CPU true-residual checks before and after
+timing. All **110 table rows** are retained below, including losses and neutral
+preconditioning cases. Exact inputs are represented by recorded byte hashes.
+
+The CPU release native dense median is lower than NumPy in 6/16 rows and eager
+Torch in 8/16. Explicit CPU BLAS is lower than NumPy in 15/16 and Torch in 16/16;
+its NumPy loss is Jacobi prepared n=2048: 3.796 versus 3.686 ms (1.030×), with
+overlapping process ranges. Native CPU CSR is lower than both references in
+all 16 rows. These are within-batch comparisons: the separate CPU BLAS batch
+also retains its native candidate and reference timings.
+
+Native CUDA medians are lower than eager Torch in every listed dense, CSR
+and scaled/neutral row. Explicit cuBLAS wins 12/16 dense comparisons; its four
+Jacobi API losses at n=64/256/1024/2048 are 1.290/1.425/1.503/1.460× slower
+than eager Torch. This is completed resident-solve wall time, including API
+resource lifecycle where selected. No isolated phase or bottleneck is inferred.
+
+On the four scaled sparse GPU inputs, Jacobi reduces native updates from
+575/1498/261/444 to 48/115/25/37. Native CG/PCG median ratios are
+7.12–10.11× prepared and 7.93–10.28× API. The neutral input stays at 50 updates;
+PCG is 1.23× slower prepared and 1.40× slower API. Unpreconditioned native and
+Torch GPU counts differ on two scaled inputs, explicitly retained below.
+CPU LU reuse has a lower median than native PCG on all five strategy fixtures
+in both scopes; its prior factorization is excluded. No universal ranking or
+equal-error claim follows from these finite fixtures.
+
+.. csv-table:: Descriptive median wins and reference/candidate ratios
+   :header: "Build / suite", "candidate", "reference", "lower median rows", "ratio range"
+
+   "cpu-release / cpu-dense-f64-v1","native","numpy-out","6/16","0.60–5.88×"
+   "cpu-release / cpu-dense-f64-v1","native","torch-eager-out","8/16","0.66–8.82×"
+   "cpu-blas / cpu-dense-f64-v1","native","numpy-out","8/16","0.59–5.94×"
+   "cpu-blas / cpu-dense-f64-v1","native","torch-eager-out","8/16","0.62–8.79×"
+   "cpu-blas / cpu-dense-f64-v1","native-blas","numpy-out","15/16","0.97–9.61×"
+   "cpu-blas / cpu-dense-f64-v1","native-blas","torch-eager-out","16/16","1.05–14.21×"
+   "cpu-release / cpu-csr-f64-v1","native","scipy-out","16/16","1.64–13.56×"
+   "cpu-release / cpu-csr-f64-v1","native","torch-eager-out","16/16","1.18–18.26×"
+   "cuda-release / cuda-dense-f64-v1","cuda-native","torch-cuda-eager","16/16","1.19–2.05×"
+   "cuda-release / cuda-dense-f64-v1","cuda-cublas","torch-cuda-eager","12/16","0.67–1.99×"
+   "cuda-release / cuda-csr-f64-v1","cuda-native","torch-cuda-eager","16/16","1.67–2.12×"
+   "cuda-release / sparse-solvers","cuda-native","torch-cuda-eager","20/20","1.77–1.94×"
+
+Ratios above 1 favor the candidate. Counts use medians only; process ranges
+and numerical work are retained in the full tables below. They are not
+confidence statements.
+
+
+Hardware, builds and sampling
+-----------------------------
+
+Host: 13th Gen Intel(R) Core(TM) i7-13700K; Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39; CPython 3.12.3.
+GPU: NVIDIA GeForce RTX 2060, compute capability 7.5,
+device 0, 6,442,123,264 reported bytes; UUID ``GPU-725be96d-2b67-c8ec-fa10-5d9b23a2c302``.
+NVIDIA display driver 591.86; CUDA toolkit/compiler 12.8.93, runtime API 12080,
+driver API 13010, architecture 75. GPU clocks, thermal/display activity and
+physical-core isolation from the Windows host were not controlled.
+
+All runs use ``taskset -c 0``, one native/library/Torch intraop thread and
+one Torch interop thread. CPU builds use GNU 16.0.1; CUDA uses GNU 13.3.0.
+All are Release ``-O3 -DNDEBUG`` with OpenMP disabled. CPU BLAS is the
+private sequential LP64 OpenBLAS 0.3.30 provider with locking. No automatic
+kernel selection is used. NumPy 2.2.6, SciPy 1.15.3 and Torch 2.8.0+cpu /
+2.8.0+cu128 use separate project-local CPU/CUDA environments.
+
+Every configuration uses seed 20261015 and three warmups. Implementation
+candidates use standard CG, fused native operations, rtol=1e-8, atol=1e-12,
+maxiter=2000 and true-residual
+refresh/restart every 50 updates. Dense repeats three solves per round;
+CSR repeats one. Thirty requested Williams rounds remain 30 for two, three
+or six candidates; the four-candidate BLAS configuration completes 32 rounds.
+Pass one executes the configurations forward and pass two reverses them.
+
+Each cell is the **median of the two process medians**, in milliseconds,
+followed by **[minimum–maximum process median]**. Each process median uses
+round-average completed wall times. The bracket is neither a confidence
+interval nor individual-call tail latency. Two launches are limited evidence
+of process variance; no statistical significance or universal speedup is claimed.
+
+Native and matching-policy prepared candidates reuse output/workspace/Jacobi
+and charge every x0 reset. API charges per-call output/workspace/Jacobi
+allocation and setup. Official SciPy CG allocates iterative workspace in both
+scopes and follows its own residual policy. CUDA inputs
+are resident, with completion fences; uploads/snapshots, canonical CSR
+conversion and correctness downloads are excluded. Torch uses eager public
+operations implementing this project's matching-policy CG, not an official
+Torch CG solver, ``torch.compile`` or CUDA Graphs. SuperLU total/reuse and
+official SciPy CG/PCG remain strategy comparisons with their own stopping
+and allocation policies. LU reuse excludes factorization in both scopes.
+Do not subtract separately measured API/prepared medians to isolate a phase.
+See :doc:`methodology` for the full timing, storage and accuracy contracts.
+
+The work column gives iteration/matvec counts. A single value is shared by
+all candidates and both processes; otherwise labels identify the differences.
+N=native, B=BLAS/cuBLAS, NP=NumPy, S=SciPy-out, T=Torch; NCG/NPCG and
+SCG/SPCG denote native and official SciPy CG/PCG; LUT/LUR denote LU total/reuse.
+``max R/tol`` is the largest independent residual/threshold ratio among
+that row's candidates and both processes. Different counts mean different
+numerical work despite shared recurrence; those are times to accepted
+solutions, not equal-work kernel speedups.
+
+
+CPU release — dense
+-------------------
+
+.. csv-table:: Completed solve milliseconds; process-median range
+   :class: benchmark-results
+   :header: "M","scope","case","N","NP","T","iter/matvec","max R/tol"
+
+   "none","prepared","dense-64","0.0348 [0.0346–0.0349]","0.2044 [0.2016–0.2073]","0.3065 [0.2931–0.3200]","49/51","0.893697"
+   "none","prepared","dense-256","0.5417 [0.5326–0.5509]","0.5415 [0.4920–0.5910]","0.6563 [0.6549–0.6577]","67/70","0.902831"
+   "none","prepared","dense-1024","9.9177 [9.5123–10.3231]","7.5079 [7.1157–7.9001]","7.8991 [7.7873–8.0108]","70/73","0.880853"
+   "none","prepared","dense-2048","86.8585 [82.3764–91.3406]","51.7299 [50.4608–52.9989]","57.6699 [55.5751–59.7647]","70/73","0.897447"
+   "none","api","dense-64","0.0383 [0.0373–0.0392]","0.1846 [0.1845–0.1847]","0.2809 [0.2777–0.2840]","49/51","0.893697"
+   "none","api","dense-256","0.5583 [0.5538–0.5627]","0.5936 [0.5830–0.6042]","0.7558 [0.7365–0.7750]","67/70","0.902831"
+   "none","api","dense-1024","9.3471 [9.2502–9.4441]","7.0990 [7.0093–7.1886]","7.4344 [7.3291–7.5396]","70/73","0.880853"
+   "none","api","dense-2048","77.5117 [75.1834–79.8399]","51.1813 [51.1473–51.2154]","52.8660 [51.6184–54.1136]","70/73","0.897447"
+   "jacobi","prepared","dense-64","0.0072 [0.0071–0.0072]","0.0280 [0.0275–0.0285]","0.0464 [0.0454–0.0473]","5/7","0.041680"
+   "jacobi","prepared","dense-256","0.0523 [0.0514–0.0532]","0.0515 [0.0455–0.0575]","0.0666 [0.0642–0.0690]","4/6","0.173276"
+   "jacobi","prepared","dense-1024","0.9633 [0.9244–1.0023]","0.7181 [0.7107–0.7255]","0.7726 [0.7705–0.7746]","4/6","0.015961"
+   "jacobi","prepared","dense-2048","5.8248 [5.5941–6.0555]","3.6703 [3.5553–3.7853]","4.1525 [4.1163–4.1886]","3/5","0.844587"
+   "jacobi","api","dense-64","0.0133 [0.0132–0.0133]","0.0386 [0.0379–0.0392]","0.0678 [0.0673–0.0683]","5/7","0.041680"
+   "jacobi","api","dense-256","0.0591 [0.0581–0.0602]","0.0619 [0.0582–0.0657]","0.0974 [0.0973–0.0976]","4/6","0.173276"
+   "jacobi","api","dense-1024","0.8269 [0.7838–0.8701]","0.7099 [0.6216–0.7982]","0.7914 [0.7096–0.8733]","4/6","0.015961"
+   "jacobi","api","dense-2048","5.4705 [5.4010–5.5399]","3.5940 [3.5573–3.6307]","3.8331 [3.7269–3.9393]","3/5","0.844587"
+
+
+CPU release — CSR
+-----------------
+
+The Poisson diagonal is constant 4: Jacobi is scalar scaling and
+has no conditioning benefit on this suite.
+
+.. csv-table:: Completed solve milliseconds; process-median range
+   :class: benchmark-results
+   :header: "M","scope","case","N","S","T","iter/matvec","max R/tol"
+
+   "none","prepared","poisson-8","0.0109 [0.0103–0.0115]","0.1462 [0.1379–0.1544]","0.1852 [0.1768–0.1935]","26/28","0.658698"
+   "none","prepared","poisson-32","0.3608 [0.3465–0.3751]","1.2358 [1.2066–1.2650]","1.2070 [1.1681–1.2460]","129/133","0.971015"
+   "none","prepared","poisson-64","3.4757 [2.9440–4.0074]","5.7123 [5.5182–5.9064]","4.7035 [4.5581–4.8489]","290/297","0.986788"
+   "none","prepared","poisson-128","14.6987 [14.0417–15.3558]","25.7277 [24.9229–26.5325]","17.9967 [16.9750–19.0183]","395/404","0.984698"
+   "none","api","poisson-8","0.0195 [0.0180–0.0210]","0.1543 [0.1522–0.1564]","0.2051 [0.1925–0.2177]","26/28","0.658698"
+   "none","api","poisson-32","0.3629 [0.3468–0.3790]","1.2436 [1.2031–1.2842]","1.2076 [1.1854–1.2297]","129/133","0.971015"
+   "none","api","poisson-64","2.8609 [2.7056–3.0162]","5.7804 [5.5080–6.0528]","4.7130 [4.4859–4.9400]","290/297","0.986788"
+   "none","api","poisson-128","14.7477 [14.2527–15.2427]","27.0862 [25.7181–28.4544]","17.9088 [17.6215–18.1960]","395/404","0.984698"
+   "jacobi","prepared","poisson-8","0.0115 [0.0114–0.0116]","0.1554 [0.1539–0.1569]","0.2093 [0.2038–0.2148]","26/28","0.658698"
+   "jacobi","prepared","poisson-32","0.3974 [0.3930–0.4018]","1.2740 [1.2559–1.2921]","1.3185 [1.2973–1.3396]","129/133","0.971015"
+   "jacobi","prepared","poisson-64","3.1014 [3.0706–3.1323]","6.1046 [6.0240–6.1853]","5.1368 [5.1015–5.1722]","290/297","0.986788"
+   "jacobi","prepared","poisson-128","16.4049 [16.1433–16.6666]","28.9058 [28.5347–29.2768]","19.5903 [19.2421–19.9386]","395/404","0.984698"
+   "jacobi","api","poisson-8","0.0221 [0.0189–0.0254]","0.1773 [0.1627–0.1918]","0.2418 [0.2364–0.2472]","26/28","0.658698"
+   "jacobi","api","poisson-32","0.4062 [0.3950–0.4174]","1.2871 [1.2102–1.3640]","1.3363 [1.3010–1.3716]","129/133","0.971015"
+   "jacobi","api","poisson-64","3.1817 [3.1413–3.2221]","6.0879 [5.9875–6.1883]","5.3103 [5.2219–5.3987]","290/297","0.986788"
+   "jacobi","api","poisson-128","16.9179 [16.3216–17.5142]","29.1480 [28.3800–29.9159]","19.9285 [19.2725–20.5845]","395/404","0.984698"
+
+
+CPU BLAS build — dense
+----------------------
+
+.. csv-table:: Completed solve milliseconds; process-median range
+   :class: benchmark-results
+   :header: "M","scope","case","N","B","NP","T","iter/matvec","max R/tol"
+
+   "none","prepared","dense-64","0.0324 [0.0318–0.0330]","0.0200 [0.0197–0.0204]","0.1926 [0.1874–0.1977]","0.2848 [0.2750–0.2945]","49/51","0.893697"
+   "none","prepared","dense-256","0.5408 [0.5293–0.5522]","0.2441 [0.2396–0.2485]","0.5787 [0.5629–0.5945]","0.6219 [0.6017–0.6421]","67/70","0.949804"
+   "none","prepared","dense-1024","9.9177 [9.8546–9.9808]","7.4851 [7.1146–7.8556]","7.6477 [7.3467–7.9487]","8.6396 [8.3152–8.9640]","70/73","0.880853"
+   "none","prepared","dense-2048","86.6400 [81.1186–92.1615]","50.6597 [48.1160–53.2034]","51.4872 [50.6147–52.3598]","53.2960 [52.7088–53.8832]","70/73","0.897447"
+   "none","api","dense-64","0.0415 [0.0360–0.0470]","0.0299 [0.0258–0.0340]","0.2239 [0.1883–0.2596]","0.3425 [0.2832–0.4018]","49/51","0.893697"
+   "none","api","dense-256","0.6019 [0.5421–0.6617]","0.3396 [0.3249–0.3543]","0.6288 [0.5699–0.6876]","0.8851 [0.7240–1.0463]","67/70","0.949804"
+   "none","api","dense-1024","10.3480 [9.5486–11.1474]","7.1999 [6.5284–7.8715]","8.1586 [7.2495–9.0678]","9.1273 [8.0416–10.2130]","70/73","0.880853"
+   "none","api","dense-2048","80.5515 [80.2618–80.8412]","49.3381 [49.0968–49.5794]","51.9802 [51.6551–52.3052]","54.1210 [53.4930–54.7490]","70/73","0.897447"
+   "jacobi","prepared","dense-64","0.0095 [0.0072–0.0118]","0.0065 [0.0058–0.0072]","0.0412 [0.0314–0.0511]","0.0693 [0.0520–0.0865]","5/7","0.041680"
+   "jacobi","prepared","dense-256","0.0577 [0.0510–0.0644]","0.0300 [0.0264–0.0336]","0.0709 [0.0562–0.0855]","0.0874 [0.0650–0.1098]","4/6","0.173276"
+   "jacobi","prepared","dense-1024","1.1201 [0.9901–1.2501]","0.8716 [0.7278–1.0153]","0.8990 [0.6920–1.1060]","1.0168 [0.7999–1.2336]","4/6","0.015961"
+   "jacobi","prepared","dense-2048","5.8228 [5.6824–5.9632]","3.7961 [3.6323–3.9600]","3.6861 [3.6625–3.7096]","4.0211 [3.9337–4.1084]","3/5","0.844587"
+   "jacobi","api","dense-64","0.0127 [0.0125–0.0129]","0.0121 [0.0117–0.0125]","0.0405 [0.0399–0.0410]","0.0720 [0.0691–0.0749]","5/7","0.041680"
+   "jacobi","api","dense-256","0.0546 [0.0542–0.0551]","0.0405 [0.0403–0.0406]","0.0641 [0.0633–0.0649]","0.0940 [0.0923–0.0957]","4/6","0.173276"
+   "jacobi","api","dense-1024","0.8088 [0.7933–0.8243]","0.5734 [0.5664–0.5804]","0.6136 [0.6132–0.6140]","0.7255 [0.7161–0.7349]","4/6","0.015961"
+   "jacobi","api","dense-2048","5.3566 [5.3213–5.3919]","3.3971 [3.3703–3.4238]","3.5550 [3.5281–3.5818]","3.8341 [3.7533–3.9150]","3/5","0.844587"
+
+
+CUDA — dense
+------------
+
+.. csv-table:: Completed solve milliseconds; process-median range
+   :class: benchmark-results
+   :header: "M","scope","case","N","B","T","iter/matvec","max R/tol"
+
+   "none","prepared","dense-64","5.0959 [4.8704–5.3214]","5.1538 [5.0045–5.3032]","10.2439 [9.9542–10.5337]","49/51","0.805850"
+   "none","prepared","dense-256","7.3061 [7.2872–7.3249]","7.1443 [7.1171–7.1716]","13.7016 [13.6421–13.7611]","67/70","0.944865"
+   "none","prepared","dense-1024","10.4540 [10.4142–10.4939]","9.0494 [8.9806–9.1183]","15.0417 [14.8594–15.2240]","70/73","0.880853"
+   "none","prepared","dense-2048","16.6067 [16.5648–16.6486]","15.1287 [15.0309–15.2264]","20.8693 [20.8239–20.9148]","70/73","0.897447"
+   "none","api","dense-64","5.2027 [5.0604–5.3450]","6.9780 [6.9468–7.0093]","10.3494 [10.3067–10.3921]","49/51","0.805850"
+   "none","api","dense-256","7.3970 [7.2684–7.5256]","8.7663 [8.5465–8.9861]","13.6243 [13.1214–14.1273]","67/70","0.944865"
+   "none","api","dense-1024","10.7520 [10.1117–11.3924]","10.8072 [10.1954–11.4189]","15.3794 [14.5124–16.2464]","70/73","0.880853"
+   "none","api","dense-2048","16.1070 [15.9303–16.2837]","16.3415 [16.0699–16.6131]","20.2376 [20.0411–20.4341]","70/73","0.897447"
+   "jacobi","prepared","dense-64","0.8195 [0.8009–0.8381]","0.8608 [0.8448–0.8767]","1.6766 [1.6431–1.7101]","5/7","0.041680"
+   "jacobi","prepared","dense-256","0.7988 [0.7820–0.8155]","0.7858 [0.7796–0.7919]","1.4095 [1.3811–1.4379]","4/6","0.173276"
+   "jacobi","prepared","dense-1024","1.0930 [1.0642–1.1218]","1.0043 [0.9736–1.0351]","1.4700 [1.4312–1.5088]","4/6","0.015961"
+   "jacobi","prepared","dense-2048","1.3815 [1.3792–1.3837]","1.2457 [1.2083–1.2832]","1.6421 [1.6346–1.6496]","3/5","0.844587"
+   "jacobi","api","dense-64","0.9993 [0.9424–1.0563]","2.5904 [2.5007–2.6801]","2.0088 [1.9398–2.0779]","5/7","0.041680"
+   "jacobi","api","dense-256","0.9076 [0.8881–0.9271]","2.5007 [2.4585–2.5428]","1.7554 [1.7159–1.7950]","4/6","0.173276"
+   "jacobi","api","dense-1024","1.2038 [1.1737–1.2339]","2.7209 [2.6952–2.7467]","1.8108 [1.7864–1.8351]","4/6","0.015961"
+   "jacobi","api","dense-2048","1.4431 [1.4407–1.4456]","2.7925 [2.7217–2.8632]","1.9124 [1.8498–1.9750]","3/5","0.844587"
+
+
+CUDA — constant-diagonal CSR
+----------------------------
+
+The Poisson diagonal is constant 4: Jacobi is scalar scaling and
+has no conditioning benefit on this suite.
+
+.. csv-table:: Completed solve milliseconds; process-median range
+   :class: benchmark-results
+   :header: "M","scope","case","N","T","iter/matvec","max R/tol"
+
+   "none","prepared","poisson-8","2.6263 [2.3094–2.9433]","5.5649 [4.9008–6.2291]","26/28","0.658698"
+   "none","prepared","poisson-32","13.6881 [13.4163–13.9600]","27.1583 [24.6738–29.6428]","129/133","0.971015"
+   "none","prepared","poisson-64","30.2525 [30.2094–30.2956]","57.7702 [57.6785–57.8619]","290/297","0.986788"
+   "none","prepared","poisson-128","46.2655 [44.4136–48.1174]","83.3017 [80.0833–86.5201]","395/404","0.984698"
+   "none","api","poisson-8","2.9891 [2.7624–3.2158]","5.8818 [5.0752–6.6884]","26/28","0.658698"
+   "none","api","poisson-32","13.8221 [13.2523–14.3918]","26.3923 [24.9435–27.8411]","129/133","0.971015"
+   "none","api","poisson-64","31.2799 [31.1208–31.4390]","59.6415 [58.2887–60.9943]","290/297","0.986788"
+   "none","api","poisson-128","48.3587 [48.2708–48.4466]","87.2058 [80.6580–93.7536]","395/404","0.984698"
+   "jacobi","prepared","poisson-8","4.6279 [4.1221–5.1336]","8.7218 [7.2471–10.1965]","26/28","0.658698"
+   "jacobi","prepared","poisson-32","20.6805 [20.3843–20.9766]","37.7189 [36.1291–39.3087]","129/133","0.971015"
+   "jacobi","prepared","poisson-64","50.4811 [45.8506–55.1115]","93.0594 [84.4538–101.6649]","290/297","0.986788"
+   "jacobi","prepared","poisson-128","73.5206 [65.9821–81.0591]","135.4548 [120.2361–150.6736]","395/404","0.984698"
+   "jacobi","api","poisson-8","4.3500 [3.9496–4.7505]","8.2950 [7.1960–9.3940]","26/28","0.658698"
+   "jacobi","api","poisson-32","20.4547 [18.8469–22.0625]","37.3356 [34.0327–40.6386]","129/133","0.971015"
+   "jacobi","api","poisson-64","49.8249 [42.9101–56.7397]","89.3411 [77.5660–101.1162]","290/297","0.986788"
+   "jacobi","api","poisson-128","69.8293 [67.4848–72.1737]","116.7591 [116.4921–117.0261]","395/404","0.984698"
+
+
+CUDA — scaled sparse and neutral input
+--------------------------------------
+
+Scaled inputs use ``A = D P D``, D spanning 1..20, with one neutral input.
+The CG count differences for scaled 2D-16 and 3D-6 are numerical work
+differences; those rows compare time to an accepted solution.
+
+.. csv-table:: Completed solve milliseconds; process-median range
+   :class: benchmark-results
+   :header: "M","scope","case","N","T","iter/matvec","max R/tol"
+
+   "none","prepared","scaled-poisson-2d-16","59.2093 [58.2447–60.1740]","109.1776 [106.9429–111.4124]","N:575/588; T:574/587","0.949605"
+   "none","prepared","scaled-poisson-2d-32","183.8893 [177.5090–190.2697]","336.8948 [325.3254–348.4641]","1498/1529","0.984252"
+   "none","prepared","scaled-poisson-3d-6","28.7142 [28.4786–28.9497]","51.4626 [50.6978–52.2275]","N:261/268; T:249/255","0.998645"
+   "none","prepared","scaled-poisson-3d-10","54.0099 [51.1716–56.8483]","97.0283 [89.8480–104.2087]","444/454","0.974858"
+   "none","prepared","poisson-2d-16-neutral","6.2516 [6.0873–6.4159]","11.2043 [10.2099–12.1988]","50/52","0.764204"
+   "none","api","scaled-poisson-2d-16","63.9252 [59.3216–68.5288]","122.8429 [111.1805–134.5054]","N:575/588; T:574/587","0.949605"
+   "none","api","scaled-poisson-2d-32","187.8049 [186.0416–189.5683]","341.1451 [337.6237–344.6665]","1498/1529","0.984252"
+   "none","api","scaled-poisson-3d-6","32.4331 [30.0606–34.8056]","58.2484 [54.7601–61.7367]","N:261/268; T:249/255","0.998645"
+   "none","api","scaled-poisson-3d-10","58.1063 [55.3724–60.8402]","102.9425 [95.8435–110.0416]","444/454","0.974858"
+   "none","api","poisson-2d-16-neutral","5.6826 [5.2162–6.1490]","10.4019 [9.5777–11.2262]","50/52","0.764204"
+   "jacobi","prepared","scaled-poisson-2d-16","7.4533 [7.4226–7.4841]","13.8046 [13.7228–13.8865]","48/50","0.911256"
+   "jacobi","prepared","scaled-poisson-2d-32","18.1834 [17.2321–19.1346]","34.5713 [32.3253–36.8173]","115/119","0.929037"
+   "jacobi","prepared","scaled-poisson-3d-6","4.0314 [3.7905–4.2724]","7.8223 [6.9565–8.6880]","25/27","0.439964"
+   "jacobi","prepared","scaled-poisson-3d-10","5.8132 [5.5081–6.1184]","10.7880 [10.1761–11.3998]","37/39","0.969066"
+   "jacobi","prepared","poisson-2d-16-neutral","7.6916 [7.5810–7.8023]","14.6514 [14.3339–14.9690]","50/52","0.764204"
+   "jacobi","api","scaled-poisson-2d-16","7.4695 [7.4256–7.5135]","14.1439 [13.9923–14.2956]","48/50","0.911256"
+   "jacobi","api","scaled-poisson-2d-32","18.2639 [18.2084–18.3194]","34.5085 [33.8132–35.2037]","115/119","0.929037"
+   "jacobi","api","scaled-poisson-3d-6","4.0898 [4.0792–4.1004]","7.7523 [7.7342–7.7705]","25/27","0.439964"
+   "jacobi","api","scaled-poisson-3d-10","5.9165 [5.9125–5.9204]","10.8291 [10.7791–10.8791]","37/39","0.969066"
+   "jacobi","api","poisson-2d-16-neutral","7.9763 [7.9644–7.9882]","15.1801 [14.6499–15.7103]","50/52","0.764204"
+
+
+CPU — official sparse solver strategies
+---------------------------------------
+
+Scaled cases use ``A = D P D`` with positive D spanning 1..20,
+plus a constant-diagonal neutral case. These parameters are not exact
+condition numbers. Official SciPy and direct strategies can have different
+counts/accepted errors; LU can achieve substantially tighter residuals.
+
+For scaled-poisson-2d-32 prepared, the first process records native CG/PCG
+residuals 1.45605e-04 / 1.36862e-04 versus LU's
+3.44175e-12, all below the requested
+1.47316e-04 threshold. This is not an equal-error comparison.
+
+.. csv-table:: Completed solve milliseconds; process-median range
+   :class: benchmark-results
+   :header: "M","scope","case","NCG","NPCG","SCG","SPCG","LUT","LUR","iter/matvec","max R/tol"
+
+   "by candidate","prepared","scaled-poisson-2d-16","0.4002 [0.4001–0.4003]","0.0507 [0.0504–0.0510]","2.2235 [2.2215–2.2255]","0.4308 [0.4266–0.4350]","0.3302 [0.3205–0.3398]","0.0273 [0.0272–0.0273]","NCG:555/568; NPCG:48/50; SCG:282/283; SPCG:48/49; LUT:0/1; LUR:0/1","0.980265"
+   "by candidate","prepared","scaled-poisson-2d-32","3.7953 [3.7729–3.8176]","0.3563 [0.3495–0.3632]","6.5297 [6.5050–6.5544]","1.1269 [1.1094–1.1443]","1.3454 [1.3265–1.3644]","0.0951 [0.0934–0.0968]","NCG:1498/1529; NPCG:115/119; SCG:609/610; SPCG:92/93; LUT:0/1; LUR:0/1","0.988386"
+   "by candidate","prepared","scaled-poisson-3d-6","0.1811 [0.1787–0.1834]","0.0305 [0.0301–0.0308]","1.4851 [1.4640–1.5062]","0.2522 [0.2510–0.2535]","0.3625 [0.3584–0.3666]","0.0259 [0.0256–0.0262]","NCG:252/259; NPCG:25/27; SCG:185/186; SPCG:25/26; LUT:0/1; LUR:0/1","0.978981"
+   "by candidate","prepared","scaled-poisson-3d-10","1.3623 [1.3537–1.3708]","0.1467 [0.1465–0.1469]","3.3281 [3.2774–3.3789]","0.4888 [0.4842–0.4934]","3.0616 [3.0123–3.1109]","0.1295 [0.1226–0.1365]","NCG:444/454; NPCG:37/39; SCG:304/305; SPCG:37/38; LUT:0/1; LUR:0/1","0.974337"
+   "by candidate","prepared","poisson-2d-16-neutral","0.0416 [0.0411–0.0422]","0.0477 [0.0473–0.0480]","0.4100 [0.4039–0.4161]","0.4283 [0.4106–0.4461]","0.2584 [0.2547–0.2621]","0.0209 [0.0203–0.0214]","NCG:50/52; NPCG:50/52; SCG:50/51; SPCG:50/51; LUT:0/1; LUR:0/1","0.764204"
+   "by candidate","api","scaled-poisson-2d-16","0.4130 [0.4058–0.4202]","0.0626 [0.0620–0.0632]","2.1764 [2.1676–2.1853]","0.4464 [0.4447–0.4481]","0.3088 [0.2891–0.3286]","0.0265 [0.0265–0.0265]","NCG:555/568; NPCG:48/50; SCG:282/283; SPCG:48/49; LUT:0/1; LUR:0/1","0.980265"
+   "by candidate","api","scaled-poisson-2d-32","3.7480 [3.7303–3.7657]","0.3682 [0.3657–0.3708]","6.6100 [6.5649–6.6551]","1.1843 [1.1796–1.1890]","1.3198 [1.3136–1.3260]","0.0869 [0.0854–0.0884]","NCG:1498/1529; NPCG:115/119; SCG:609/610; SPCG:92/93; LUT:0/1; LUR:0/1","0.988386"
+   "by candidate","api","scaled-poisson-3d-6","0.1935 [0.1920–0.1950]","0.0445 [0.0440–0.0450]","1.4596 [1.4495–1.4698]","0.2760 [0.2720–0.2800]","0.3609 [0.3558–0.3659]","0.0270 [0.0262–0.0278]","NCG:252/259; NPCG:25/27; SCG:185/186; SPCG:25/26; LUT:0/1; LUR:0/1","0.978981"
+   "by candidate","api","scaled-poisson-3d-10","1.4048 [1.3930–1.4166]","0.1728 [0.1726–0.1730]","3.3041 [3.2973–3.3109]","0.5306 [0.5266–0.5346]","3.0264 [3.0200–3.0328]","0.1209 [0.1152–0.1266]","NCG:444/454; NPCG:37/39; SCG:304/305; SPCG:37/38; LUT:0/1; LUR:0/1","0.974337"
+   "by candidate","api","poisson-2d-16-neutral","0.0511 [0.0511–0.0511]","0.0614 [0.0595–0.0632]","0.4095 [0.4089–0.4102]","0.4431 [0.4367–0.4496]","0.2585 [0.2576–0.2594]","0.0214 [0.0208–0.0219]","NCG:50/52; NPCG:50/52; SCG:50/51; SPCG:50/51; LUT:0/1; LUR:0/1","0.764204"
+
+
+Raw evidence and immutable compiled identity
+--------------------------------------------
+
+All raw JSON, logs and actual argv remain local under
+``build/performance-optimization/baseline/raw/``. They are not stored in Git.
+The complete 52-command forward/reverse declaration, environment/option
+alignment checks, input hashes and per-file SHA-256/bytes are in
+``build/performance-optimization/baseline/manifest.json``. Its SHA-256 is:
+
+``f23623c1414779ebbbdb949c6366ab220379fec32088df75339f8b95746958ff``.
+
+The 52 raw files total 2,655,471 bytes. All 680 results are measured
+and converged; maximum independent R/tol is 0.998644905381452.
+
+* ``cpu-release``:
+  ``_core.cpython-312-x86_64-linux-gnu.so`` → ``fd4e3a62e057a70a18ad8dd60656d5fefb51bee559243171d0d84de45516746a``.
+* ``cpu-blas``:
+  ``_core.cpython-312-x86_64-linux-gnu.so`` → ``cddcdc72d612d16a3e5f8a02b9339ede818d02ebcb7eac298e0317ebb1c2bb09``.
+* ``cuda-release``:
+  ``_core.cpython-312-x86_64-linux-gnu.so`` → ``7e68ab3075f92801e2c2d53e58405f1cccf4f1dc8d2e3147b65c7159b2ecf853``.
+  ``_cuda.cpython-312-x86_64-linux-gnu.so`` → ``419b4718d7eed0b9544805fe8f89bf4675f29f000794a259a714d4198450454c``.
+
+The original staged cgpy/cgbench packages, binaries and CMake caches were
+copied before sampling to
+``build/performance-optimization/baseline-stages/<preset>/``.
+Each stage's ``identity.json`` records compiled revision
+``b96e455972b937641cec52fc7fc86e75a058f07c`` and complete staged file hashes.
+The original capture directly loaded these frozen packages; no Make/rebuild
+ran inside sampling. Actual loaded module paths/hashes match the stages.
+Copied caches still name the live checkout: when rerunning a saved binary
+after source changes, use the immutable compiled revision rather than the
+live checkout HEAD. Rebuilds elsewhere need not have byte-identical binaries.
+
+
+Reproduce
+---------
+
+Use a fresh checkout, CPython 3.12, a compatible NVIDIA driver and existing
+GNU C++20 toolchains. These commands use project-local dependencies and toolkit.
+Choose compatible architecture/affinity/compiler values on another host; keep
+that changed environment visible in its JSON.
+
+.. code-block:: bash
+
+   git clone https://github.com/ThreeMonth03/Conjugate-Gradient-Method-library.git cgpy-main-baseline
+   cd cgpy-main-baseline
+   git checkout --detach b96e455972b937641cec52fc7fc86e75a058f07c
+   python3.12 -m venv .venv
+   .venv/bin/python -m pip install --cache-dir .cache/pip -r requirements/benchmark.lock
+   python3.12 -m venv .venv-cuda
+   .venv-cuda/bin/python -m pip install --cache-dir .cache/pip -r requirements/cuda-benchmark.lock
+   .venv-cuda/bin/python scripts/setup_cuda.py --prefix .deps/cuda-12.8
+   make build PRESET=cpu-release JOBS=2
+   make build PRESET=cpu-blas JOBS=2
+   make build PRESET=cuda-release PYTHON="$PWD/.venv-cuda/bin/python" JOBS=2 \
+       CUDA_HOST_COMPILER=/usr/bin/g++-13 CUDA_ARCHITECTURES=75
+
+The following public ``make pyprof`` commands reproduce all 52 fixed profiles
+without requiring the local collection driver. They rebuild as necessary
+before launching each worker; use the fixed checkout and keep the measurement
+host idle. The original collection used the equivalent frozen harness/spec
+without per-profile rebuilds. The loop stops on a failed command. Inspect every saved candidate status, true residual,
+count, input hash and binary identity before using a performance comparison.
+
+.. code-block:: python
+
+   from pathlib import Path
+   import json
+   import math
+   import subprocess
+   import sys
+
+   root = Path.cwd()
+   groups = [
+       ("cpu-release", "cpu-dense-f64-v1", "native,numpy-out,torch-eager-out", "cpu", 3),
+       ("cpu-release", "cpu-csr-f64-v1", "native,scipy-out,torch-eager-out", "cpu", 1),
+       ("cpu-blas", "cpu-dense-f64-v1", "native,native-blas,numpy-out,torch-eager-out", "cpu", 3),
+       ("cuda-release", "cuda-dense-f64-v1", "cuda-native,cuda-cublas,torch-cuda-eager", "cuda", 3),
+       ("cuda-release", "cuda-csr-f64-v1", "cuda-native,torch-cuda-eager", "cuda", 1),
+       ("cuda-release", "sparse-solvers", "cuda-native,torch-cuda-eager", "cuda", 1),
+       ("cpu-release", "sparse-solvers", "native-cg,native-pcg,scipy-cg,scipy-pcg,scipy-lu-total,scipy-lu-reuse", "cpu", 1),
+   ]
+   configs = [
+       (*group, m, scope)
+       for group in groups
+       for m in (("none",) if group[0] == "cpu-release" and group[1] == "sparse-solvers" else ("none", "jacobi"))
+       for scope in ("prepared", "api")
+   ]
+   for pass_id in (1, 2):
+       for preset, suite, candidates, device, repetitions, m, scope in (configs if pass_id == 1 else reversed(configs)):
+           python = root / (".venv-cuda" if device == "cuda" else ".venv") / "bin/python"
+           name = f"{preset}-{suite}-{m}-{scope}-r{pass_id:02}"
+           output = root / "build/performance-optimization/reproduced" / f"{name}.json"
+           flags = (
+               f"--implementations {candidates} --seed 20261015 --warmups 3 "
+               f"--algorithm standard --fused --preconditioner {m} "
+               "--rtol 1e-8 --atol 1e-12 --maxiter 2000 --residual-refresh 50"
+           )
+           if device == "cuda":
+               flags += " --device cuda --cuda-device 0"
+           command = [
+               "taskset", "-c", "0", "make", "pyprof", f"PRESET={preset}",
+               f"PYTHON={python}", "JOBS=2", f"PYPROF_SUITE={suite}",
+               "PYPROF_THREADS=1", f"PYPROF_SCOPE={scope}", "PYPROF_ROUNDS=30",
+               f"PYPROF_REPETITIONS={repetitions}", f"PYPROF_OUTPUT={output}",
+               f"PYPROF_ARGS={flags}",
+           ]
+           if device == "cuda":
+               command += ["CUDA_HOST_COMPILER=/usr/bin/g++-13", "CUDA_ARCHITECTURES=75"]
+           subprocess.run(command, check=True)
+           artifact = json.loads(output.read_text())
+           for case in artifact["cases"]:
+               assert {entry["name"] for entry in case["results"]} == set(candidates.split(","))
+               for entry in case["results"]:
+                   assert entry["status"] == "measured" and entry["solver_status"] == "converged"
+                   assert math.isfinite(entry["true_residual_norm"])
+                   assert entry["true_residual_norm"] <= entry["residual_threshold"] * (1 + 64 * sys.float_info.epsilon)
+
+Replay a newly generated artifact with its saved fixture hashes, candidate
+set and actual sampling schedule. The new environment/binary identity is
+recorded; identical latency is not expected. Replay is a separate validation
+and is not pooled into baseline timings.
+
+.. code-block:: bash
+
+   taskset -c 0 env PYTHONPATH="$PWD/build/cuda-release/python" \
+       .venv-cuda/bin/python -m cgbench replay \
+       build/performance-optimization/reproduced/cuda-release-sparse-solvers-jacobi-prepared-r01.json \
+       --output build/performance-optimization/replayed-scaled-pcg.json
+
+For the originally collected evidence on this host, use the corresponding
+file under ``build/performance-optimization/baseline/raw/`` instead.
+
+For later regression checks, keep both original process files and compare
+matching new files with ``scripts/compare_performance.py``; its strict
+input/options/count gates must remain intact. A change in reduction order
+can legitimately change iterations: disclose those time-to-tolerance cases
+separately rather than weakening the equal-work gate. Subsequent optimization
+or profiling measurements belong in separate reports. No automatic crossover
+or backend mode is inferred. See :doc:`methodology` for shared contracts.
+
+
+Baseline profiling observations
+-------------------------------
+
+Separate Nsight Systems 2025.5.2 captures used the same frozen CUDA binary,
+seed, float64 dense-1024 fixture and Jacobi policy. Each captured 10 calls after
+three warmups. All before/after independent residual gates passed; each solve
+performed four updates and six matvecs. These instrumented diagnostics are not
+part of the 52 framework artifacts or their rankings.
+
+.. csv-table:: Completed diagnostic wall medians, milliseconds
+   :header: "Kernel", "probe / scope", "median ms"
+
+   "native", "workspace construction + destruction", "0.897"
+   "cuBLAS", "workspace construction + destruction", "2.415"
+   "native", "solve / prepared", "1.350"
+   "cuBLAS", "solve / prepared", "1.061"
+   "cuBLAS", "solve / API", "3.670"
+
+The native workspace capture recorded 70 ``cudaMalloc`` and 70 ``cudaFree``
+calls, plus 10 ``cudaMallocHost`` / ``cudaFreeHost`` pairs. The cuBLAS workspace
+capture recorded 100 / 110 device allocation/free calls and 160 event
+creation/destruction pairs, including provider internals. This measures real
+per-call lifecycle; reusing a prepared workspace changes the scope.
+
+In the cuBLAS API solve capture, ``cudaMallocHost`` consumed 7.108 ms and
+``cudaFreeHost`` 3.006 ms across ten calls, with per-call medians 0.583 and
+0.265 ms. Together they accounted for 26.3% of recorded CUDA API duration.
+Their eight-byte storage was used only for scalar readback followed immediately
+by a stream fence. This motivates testing workspace-owned pageable scalar
+storage while retaining explicit completion and lifetime guarantees; pageable
+``cudaMemcpyAsync`` may itself block, as described in the
+`CUDA 12.8.1 API synchronization documentation
+<https://docs.nvidia.com/cuda/archive/12.8.1/cuda-runtime-api/api-sync-behavior.html>`_.
+
+Both prepared captures recorded 170 ``cudaMemcpyAsync`` and 190
+``cudaStreamSynchronize`` calls for ten solves, including the profiler driver's
+completion fences. No allocation/free calls occurred in these prepared ranges.
+Recorded stream synchronization consumed 72.6% / 75.4% of CUDA API duration for
+native / cuBLAS. This motivates an explicit device control mode; it does not
+establish an achievable speedup. CUDA API waiting overlaps GPU work, and these
+API durations, kernel durations and independently sampled phase medians must
+not be added or subtracted as a latency decomposition.
+
+Captures and diagnostic JSON are retained under
+``build/performance-optimization/profiles/baseline-*.{json,nsys-rep,sqlite}``,
+with ``*_cuda_api_sum.csv`` and ``*_cuda_gpu_kern_sum.csv`` exports. Use
+:doc:`../benchmarks` for the public profiling command. CPU disassembly of the
+baseline generic GNU 16 ``-O3`` dense kernel shows SSE2 packed double operations;
+the optimization question is vector reuse and row blocking, not whether the
+baseline is entirely scalar. No CPU hardware-counter measurement is claimed.
