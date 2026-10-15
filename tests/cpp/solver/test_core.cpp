@@ -599,7 +599,34 @@ TEST(FusedOperations, MatchesReferenceDenseReductionAndResidual)
     }
 }
 
-TEST(DenseRows, OptimizedReductionsMatchLongDoubleWithOddTailsAndPaddedRows)
+TEST(DenseRows, NativeMatvecIsIndependentOfFusionSelection)
+{
+    // Cancellation makes different GEMV accumulation policies observable.
+    // Include a row pair, a leftover row, a column tail and poisoned padding.
+    constexpr std::size_t rows = 3, columns = 5, stride = 8;
+    const std::array<double, rows * columns> values{1e16, 1, -1e16, 1, 4, -1e16, 1, 1e16, 1, -3, 1e16, 1, -1e16, 1, 7};
+    std::array<double, rows * stride> storage;
+    storage.fill(std::numeric_limits<double>::quiet_NaN());
+    for (std::size_t row = 0; row < rows; ++row)
+    {
+        for (std::size_t column = 0; column < columns; ++column)
+        {
+            storage[row * stride + column] = values[row * columns + column];
+        }
+    }
+    const cg::DenseMatrixView A(storage.data(), rows, columns, stride);
+    const std::array<double, columns> x{1, 1, 1, 1, 1};
+    std::array<double, rows> fused_output{}, separate_output{};
+    cg::CpuBackend(1, true).apply(A, x, fused_output);
+    cg::CpuBackend(1, false).apply(A, x, separate_output);
+    for (std::size_t row = 0; row < rows; ++row)
+    {
+        EXPECT_TRUE(std::isfinite(fused_output[row]));
+        EXPECT_EQ(separate_output[row], fused_output[row]);
+    }
+}
+
+TEST(DenseRows, FusionPoliciesMatchLongDoubleWithOddTailsAndPaddedRows)
 {
     for (const std::size_t columns : {1u, 3u, 5u, 7u, 17u, 65u, 129u, 257u})
     {
@@ -617,9 +644,9 @@ TEST(DenseRows, OptimizedReductionsMatchLongDoubleWithOddTailsAndPaddedRows)
             }
         }
         const cg::DenseMatrixView A(storage.data(), rows, columns, stride);
-        for (const bool optimized : {false, true})
+        for (const bool fused : {false, true})
         {
-            const cg::CpuBackend backend(1, optimized);
+            const cg::CpuBackend backend(1, fused);
             backend.apply(A, x, output);
             for (std::size_t row = 0; row < rows; ++row)
             {
@@ -641,7 +668,7 @@ TEST(DenseRows, OptimizedReductionsMatchLongDoubleWithOddTailsAndPaddedRows)
     }
 }
 
-TEST(DenseRows, OptimizationPreservesNonfiniteMultiplicationBehavior)
+TEST(DenseRows, FusionPoliciesPreserveNonfiniteMultiplicationBehavior)
 {
     cg::DenseMatrix A(17, 17);
     std::vector<double> x(17), b(17), output(17);
@@ -650,9 +677,9 @@ TEST(DenseRows, OptimizationPreservesNonfiniteMultiplicationBehavior)
         A.data()[i * 17 + i] = 1;
     }
     A.data()[16] = std::numeric_limits<double>::infinity();
-    for (const bool optimized : {false, true})
+    for (const bool fused : {false, true})
     {
-        const cg::CpuBackend backend(1, optimized);
+        const cg::CpuBackend backend(1, fused);
         backend.apply(A.view(), x, output);
         EXPECT_TRUE(std::isnan(output.data()[0]));
         EXPECT_TRUE(std::isnan(backend.apply_and_dot(A.view(), x, output)));
