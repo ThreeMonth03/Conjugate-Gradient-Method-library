@@ -50,47 +50,58 @@ def _nonnegative(value):
     return result
 
 
-def parser():
+def configure_benchmark_arguments(result, *, default_implementations=None):
+    """Share fixture, execution-scope and solver controls across launchers."""
     from . import cases as case_module
 
-    result = argparse.ArgumentParser(
-        description="Reproducible explicit CPU/CUDA CG comparisons (also run by make pyprof)"
-    )
-    commands = result.add_subparsers(dest="command", required=True)
-    run = commands.add_parser("run")
-    run.add_argument(
+    result.add_argument(
         "--suite", choices=tuple(case_module.SUITES), default="cpu"
     )
-    run.add_argument(
+    result.add_argument(
         "--implementations",
-        help="comma-separated candidates; default follows suite storage",
+        default=default_implementations,
+        help="comma-separated candidates; "
+        + (
+            f"default: {default_implementations}"
+            if default_implementations
+            else "default follows suite storage"
+        ),
     )
-    run.add_argument(
+    result.add_argument(
         "--scope", choices=("api", "prepared"), default="prepared"
     )
-    run.add_argument("--device", choices=("cpu", "cuda"), default="cpu")
-    run.add_argument("--cuda-device", type=_nonnegative, default=0)
-    run.add_argument("--threads", type=_positive, default=1)
-    run.add_argument("--seed", type=_nonnegative, default=20261015)
-    run.add_argument("--warmups", type=_nonnegative, default=3)
-    run.add_argument("--repetitions", type=_positive, default=3)
-    run.add_argument("--rounds", type=_positive, default=30)
-    run.add_argument(
+    result.add_argument("--device", choices=("cpu", "cuda"), default="cpu")
+    result.add_argument("--cuda-device", type=_nonnegative, default=0)
+    result.add_argument("--threads", type=_positive, default=1)
+    result.add_argument("--seed", type=_nonnegative, default=20261015)
+    result.add_argument(
         "--algorithm", choices=("standard", "explicit"), default="standard"
     )
-    run.add_argument(
+    result.add_argument(
         "--fused",
         action=argparse.BooleanOptionalAction,
         default=True,
         help="select native fused kernels or their separate-operation reference path",
     )
-    run.add_argument("--rtol", type=float, default=1e-8)
-    run.add_argument("--atol", type=float, default=1e-12)
-    run.add_argument("--maxiter", type=_nonnegative, default=2000)
-    run.add_argument("--residual-refresh", type=_nonnegative, default=50)
-    run.add_argument(
+    result.add_argument("--rtol", type=float, default=1e-8)
+    result.add_argument("--atol", type=float, default=1e-12)
+    result.add_argument("--maxiter", type=_nonnegative, default=2000)
+    result.add_argument("--residual-refresh", type=_nonnegative, default=50)
+    result.add_argument(
         "--preconditioner", choices=("none", "jacobi"), default="none"
     )
+
+
+def parser():
+    result = argparse.ArgumentParser(
+        description="Reproducible explicit CPU/CUDA CG comparisons (also run by make pyprof)"
+    )
+    commands = result.add_subparsers(dest="command", required=True)
+    run = commands.add_parser("run")
+    configure_benchmark_arguments(run)
+    run.add_argument("--warmups", type=_nonnegative, default=3)
+    run.add_argument("--repetitions", type=_positive, default=3)
+    run.add_argument("--rounds", type=_positive, default=30)
     run.add_argument("--output", default="build/benchmarks/cpu.json")
     compare = commands.add_parser("compare")
     compare.add_argument("artifacts", nargs="+")
@@ -197,120 +208,122 @@ def _run_worker(spec, output):
     return int(failed)
 
 
+def benchmark_spec(arguments):
+    """Validate and resolve a benchmark request without starting workers."""
+    import math
+
+    from . import cases as case_module
+
+    default_reference = (
+        "scipy-out"
+        if case_module.SUITES[arguments.suite][0].storage == "csr"
+        else "numpy-out"
+    )
+    comparison = (
+        "sparse-solvers"
+        if arguments.suite
+        in (
+            "sparse-solvers",
+            "smoke-sparse-solvers",
+            "sparse-solvers-large",
+        )
+        else "implementations"
+    )
+    names = (
+        arguments.implementations.split(",")
+        if arguments.implementations
+        else list(SPARSE_SOLVERS)
+        if comparison == "sparse-solvers"
+        else ["native", default_reference, "torch-eager-out"]
+    )
+    if (
+        not names
+        or len(names) != len(set(names))
+        or any(name not in IMPLEMENTATIONS for name in names)
+    ):
+        raise SystemExit(
+            "implementations must be unique names: "
+            + ",".join(IMPLEMENTATIONS)
+        )
+    if arguments.device == "cuda":
+        if not arguments.implementations:
+            raise SystemExit(
+                "--device cuda requires explicit --implementations"
+            )
+        if any(name not in backends.CUDA_IMPLEMENTATIONS for name in names):
+            raise SystemExit(
+                "--device cuda requires CUDA candidates; CPU fallback is disabled"
+            )
+        comparison = "implementations"
+    elif any(
+        name in backends.CUDA_IMPLEMENTATIONS for name in names
+    ) or arguments.suite.startswith(("cuda-", "smoke-cuda-")):
+        raise SystemExit(
+            "CUDA candidates and suite aliases require --device cuda"
+        )
+    if "cuda-cublas" in names and any(
+        case.storage != "dense" for case in case_module.SUITES[arguments.suite]
+    ):
+        raise SystemExit("cuda-cublas requires a dense suite")
+    if "native-blas" in names:
+        if any(
+            case.storage != "dense"
+            for case in case_module.SUITES[arguments.suite]
+        ):
+            raise SystemExit("native-blas requires a dense suite")
+        if arguments.threads != 1:
+            raise SystemExit("native-blas currently requires --threads 1")
+    if any(
+        name in ("scipy-cg", "scipy-pcg", "scipy-lu-total", "scipy-lu-reuse")
+        for name in names
+    ):
+        comparison = "sparse-solvers"
+    if not all(
+        math.isfinite(value) and value >= 0
+        for value in (arguments.rtol, arguments.atol)
+    ):
+        raise SystemExit("rtol and atol must be finite and nonnegative")
+    if arguments.algorithm != "standard" and (
+        arguments.preconditioner == "jacobi"
+        or any(name.endswith("pcg") for name in names)
+    ):
+        raise SystemExit("Jacobi PCG requires --algorithm standard")
+    spec = {
+        "comparison": comparison,
+        "suite": arguments.suite,
+        "cases": [
+            case.to_dict() for case in case_module.SUITES[arguments.suite]
+        ],
+        "implementations": names,
+        "scope": arguments.scope,
+        "threads": arguments.threads,
+        "seed": arguments.seed,
+        "solver": {
+            "algorithm": arguments.algorithm,
+            "rtol": arguments.rtol,
+            "atol": arguments.atol,
+            "maxiter": arguments.maxiter,
+            "residual_refresh": arguments.residual_refresh,
+            "fused": arguments.fused,
+            "preconditioner": arguments.preconditioner,
+        },
+    }
+    if arguments.device == "cuda":
+        spec.update(device="cuda", cuda_device=arguments.cuda_device)
+    return spec
+
+
 def main(argv=None):
     arguments = parser().parse_args(argv)
     if arguments.command == "_worker":
         return _run_worker(json.loads(arguments.spec_json), arguments.output)
     if arguments.command == "run":
-        import math
-
-        from . import cases as case_module
-
-        default_reference = (
-            "scipy-out"
-            if case_module.SUITES[arguments.suite][0].storage == "csr"
-            else "numpy-out"
-        )
-        comparison = (
-            "sparse-solvers"
-            if arguments.suite
-            in (
-                "sparse-solvers",
-                "smoke-sparse-solvers",
-                "sparse-solvers-large",
-            )
-            else "implementations"
-        )
-        names = (
-            arguments.implementations.split(",")
-            if arguments.implementations
-            else list(SPARSE_SOLVERS)
-            if comparison == "sparse-solvers"
-            else ["native", default_reference, "torch-eager-out"]
-        )
-        if (
-            not names
-            or len(names) != len(set(names))
-            or any(name not in IMPLEMENTATIONS for name in names)
-        ):
-            raise SystemExit(
-                "implementations must be unique names: "
-                + ",".join(IMPLEMENTATIONS)
-            )
-        if arguments.device == "cuda":
-            if not arguments.implementations:
-                raise SystemExit(
-                    "--device cuda requires explicit --implementations"
-                )
-            if any(
-                name not in backends.CUDA_IMPLEMENTATIONS for name in names
-            ):
-                raise SystemExit(
-                    "--device cuda requires CUDA candidates; CPU fallback is disabled"
-                )
-            comparison = "implementations"
-        elif any(
-            name in backends.CUDA_IMPLEMENTATIONS for name in names
-        ) or arguments.suite.startswith(("cuda-", "smoke-cuda-")):
-            raise SystemExit(
-                "CUDA candidates and suite aliases require --device cuda"
-            )
-        if "cuda-cublas" in names and any(
-            case.storage != "dense"
-            for case in case_module.SUITES[arguments.suite]
-        ):
-            raise SystemExit("cuda-cublas requires a dense suite")
-        if "native-blas" in names:
-            if any(
-                case.storage != "dense"
-                for case in case_module.SUITES[arguments.suite]
-            ):
-                raise SystemExit("native-blas requires a dense suite")
-            if arguments.threads != 1:
-                raise SystemExit("native-blas currently requires --threads 1")
-        if any(
-            name
-            in ("scipy-cg", "scipy-pcg", "scipy-lu-total", "scipy-lu-reuse")
-            for name in names
-        ):
-            comparison = "sparse-solvers"
-        if not all(
-            math.isfinite(value) and value >= 0
-            for value in (arguments.rtol, arguments.atol)
-        ):
-            raise SystemExit("rtol and atol must be finite and nonnegative")
-        if arguments.algorithm != "standard" and (
-            arguments.preconditioner == "jacobi"
-            or any(name.endswith("pcg") for name in names)
-        ):
-            raise SystemExit("Jacobi PCG requires --algorithm standard")
-        spec = {
-            "comparison": comparison,
-            "suite": arguments.suite,
-            "cases": [
-                case.to_dict() for case in case_module.SUITES[arguments.suite]
-            ],
-            "implementations": names,
-            "scope": arguments.scope,
-            "threads": arguments.threads,
-            "seed": arguments.seed,
-            "sampling": {
-                "warmups": arguments.warmups,
-                "repetitions": arguments.repetitions,
-                "rounds": arguments.rounds,
-            },
-            "solver": {
-                "algorithm": arguments.algorithm,
-                "rtol": arguments.rtol,
-                "atol": arguments.atol,
-                "maxiter": arguments.maxiter,
-                "residual_refresh": arguments.residual_refresh,
-                "fused": arguments.fused,
-                "preconditioner": arguments.preconditioner,
-            },
+        spec = benchmark_spec(arguments)
+        spec["sampling"] = {
+            "warmups": arguments.warmups,
+            "repetitions": arguments.repetitions,
+            "rounds": arguments.rounds,
         }
-        if arguments.device == "cuda":
-            spec.update(device="cuda", cuda_device=arguments.cuda_device)
         return _launch(spec, arguments.output)
     from . import artifacts as artifact_module
 

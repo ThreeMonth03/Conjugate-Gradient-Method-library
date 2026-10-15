@@ -133,6 +133,15 @@ docstrings. No imports are mocked. Once dependencies and the extension are
 available, Sphinx requires no network access: the configuration uses no remote
 theme assets or intersphinx inventories.
 
+GitHub Pages publishes the HTML built from ``main`` at
+`the documentation site <https://ThreeMonth03.github.io/Conjugate-Gradient-Method-library/>`_.
+The ``Documentation`` workflow builds the real CPU extension, checks Sphinx
+warnings and executes doctests on every pull request. After a merge to
+``main``, it uploads the HTML and deploys it to the ``github-pages``
+environment. The repository's Pages source is GitHub Actions; generated HTML
+stays out of Git. BLAS and CUDA documentation examples are additionally
+checked in their respective solver CI jobs.
+
 Python version and dependency policy
 ------------------------------------
 

@@ -57,10 +57,10 @@ jobs:
         run: make test PRESET=${{ matrix.preset }} JOBS=2
 
       - name: Install project-local Sphinx tooling
-        if: matrix.preset != 'cpu-openmp'
+        if: matrix.preset == 'cpu-blas'
         run: .venv/bin/python -m pip install --cache-dir .cache/pip -r requirements/docs.lock
       - name: Build API documentation and execute examples with warnings as errors
-        if: matrix.preset != 'cpu-openmp'
+        if: matrix.preset == 'cpu-blas'
         run: make docs doctest PRESET=${{ matrix.preset }} JOBS=2
 
       - name: Reproduce sparse CG, PCG and direct-solver smoke comparisons
