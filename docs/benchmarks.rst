@@ -9,7 +9,8 @@ Run the comparison suite with:
    make pyprof PYPROF_SUITE=sparse-solvers
 
 Benchmarks measure time to an independently verified solution. Choose
-``prepared`` to reuse setup or ``api`` to include per-call allocation.
+``prepared`` to reuse setup, ``api`` to include per-call allocation, or CUDA
+``session`` to reuse execution resources with fresh output and per-call Jacobi.
 :doc:`benchmarks/methodology` defines their exact boundaries, fixtures,
 correctness checks and sampling.
 
@@ -17,6 +18,7 @@ correctness checks and sampling.
    :maxdepth: 1
 
    benchmarks/current
+   benchmarks/execution-reuse-20261016
    benchmarks/api-lifecycle-20261016
    benchmarks/optimization-20261016
    benchmarks/main-20261016

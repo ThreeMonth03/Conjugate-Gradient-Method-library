@@ -177,6 +177,12 @@ The optional cuBLAS resource bundle is held directly in the execution state;
 its device allocations retain their own RAII owners. A prepared solver derives
 its preconditioner kind from the optional cached Jacobi state.
 
+Python ``cuda.Session`` owns one existing CUDA workspace with fixed size,
+device, stream, kernel and execution mode. It borrows matrix inputs for each
+call and returns a fresh owning output, with Jacobi rebuilt per call. It
+retains no operator/preconditioner cache and permits one active call, rejecting
+overlap. See :doc:`cuda` for the public lifetime contract.
+
 CUDA CSR storage directly composes two RAII-owned ``int64`` index arrays and
 a CUDA ``Vector`` for values. It derives ``nnz`` and device identity from the
 values owner. The matrix is noncopyable and has nonthrowing moves; a moved-from

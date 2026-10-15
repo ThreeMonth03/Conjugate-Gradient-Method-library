@@ -176,6 +176,74 @@ jobs:
               assert len(case['results']) == 3
               assert all(result['status'] == 'measured' for result in case['results'])
           PY
+      - name: Verify public CUDA Jacobi scopes and execution modes
+        env:
+          CUBLAS_WORKSPACE_CONFIG: ':4096:8'
+        run: |
+          for scope in api session prepared; do
+            for mode in host device; do
+              make pyprof PRESET=cuda-release JOBS=2 \
+                PYPROF_SUITE=smoke-cuda-dense PYPROF_THREADS=1 \
+                PYPROF_SCOPE="$scope" PYPROF_ROUNDS=6 PYPROF_REPETITIONS=1 \
+                PYPROF_OUTPUT="build/cuda-release/benchmarks/smoke-cuda-dense-jacobi-${scope}-${mode}.json" \
+                PYPROF_ARGS="--device cuda --cuda-device 0 --implementations cuda-native,cuda-cublas,torch-cuda-eager --cuda-execution-mode ${mode} --preconditioner jacobi --warmups 3"
+            done
+          done
+          PYTHONPATH="$PWD/build/cuda-release/python" .venv/bin/python - <<'PY'
+          from pathlib import Path
+          from cgbench.artifacts import load_artifact
+
+          names = {'cuda-native', 'cuda-cublas', 'torch-cuda-eager'}
+          hashes = set()
+          paths = []
+          for scope in ('api', 'session', 'prepared'):
+              for mode in ('host', 'device'):
+                  path = Path('build/cuda-release/benchmarks') / f'smoke-cuda-dense-jacobi-{scope}-{mode}.json'
+                  paths.append(path)
+                  artifact = load_artifact(path)
+                  spec = artifact['spec']
+                  assert spec['suite'] == 'smoke-cuda-dense'
+                  assert spec['device'] == 'cuda' and spec['cuda_device'] == 0
+                  assert spec['scope'] == scope and spec['threads'] == 1
+                  assert set(spec['implementations']) == names
+                  assert spec['solver']['preconditioner'] == 'jacobi'
+                  assert spec['solver']['algorithm'] == 'standard'
+                  assert spec['solver']['fused'] is True
+                  assert spec['solver'].get('execution_mode', 'host') == mode
+                  assert ('execution_mode' in spec['solver']) == (mode == 'device')
+                  assert len(artifact['cases']) == 1
+                  case = artifact['cases'][0]
+                  hashes.add(case['input_sha256'])
+                  assert case['sampling'] == {'warmups': 3, 'rounds': 6, 'repetitions': 1}
+                  assert case['cycle_rows'] == 6
+                  assert len(case['results']) == 3
+                  assert {result['name'] for result in case['results']} == names
+                  for result in case['results']:
+                      assert result['status'] == 'measured'
+                      setup = result['setup']
+                      assert setup['cuda_device'] == 0
+                      assert setup['preconditioner'] == 'jacobi'
+                      assert setup['setup_in_timed_call'] is (scope != 'prepared')
+                      if result['name'] == 'torch-cuda-eager':
+                          assert setup['native_execution_mode'] == mode
+                          assert setup['native_execution_mode_applies'] is False
+                      else:
+                          assert setup['execution_mode'] == mode
+                          assert setup['dense_kernel'] == ('cublas' if result['name'] == 'cuda-cublas' else 'native')
+                          assert setup['fused'] is True and setup['stream'] == 0
+                      if scope == 'session':
+                          for key, expected in {
+                              'workspace_reused': True,
+                              'workspace_in_timed_call': False,
+                              'output_reused': False,
+                              'output_in_timed_call': True,
+                              'preconditioner_reused': False,
+                              'preconditioner_in_timed_call': True,
+                          }.items():
+                              assert setup[key] is expected
+          assert len(paths) == len(set(paths)) == 6
+          assert len(hashes) == 1, 'Scope/mode smokes must use the same fixture bytes'
+          PY
       - uses: actions/upload-artifact@v4
         with:
           name: cuda-gpu-smoke
