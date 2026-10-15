@@ -17,6 +17,7 @@ correctness checks and sampling.
    :maxdepth: 1
 
    benchmarks/current
+   benchmarks/cub
    benchmarks/methodology
    benchmarks/cpu
    benchmarks/sparse
