@@ -125,8 +125,17 @@ __device__ void decide_residual_exit(DeviceState *state, bool explicit_residual)
     }
 }
 
-__global__ void evaluate_residual_and_compute_beta(DeviceState *state, bool explicit_residual, bool preconditioned)
+__global__ void evaluate_residual_and_compute_beta(DeviceState *state, ConstVectorView residual, bool explicit_residual,
+                                                   bool preconditioned)
 {
+    // All lanes must finish the shared-memory norm before only lane zero
+    // applies residual policy and beta checks. Alpha failures still compute
+    // the norm, matching the previously unconditional backend norm kernel.
+    block_stable_norm_into(residual, &state->residual_squared, &state->packet.residual_norm);
+    if (threadIdx.x != 0)
+    {
+        return;
+    }
     // Residual exits take priority over an unusable next-rho or beta. The
     // next-rho kernels do not consume this decision and were always submitted
     // before the packet read, including candidate/refresh/last/failure paths.
@@ -324,7 +333,6 @@ SolveInfo solve_device_impl(const Matrix &A, ConstVectorView b, VectorView x, Wo
             launch_check();
             backend.dot_into(r, r, &state->residual_squared);
         }
-        backend.norm_from_squared_into(r, &state->residual_squared, &state->packet.residual_norm);
         if (explicit_residual && !last)
         {
             backend.dot_into(r, ap, &state->next_rho);
@@ -333,7 +341,8 @@ SolveInfo solve_device_impl(const Matrix &A, ConstVectorView b, VectorView x, Wo
         {
             backend.multiply_and_dot_into(M->inverse_diagonal(), r, z, &state->next_rho);
         }
-        evaluate_residual_and_compute_beta<<<1, 1, 0, stream(context)>>>(state, explicit_residual, M != nullptr);
+        evaluate_residual_and_compute_beta<<<1, block_size, 0, stream(context)>>>(state, r, explicit_residual,
+                                                                                  M != nullptr);
         launch_check();
         guarded_direction<<<blocks(p.size()), block_size, 0, stream(context)>>>(M == nullptr ? r : z, p, state,
                                                                                 explicit_residual ? -1.0 : 1.0);
