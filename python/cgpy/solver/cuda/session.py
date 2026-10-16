@@ -9,7 +9,9 @@ from ..._typing import (
     CudaDenseKernel,
     ExecutionMode,
     Preconditioner,
+    SupportsCudaArrayInterface,
 )
+from ...matrix import cuda as matrix
 from ...storage import cuda as storage
 from .. import result
 from . import api
@@ -88,9 +90,9 @@ class Session:
 
     def solve(
         self,
-        A: object,
-        b: object,
-        x0: object | None = None,
+        A: matrix.DenseMatrix | matrix.CsrMatrix | SupportsCudaArrayInterface,
+        b: SupportsCudaArrayInterface,
+        x0: SupportsCudaArrayInterface | None = None,
         *,
         rtol: float = 1e-8,
         atol: float = 0.0,

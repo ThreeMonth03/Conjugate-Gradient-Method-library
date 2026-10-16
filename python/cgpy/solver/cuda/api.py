@@ -13,8 +13,10 @@ from ..._typing import (
     CudaDenseKernel,
     ExecutionMode,
     Preconditioner,
+    SupportsCudaArrayInterface,
 )
 from ...matrix import csr
+from ...matrix import cuda as matrix
 from ...storage import cuda as storage
 from .. import result
 from . import prepared
@@ -22,7 +24,7 @@ from . import workspace as workspace_module
 
 
 def prepare(
-    A: object,
+    A: matrix.DenseMatrix | matrix.CsrMatrix | SupportsCudaArrayInterface,
     *,
     device: int = 0,
     stream: int = 0,
@@ -76,9 +78,9 @@ def prepare_host(
 
 
 def solve_into(
-    A: object,
-    b: object,
-    x: object,
+    A: matrix.DenseMatrix | matrix.CsrMatrix | SupportsCudaArrayInterface,
+    b: SupportsCudaArrayInterface,
+    x: SupportsCudaArrayInterface,
     *,
     workspace: workspace_module.Workspace,
     rtol: float = 1e-8,
@@ -118,9 +120,9 @@ def solve_into(
 
 
 def solve(
-    A: object,
-    b: object,
-    x0: object | None = None,
+    A: matrix.DenseMatrix | matrix.CsrMatrix | SupportsCudaArrayInterface,
+    b: SupportsCudaArrayInterface,
+    x0: SupportsCudaArrayInterface | None = None,
     *,
     device: int = 0,
     stream: int = 0,
@@ -180,7 +182,10 @@ def solve(
 
 
 def _initial_output(
-    b: object, x0: object | None, device: int, stream: int
+    b: SupportsCudaArrayInterface,
+    x0: SupportsCudaArrayInterface | None,
+    device: int,
+    stream: int,
 ) -> tuple[storage.Vector, int]:
     """Validate device inputs, then allocate/reset a fresh owning output."""
     x = storage.Vector.__new__(storage.Vector)

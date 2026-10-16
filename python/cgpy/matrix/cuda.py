@@ -8,6 +8,7 @@ import numpy.typing as npt
 
 from .._interop import host
 from .._runtime import cuda as cuda_runtime
+from .._typing import SupportsCudaArrayInterface
 from . import csr
 
 if typing.TYPE_CHECKING:
@@ -39,7 +40,11 @@ class DenseMatrix:
 
     @classmethod
     def from_device(
-        cls, source: object, *, device: int = 0, stream: int = 0
+        cls,
+        source: SupportsCudaArrayInterface,
+        *,
+        device: int = 0,
+        stream: int = 0,
     ) -> typing.Self:
         """Snapshot a C-contiguous float64 CUDA Array Interface matrix.
 
@@ -92,9 +97,9 @@ class CsrMatrix:
     @classmethod
     def from_device(
         cls,
-        indptr: object,
-        indices: object,
-        data: object,
+        indptr: SupportsCudaArrayInterface,
+        indices: SupportsCudaArrayInterface,
+        data: SupportsCudaArrayInterface,
         shape: tuple[int, int],
         *,
         device: int = 0,

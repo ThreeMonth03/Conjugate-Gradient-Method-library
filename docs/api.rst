@@ -35,9 +35,10 @@ and strict array inputs use ``numpy.typing.NDArray[numpy.float64]``;
 convenience host inputs use ``ArrayLike``. CUDA results contain an owned
 ``cuda.Vector``. Finite option sets use ``Literal`` annotations, and iteration
 limits use ``SupportsIndex`` to retain NumPy integer support. External CUDA
-Array Interface inputs remain dynamically typed as ``object``. Array shape,
-layout, writeability, device, stream and aliasing still require the existing
-runtime validation; annotations do not establish those conditions.
+inputs use ``cuda.SupportsCudaArrayInterface``; its descriptor remains typed
+as ``object`` for native validation. Array shape, layout, writeability,
+device, stream and aliasing still require the existing runtime validation;
+annotations do not establish those conditions.
 
 ``dense_kernel="native"`` is the default. The optional ``"blas"`` choice is
 dense-only and accepts ``num_threads=1``. ``fused`` independently controls the

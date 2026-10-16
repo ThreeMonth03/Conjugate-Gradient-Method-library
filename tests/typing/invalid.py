@@ -52,3 +52,32 @@ def invalid_cuda_calls(
     cuda.Workspace(2).execution_mode = "host"  # type: ignore[misc]
     cuda.CsrMatrix.from_host([[1.0]])  # type: ignore[arg-type]
     rhs.fill("zero")  # type: ignore[arg-type]
+
+
+def invalid_cuda_exporters(
+    matrix: cuda.DenseMatrix,
+    sparse: cuda.CsrMatrix,
+    rhs: cuda.Vector,
+    output: cuda.Vector,
+    host_array: npt.NDArray[np.float64],
+    plain_object: object,
+    workspace: cuda.Workspace,
+) -> None:
+    cuda.prepare(host_array)  # type: ignore[arg-type]
+    cuda.prepare([1.0, 2.0])  # type: ignore[arg-type]
+    cuda.prepare(1)  # type: ignore[arg-type]
+    cuda.prepare(plain_object)  # type: ignore[arg-type]
+    cuda.solve(matrix, [1.0, 2.0])  # type: ignore[arg-type]
+    cuda.solve(matrix, host_array)  # type: ignore[arg-type]
+    cuda.solve(matrix, rhs, plain_object)  # type: ignore[arg-type]
+    cuda.solve_into(matrix, rhs, [0.0, 0.0], workspace=workspace)  # type: ignore[arg-type]
+    cuda.prepare(matrix).solve_into(matrix, output, workspace=workspace)  # type: ignore[arg-type]
+    cuda.prepare(matrix).solve_into(rhs, sparse, workspace=workspace)  # type: ignore[arg-type]
+    cuda.Session(2).solve(matrix, host_array)  # type: ignore[arg-type]
+    rhs.copy_from_device(matrix)  # type: ignore[arg-type]
+    rhs.copy_from_device(host_array)  # type: ignore[arg-type]
+    cuda.DenseMatrix.from_device(matrix)  # type: ignore[arg-type]
+    cuda.DenseMatrix.from_device(plain_object)  # type: ignore[arg-type]
+    cuda.CsrMatrix.from_device(sparse, rhs, output, (2, 2))  # type: ignore[arg-type]
+    cuda.CsrMatrix.from_device(rhs, host_array, output, (2, 2))  # type: ignore[arg-type]
+    cuda.CsrMatrix.from_device(rhs, rhs, [1.0, 2.0], (2, 2))  # type: ignore[arg-type]

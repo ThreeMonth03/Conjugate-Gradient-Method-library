@@ -52,9 +52,12 @@ for name in ('py.typed', '_core.pyi', '_cuda.pyi'):
     assert (package / name).is_file(), name
 assert 'cgpy._cuda' not in sys.modules
 for name in ('Vector', 'DenseMatrix', 'CsrMatrix', 'PreparedSolver',
-             'Workspace', 'Session', 'prepare', 'prepare_host',
+             'Workspace', 'Session', 'SupportsCudaArrayInterface',
+             'prepare', 'prepare_host',
              'solve', 'solve_into'):
     assert hasattr(cuda, name), name
+assert 'SupportsCudaArrayInterface' in cuda.__all__
+assert 'cgpy._cuda' not in sys.modules
 print(f'Typed consumer package: {package}; CUDA extension remains unloaded.')
 """
         python = str(options.python.absolute())

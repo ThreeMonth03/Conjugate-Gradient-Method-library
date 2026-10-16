@@ -1,4 +1,4 @@
-"""Types for the optional native CUDA boundary; no device Protocol required."""
+"""Types for the optional native CUDA boundary and its array capability."""
 
 from typing import Never, SupportsIndex
 
@@ -6,7 +6,13 @@ import numpy as np
 import numpy.typing as npt
 
 from . import _core
-from ._typing import Algorithm, CudaDenseKernel, ExecutionMode, Preconditioner
+from ._typing import (
+    Algorithm,
+    CudaDenseKernel,
+    ExecutionMode,
+    Preconditioner,
+    SupportsCudaArrayInterface,
+)
 
 class Vector:
     def __init__(
@@ -22,7 +28,9 @@ class Vector:
     def copy_from_host(
         self, source: npt.NDArray[np.float64], stream: int = 0
     ) -> None: ...
-    def copy_from_device(self, source: object, stream: int = 0) -> None: ...
+    def copy_from_device(
+        self, source: SupportsCudaArrayInterface, stream: int = 0
+    ) -> None: ...
     def to_host(self, stream: int = 0) -> npt.NDArray[np.float64]: ...
 
 class DenseMatrix:
@@ -34,7 +42,7 @@ class DenseMatrix:
     ) -> DenseMatrix: ...
     @staticmethod
     def from_device(
-        source: object, device: int = 0, stream: int = 0
+        source: SupportsCudaArrayInterface, device: int = 0, stream: int = 0
     ) -> DenseMatrix: ...
     @property
     def shape(self) -> tuple[int, int]: ...
@@ -50,9 +58,9 @@ class CsrMatrix:
     ) -> CsrMatrix: ...
     @staticmethod
     def from_device(
-        indptr: object,
-        indices: object,
-        data: object,
+        indptr: SupportsCudaArrayInterface,
+        indices: SupportsCudaArrayInterface,
+        data: SupportsCudaArrayInterface,
         shape: tuple[int, int],
         device: int = 0,
         stream: int = 0,
@@ -87,7 +95,7 @@ class Workspace:
 class PreparedSolver:
     def __init__(
         self,
-        matrix: object,
+        matrix: DenseMatrix | CsrMatrix | SupportsCudaArrayInterface,
         device: int = 0,
         stream: int = 0,
         dense_kernel: CudaDenseKernel = "native",
@@ -115,8 +123,8 @@ class PreparedSolver:
     def preconditioner_nbytes(self) -> int: ...
     def solve_into(
         self,
-        b: object,
-        x: object,
+        b: SupportsCudaArrayInterface,
+        x: SupportsCudaArrayInterface,
         *,
         workspace: Workspace,
         rtol: float = 1e-8,
@@ -128,9 +136,9 @@ class PreparedSolver:
     ) -> _core.SolveInfo: ...
 
 def solve_into(
-    A: object,
-    b: object,
-    x: object,
+    A: DenseMatrix | CsrMatrix | SupportsCudaArrayInterface,
+    b: SupportsCudaArrayInterface,
+    x: SupportsCudaArrayInterface,
     *,
     workspace: Workspace,
     rtol: float = 1e-8,
@@ -142,7 +150,10 @@ def solve_into(
     preconditioner: Preconditioner = "none",
 ) -> _core.SolveInfo: ...
 def _initial_output(
-    b: object, x0: object | None, device: int, stream: int
+    b: SupportsCudaArrayInterface,
+    x0: SupportsCudaArrayInterface | None,
+    device: int,
+    stream: int,
 ) -> Vector: ...
 def is_available(device: int = 0) -> bool: ...
 def synchronize(device: int = 0, stream: int = 0) -> None: ...
