@@ -7,26 +7,41 @@ namespace cuda
 {
 namespace detail
 {
+namespace
+{
 
-CublasResources::CublasResources(const Context &context)
-    : workspace(device_allocation<unsigned char>(workspace_bytes, context)), handle(blas_handle(context))
+std::size_t reduction_offset(DenseKernel selected)
+{
+    switch (selected)
+    {
+    case DenseKernel::native:
+        return 0;
+    case DenseKernel::cublas:
+        return CublasResources::workspace_bytes;
+    }
+    throw std::invalid_argument("unsupported CUDA dense kernel");
+}
+
+static_assert(CublasResources::workspace_bytes % 256 == 0);
+static_assert(CublasResources::workspace_bytes % alignof(double) == 0);
+
+} // namespace
+
+CublasResources::CublasResources(const Context &context, void *workspace) : handle(blas_handle(context))
 {
     DeviceGuard guard(context.device());
     check(cublasSetPointerMode(handle.get(), CUBLAS_POINTER_MODE_HOST), "cublasSetPointerMode");
     check(cublasSetAtomicsMode(handle.get(), CUBLAS_ATOMICS_NOT_ALLOWED), "cublasSetAtomicsMode");
-    check(cublasSetWorkspace(handle.get(), workspace.get(), workspace_bytes), "cublasSetWorkspace");
+    check(cublasSetWorkspace(handle.get(), workspace, workspace_bytes), "cublasSetWorkspace");
 }
 ExecutionResources::ExecutionResources(const Context &ctx, DenseKernel selected)
-    : context(ctx), reduction(device_allocation<double>(max_blocks + 1, ctx)), partials(reduction.get()),
-      scalar(reduction.get() + max_blocks)
+    : context(ctx),
+      storage(device_allocation<std::byte>(reduction_offset(selected) + (max_blocks + 1) * sizeof(double), ctx)),
+      partials(reinterpret_cast<double *>(storage.get() + reduction_offset(selected))), scalar(partials + max_blocks)
 {
-    if (selected != DenseKernel::native && selected != DenseKernel::cublas)
-    {
-        throw std::invalid_argument("unsupported CUDA dense kernel");
-    }
     if (selected == DenseKernel::cublas)
     {
-        cublas.emplace(ctx);
+        cublas.emplace(ctx, storage.get());
     }
 }
 

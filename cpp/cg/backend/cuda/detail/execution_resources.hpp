@@ -4,6 +4,7 @@
 #include <cg/backend/cuda/detail/blas_handle.hpp>
 #include <cg/storage/cuda/device_memory.hpp>
 
+#include <cstddef>
 #include <optional>
 
 namespace cg
@@ -15,9 +16,8 @@ namespace detail
 
 struct CublasResources
 {
-    explicit CublasResources(const Context &context);
+    CublasResources(const Context &context, void *workspace);
     static constexpr std::size_t workspace_bytes = 4 * 1024 * 1024;
-    DeviceAllocation<unsigned char> workspace;
     BlasHandle handle;
 };
 
@@ -26,9 +26,12 @@ struct CublasResources
 struct ExecutionResources
 {
     explicit ExecutionResources(const Context &context, DenseKernel kernel = DenseKernel::native);
+    ExecutionResources(ExecutionResources &&) = delete;
+    ExecutionResources &operator=(ExecutionResources &&) = delete;
     Context context;
-    DeviceAllocation<double> reduction;
-    // Borrowed nonoverlapping spans of reduction, valid for this owner's lifetime.
+    // Declared before cublas so the handle is destroyed before its borrowed scratch.
+    DeviceAllocation<std::byte> storage;
+    // Borrowed nonoverlapping reduction spans, after any cuBLAS scratch.
     double *partials, *scalar;
     // Scalar copies are consumed only after the workspace stream is synchronized.
     double host = 0.0;

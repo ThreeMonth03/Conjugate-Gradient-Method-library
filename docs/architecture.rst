@@ -214,9 +214,12 @@ workspace composes solver vectors and private backend execution resources on
 one device/stream. A
 solver-local RAII guard acquires the workspace and lends those resources to
 the backend; the backend never sees solver state. Only resources prepared
-for the cuBLAS kernel own a handle and 4 MiB scratch allocation.
-The optional cuBLAS resource bundle is held directly in the execution state;
-its device allocations retain their own RAII owners. The selected kernel and
+for the cuBLAS kernel own a handle and a full 4 MiB scratch span. One private
+RAII allocation contains that scratch followed by the 2056-byte reduction
+span; native resources allocate only the reduction span. The cuBLAS scratch
+starts at the aligned allocation base, and the optional handle is destroyed
+before its borrowed scratch is freed. These private execution resources do
+not move while the backend borrows them. The selected kernel and
 execution mode are derived from optional cuBLAS and device-control resources.
 A prepared solver derives its preconditioner kind from optional cached Jacobi
 state. Python bindings register the native workspace directly and borrow its

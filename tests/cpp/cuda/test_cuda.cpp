@@ -2,6 +2,7 @@
 #include <cg/backend/cuda/detail/execution_resources.hpp>
 #include <cg/cg.hpp>
 #include <cg/cuda.hpp>
+#include <cg/runtime/cuda/detail/launch.hpp>
 #include <cg/solver/cuda/detail/workspace_use_guard.hpp>
 #include <cg/solver/cuda/prepared_solver.hpp>
 
@@ -11,6 +12,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdint>
 #include <future>
 #include <limits>
 #include <memory>
@@ -105,6 +107,8 @@ static_assert(!std::is_copy_constructible_v<gpu::JacobiPreconditioner>);
 static_assert(!std::is_copy_assignable_v<gpu::JacobiPreconditioner>);
 static_assert(std::is_nothrow_move_constructible_v<gpu::JacobiPreconditioner>);
 static_assert(std::is_nothrow_move_assignable_v<gpu::JacobiPreconditioner>);
+static_assert(!std::is_move_constructible_v<gpu::detail::ExecutionResources>);
+static_assert(!std::is_move_assignable_v<gpu::detail::ExecutionResources>);
 
 TEST(CudaCapability, DeviceCountIsSafeWithoutAnAvailableDriver)
 {
@@ -251,6 +255,60 @@ TEST_F(Cuda, DenseProductsHandlePaddingOddTailsAndBothResidualSigns)
     out.download(downloaded, *context);
     EXPECT_DOUBLE_EQ(downloaded[0], 6);
     EXPECT_DOUBLE_EQ(downloaded[1], 7);
+}
+
+TEST_F(Cuda, ExecutionStorageKeepsProviderScratchDisjointAndReductionReusable)
+{
+    constexpr std::size_t size = 257, stride = size + 3;
+    std::vector<double> host_matrix(size * stride, NAN), host_p(size), host_b(size), expected_product(size);
+    double expected_dot = 0.0, expected_p_squared = 0.0;
+    for (std::size_t row = 0; row < size; ++row)
+    {
+        std::fill_n(host_matrix.data() + row * stride, size, 0.0);
+        const double diagonal = 1.0 + row % 4;
+        host_matrix[row * stride + row] = diagonal;
+        host_p[row] = static_cast<int>(row % 5) - 2;
+        expected_product[row] = diagonal * host_p[row];
+        host_b[row] = expected_product[row] + 1.0;
+        expected_dot += host_p[row] * expected_product[row];
+        expected_p_squared += host_p[row] * host_p[row];
+    }
+    // Keep device padding: a DenseMatrix snapshot would pack the active entries.
+    const gpu::Vector matrix_storage(host_matrix, *context);
+    const gpu::DenseMatrixView A(matrix_storage.data(), size, size, stride, context->device());
+    gpu::Vector p(host_p, *context), b(host_b, *context), output(size, *context);
+    std::vector<double> actual(size);
+    for (const auto kernel : {gpu::DenseKernel::native, gpu::DenseKernel::cublas})
+    {
+        SCOPED_TRACE(static_cast<int>(kernel));
+        gpu::detail::ExecutionResources resources(*context, kernel);
+        const auto base = reinterpret_cast<std::uintptr_t>(resources.storage.get());
+        const auto partials = reinterpret_cast<std::uintptr_t>(resources.partials);
+        const auto scalar = reinterpret_cast<std::uintptr_t>(resources.scalar);
+        EXPECT_EQ(base % 256, 0u);
+        const std::size_t scratch_bytes =
+            kernel == gpu::DenseKernel::cublas ? gpu::detail::CublasResources::workspace_bytes : 0;
+        EXPECT_EQ(partials - base, scratch_bytes);
+        EXPECT_EQ(partials % alignof(double), 0u);
+        EXPECT_EQ(scalar - partials, gpu::detail::max_blocks * sizeof(double));
+        EXPECT_EQ(resources.dense_kernel(), kernel);
+        for (const bool fused : {false, true})
+        {
+            SCOPED_TRACE(fused);
+            const gpu::detail::Backend backend(resources, fused);
+            for (int repeat = 0; repeat < 3; ++repeat)
+            {
+                EXPECT_DOUBLE_EQ(backend.apply_and_dot(A, p.view(), output.view()), expected_dot);
+                output.download(actual, *context);
+                EXPECT_EQ(actual, expected_product);
+                EXPECT_DOUBLE_EQ(backend.dot(p.view(), p.view()), expected_p_squared);
+                EXPECT_DOUBLE_EQ(backend.residual_squared_norm(A, b.view(), p.view(), output.view()), size);
+                output.download(actual, *context);
+                EXPECT_EQ(actual, std::vector<double>(size, 1.0));
+                EXPECT_DOUBLE_EQ(backend.norm(output.view()), std::sqrt(static_cast<double>(size)));
+            }
+        }
+    }
 }
 
 TEST_F(Cuda, RectangularAndEmptyProductsAvoidInvalidDeviceAccess)
