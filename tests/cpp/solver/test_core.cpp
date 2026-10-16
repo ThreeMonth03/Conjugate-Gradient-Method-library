@@ -602,15 +602,17 @@ TEST(CGExplicit, ValidatesOptionsStorageAndWorkspace)
     cg::CgOptions options;
     options.algorithm = cg::Algorithm::explicit_residual;
     options.rtol = -1;
-    EXPECT_THROW(cg::solve_into(A.view(), b, x, workspace, backend, options), std::invalid_argument);
+    EXPECT_THROW(static_cast<void>(cg::solve_into(A.view(), b, x, workspace, backend, options)), std::invalid_argument);
     options.rtol = std::numeric_limits<double>::infinity();
-    EXPECT_THROW(cg::solve_into(A.view(), b, x, workspace, backend, options), std::invalid_argument);
+    EXPECT_THROW(static_cast<void>(cg::solve_into(A.view(), b, x, workspace, backend, options)), std::invalid_argument);
     options.rtol = 1e-8;
-    EXPECT_THROW(cg::solve_into(A.view(), b, b, workspace, backend, options), std::invalid_argument);
-    EXPECT_THROW(cg::solve_into(A.view(), b, {A.data(), 2}, workspace, backend, options), std::invalid_argument);
-    EXPECT_THROW(cg::solve_into(A.view(), b, workspace.residual(), workspace, backend, options), std::invalid_argument);
+    EXPECT_THROW(static_cast<void>(cg::solve_into(A.view(), b, b, workspace, backend, options)), std::invalid_argument);
+    EXPECT_THROW(static_cast<void>(cg::solve_into(A.view(), b, {A.data(), 2}, workspace, backend, options)),
+                 std::invalid_argument);
+    EXPECT_THROW(static_cast<void>(cg::solve_into(A.view(), b, workspace.residual(), workspace, backend, options)),
+                 std::invalid_argument);
     workspace.prepare(1);
-    EXPECT_THROW(cg::solve_into(A.view(), b, x, workspace, backend, options), std::invalid_argument);
+    EXPECT_THROW(static_cast<void>(cg::solve_into(A.view(), b, x, workspace, backend, options)), std::invalid_argument);
 }
 
 TEST(CGExplicit, ReusingWorkspaceResetsAllIterationState)

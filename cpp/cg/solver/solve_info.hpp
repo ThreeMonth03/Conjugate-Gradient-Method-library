@@ -15,7 +15,7 @@ enum class Status
     non_finite
 };
 
-struct SolveInfo
+struct [[nodiscard("Check SolveInfo.status before using x")]] SolveInfo
 {
     Status status = Status::max_iterations;
     std::size_t iterations = 0;

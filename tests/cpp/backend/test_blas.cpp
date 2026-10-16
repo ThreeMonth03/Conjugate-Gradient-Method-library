@@ -376,7 +376,7 @@ TEST_F(Blas, RejectsCsrInsteadOfSilentlySelectingNativeKernels)
     EXPECT_THROW(backend.apply(A, x, output), std::invalid_argument);
     EXPECT_THROW(backend.apply_and_dot(A, x, output), std::invalid_argument);
     EXPECT_THROW(backend.residual_squared_norm(A, b, x, output), std::invalid_argument);
-    EXPECT_THROW(cg::solve_into(A, b, output, workspace, backend), std::invalid_argument);
+    EXPECT_THROW(static_cast<void>(cg::solve_into(A, b, output, workspace, backend)), std::invalid_argument);
     EXPECT_DOUBLE_EQ(output.data()[0], 7);
     EXPECT_DOUBLE_EQ(output.data()[1], 8);
 }

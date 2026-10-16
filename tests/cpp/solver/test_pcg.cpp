@@ -212,16 +212,20 @@ TEST(PCG, RejectsIncompatibleAlgorithmDimensionsAndOutputAliasingBeforeMutation)
     const cg::CpuBackend backend;
     cg::CgOptions options;
     options.algorithm = cg::Algorithm::explicit_residual;
-    EXPECT_THROW(cg::solve_into(A.view(), b, x, workspace, backend, options, &M), std::invalid_argument);
+    EXPECT_THROW(static_cast<void>(cg::solve_into(A.view(), b, x, workspace, backend, options, &M)),
+                 std::invalid_argument);
     EXPECT_DOUBLE_EQ(x.data()[0], 10);
     EXPECT_DOUBLE_EQ(x.data()[1], 20);
     options.algorithm = cg::Algorithm::recurrence;
-    EXPECT_THROW(cg::solve_into(A.view(), b, x, workspace, backend, options, &wrong_size), std::invalid_argument);
-    cg::VectorView inverse_output{const_cast<double *>(M.inverse_diagonal().data()), M.size()};
-    EXPECT_THROW(cg::solve_into(A.view(), b, inverse_output, workspace, backend, options, &M), std::invalid_argument);
-    EXPECT_THROW(M.apply(b, inverse_output, backend), std::invalid_argument);
-    EXPECT_THROW(cg::solve_into(A.view(), b, workspace.preconditioned(), workspace, backend, options, &M),
+    EXPECT_THROW(static_cast<void>(cg::solve_into(A.view(), b, x, workspace, backend, options, &wrong_size)),
                  std::invalid_argument);
+    cg::VectorView inverse_output{const_cast<double *>(M.inverse_diagonal().data()), M.size()};
+    EXPECT_THROW(static_cast<void>(cg::solve_into(A.view(), b, inverse_output, workspace, backend, options, &M)),
+                 std::invalid_argument);
+    EXPECT_THROW(M.apply(b, inverse_output, backend), std::invalid_argument);
+    EXPECT_THROW(
+        static_cast<void>(cg::solve_into(A.view(), b, workspace.preconditioned(), workspace, backend, options, &M)),
+        std::invalid_argument);
     EXPECT_THROW(M.apply_and_dot(b, b, backend), std::invalid_argument);
     EXPECT_DOUBLE_EQ(M.inverse_diagonal().data()[0], 0.25);
 }

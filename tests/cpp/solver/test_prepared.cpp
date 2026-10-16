@@ -74,7 +74,8 @@ TEST(PreparedSolver, OneShotSetupPreservesBorrowedMatrixAndRejectsInvalidPolicyB
     cg::CgOptions explicit_options;
     explicit_options.algorithm = cg::Algorithm::explicit_residual;
     const auto before = x;
-    EXPECT_THROW(cg::solve_into(A.view(), b, x, workspace, backend, explicit_options, cg::PreconditionerKind::jacobi),
+    EXPECT_THROW(static_cast<void>(cg::solve_into(A.view(), b, x, workspace, backend, explicit_options,
+                                                  cg::PreconditionerKind::jacobi)),
                  std::invalid_argument);
     EXPECT_EQ(x, before);
 }

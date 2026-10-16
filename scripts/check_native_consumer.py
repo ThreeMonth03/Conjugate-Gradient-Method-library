@@ -89,6 +89,48 @@ def check_consumer_cache(build, prefix, source, producer):
                 raise AssertionError("consumer inherits CUDA SDK headers")
 
 
+def check_nodiscard(build, environment):
+    command = json.loads((build / "compile_commands.json").read_text())[0]
+    arguments = command.get("arguments") or shlex.split(command["command"])
+    compiler = []
+    skip = False
+    for argument in arguments:
+        if skip:
+            skip = False
+        elif argument == "-o":
+            skip = True
+        elif argument not in ("-c", command["file"]):
+            compiler.append(argument)
+    probe = build / "solve_info_probe.cpp"
+    for body, success in (
+        ("static_cast<void>(solve());", True),
+        ("return solve().status == cg::Status::converged;", True),
+        ("solve();", False),
+    ):
+        probe.write_text(
+            "#include <cg/solver/solve_info.hpp>\n"
+            "cg::SolveInfo solve();\n"
+            f"int main() {{ {body} }}\n"
+        )
+        result = subprocess.run(
+            [*compiler, "-fsyntax-only", "-Werror", str(probe)],
+            cwd=command["directory"],
+            env=environment,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            check=False,
+        )
+        if (result.returncode == 0) != success or (
+            not success and "nodiscard" not in result.stdout
+        ):
+            raise AssertionError(
+                f"SolveInfo nodiscard contract failed for {body}:\n"
+                f"{result.stdout}"
+            )
+    print("SolveInfo nodiscard compiler checks passed.", flush=True)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--build-dir", type=pathlib.Path, required=True)
@@ -235,6 +277,7 @@ def main():
                 env=environment,
                 check=True,
             )
+            check_nodiscard(build, environment)
 
         cases = [
             ("unknown", "COMPONENTS Unknown", "Unknown cgpy component", False),
