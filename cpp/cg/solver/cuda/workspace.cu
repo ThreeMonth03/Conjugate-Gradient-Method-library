@@ -35,27 +35,27 @@ ExecutionMode Workspace::execution_mode() const noexcept
 {
     return m_impl->control ? ExecutionMode::device : ExecutionMode::host;
 }
-VectorView Workspace::residual() noexcept
+VectorView Workspace::residual() & noexcept
 {
     return m_impl->r;
 }
-VectorView Workspace::direction() noexcept
+VectorView Workspace::direction() & noexcept
 {
     return m_impl->p;
 }
-VectorView Workspace::product() noexcept
+VectorView Workspace::product() & noexcept
 {
     return m_impl->ap;
 }
-VectorView Workspace::scratch() noexcept
+VectorView Workspace::scratch() & noexcept
 {
     return m_impl->scratch;
 }
-VectorView Workspace::preconditioned() noexcept
+VectorView Workspace::preconditioned() & noexcept
 {
     return m_impl->z;
 }
-const Context &Workspace::context() const noexcept
+const Context &Workspace::context() const & noexcept
 {
     return m_impl->execution.context;
 }

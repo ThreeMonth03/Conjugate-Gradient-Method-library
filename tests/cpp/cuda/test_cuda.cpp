@@ -280,7 +280,8 @@ TEST_F(Cuda, WorkspaceOwnsExecutionSettingsAndRejectsIncompatiblePlansBeforeWrit
             EXPECT_NEAR(actual[1], 2.0 / 3.0, 1e-14);
 
             const auto other = kernel == gpu::DenseKernel::native ? gpu::DenseKernel::cublas : gpu::DenseKernel::native;
-            const gpu::PreparedSolver plan(gpu::DenseMatrix(host.view(), *context), *context, kernel);
+            const gpu::PreparedSolver plan(gpu::DenseMatrix(host.view(), *context), *context,
+                                           cg::PreconditionerKind::none, kernel);
             gpu::Workspace mismatched(2, *context, other, mode);
             x.fill(-7, *context);
             EXPECT_THROW(plan.solve_into(b.view(), x.view(), mismatched), std::invalid_argument);
@@ -511,7 +512,8 @@ TEST_F(Cuda, DeviceFailuresPreserveOutputCountsAndPermitWorkspaceReuse)
     {
         gpu::Workspace host_work(2, *context, kernel);
         gpu::Workspace device_work(2, *context, kernel, gpu::ExecutionMode::device);
-        const gpu::DenseMatrix good(cg::DenseMatrix(2, 2, {2, 0, 0, 3}).view(), *context);
+        const cg::DenseMatrix host_good(2, 2, {2, 0, 0, 3});
+        const gpu::DenseMatrix good(host_good.view(), *context);
         for (const bool fused : {false, true})
         {
             for (const auto algorithm : {cg::Algorithm::recurrence, cg::Algorithm::explicit_residual})
@@ -521,7 +523,8 @@ TEST_F(Cuda, DeviceFailuresPreserveOutputCountsAndPermitWorkspaceReuse)
                 for (const double diagonal : {-1.0, 0.0, 1e-310, 1e308})
                 {
                     SCOPED_TRACE(diagonal);
-                    const gpu::DenseMatrix A(cg::DenseMatrix(2, 2, {diagonal, 0, 0, diagonal}).view(), *context);
+                    const cg::DenseMatrix host(2, 2, {diagonal, 0, 0, diagonal});
+                    const gpu::DenseMatrix A(host.view(), *context);
                     x_host.upload(initial, *context);
                     x_device.upload(initial, *context);
                     const auto reference =
@@ -846,22 +849,23 @@ TEST_F(Cuda, NativePreparedPlansCacheSetupAndReuseIndependentWorkspaces)
     {
         for (const auto kernel : {gpu::DenseKernel::native, gpu::DenseKernel::cublas})
         {
-            gpu::PreparedSolver plan(gpu::DenseMatrix(host.view(), *context), *context, kernel, kind);
+            gpu::PreparedSolver plan(gpu::DenseMatrix(host.view(), *context), *context, kind, kernel);
             const auto moved = std::move(plan);
             check(moved, kind);
         }
-        const gpu::PreparedSolver sparse(gpu::CsrMatrix(as_csr(host.view()), *context), *context,
-                                         gpu::DenseKernel::native, kind);
+        const gpu::PreparedSolver sparse(gpu::CsrMatrix(as_csr(host.view()), *context), *context, kind,
+                                         gpu::DenseKernel::native);
         check(sparse, kind);
     }
-    EXPECT_THROW(gpu::PreparedSolver(gpu::CsrMatrix(as_csr(host.view()), *context), *context, gpu::DenseKernel::cublas),
+    EXPECT_THROW(gpu::PreparedSolver(gpu::CsrMatrix(as_csr(host.view()), *context), *context,
+                                     cg::PreconditionerKind::none, gpu::DenseKernel::cublas),
                  std::invalid_argument);
     const auto invalid_kind = static_cast<cg::PreconditionerKind>(-1);
     EXPECT_THROW(
-        gpu::PreparedSolver(gpu::DenseMatrix(host.view(), *context), *context, gpu::DenseKernel::native, invalid_kind),
+        gpu::PreparedSolver(gpu::DenseMatrix(host.view(), *context), *context, invalid_kind, gpu::DenseKernel::native),
         std::invalid_argument);
-    EXPECT_THROW(gpu::PreparedSolver(gpu::CsrMatrix(as_csr(host.view()), *context), *context, gpu::DenseKernel::native,
-                                     invalid_kind),
+    EXPECT_THROW(gpu::PreparedSolver(gpu::CsrMatrix(as_csr(host.view()), *context), *context, invalid_kind,
+                                     gpu::DenseKernel::native),
                  std::invalid_argument);
 }
 
@@ -1108,11 +1112,13 @@ TEST_F(Cuda, NonfiniteProductsAndNegativeCurvatureReportNumericalStatuses)
         {
             cg::CgOptions options;
             options.algorithm = algorithm;
-            const gpu::DenseMatrix negative(cg::DenseMatrix(2, 2, {-1, 0, 0, -1}).view(), *context);
+            const cg::DenseMatrix host_negative(2, 2, {-1, 0, 0, -1});
+            const gpu::DenseMatrix negative(host_negative.view(), *context);
             x.fill(0, *context);
             EXPECT_EQ(gpu::solve_into(negative.view(), b.view(), x.view(), selected_workspace, options, true).status,
                       cg::Status::non_positive_curvature);
-            const gpu::DenseMatrix invalid(cg::DenseMatrix(2, 2, {1, INFINITY, 0, 1}).view(), *context);
+            const cg::DenseMatrix host_invalid(2, 2, {1, INFINITY, 0, 1});
+            const gpu::DenseMatrix invalid(host_invalid.view(), *context);
             x.fill(0, *context);
             EXPECT_EQ(gpu::solve_into(invalid.view(), b.view(), x.view(), selected_workspace, options, true).status,
                       cg::Status::non_finite);
@@ -1157,8 +1163,8 @@ TEST_F(Cuda, ImmutablePreparedPlanSupportsConcurrentSolvesOnIndependentStreams)
     {
         for (const auto kernel : {gpu::DenseKernel::native, gpu::DenseKernel::cublas})
         {
-            const gpu::PreparedSolver plan(gpu::DenseMatrix(host.view(), *context), *context, kernel,
-                                           cg::PreconditionerKind::jacobi);
+            const gpu::PreparedSolver plan(gpu::DenseMatrix(host.view(), *context), *context,
+                                           cg::PreconditionerKind::jacobi, kernel);
             const auto run = [&](double rhs)
             {
                 cudaStream_t stream = nullptr;

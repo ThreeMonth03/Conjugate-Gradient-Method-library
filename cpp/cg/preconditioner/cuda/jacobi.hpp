@@ -26,7 +26,8 @@ class JacobiPreconditioner
     JacobiPreconditioner &operator=(JacobiPreconditioner &&other) noexcept;
     std::size_t size() const noexcept { return m_inverse.size(); }
     int device() const noexcept { return m_inverse.device(); }
-    ConstVectorView inverse_diagonal() const noexcept { return m_inverse; }
+    ConstVectorView inverse_diagonal() const & noexcept { return m_inverse; }
+    ConstVectorView inverse_diagonal() const && = delete;
     double apply_and_dot(ConstVectorView r, VectorView z, const detail::Backend &backend) const;
 
     private:

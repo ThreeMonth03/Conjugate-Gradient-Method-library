@@ -23,10 +23,15 @@ class Vector
     Vector &operator=(Vector &&other) noexcept;
     std::size_t size() const noexcept { return m_size; }
     int device() const noexcept { return m_data.get_deleter().device; }
-    double *data() noexcept { return m_data.get(); }
-    const double *data() const noexcept { return m_data.get(); }
-    VectorView view() noexcept { return {data(), size(), device()}; }
-    ConstVectorView view() const noexcept { return {data(), size(), device()}; }
+    // Pointers and views borrow the allocation; only live owners provide them.
+    double *data() & noexcept { return m_data.get(); }
+    const double *data() const & noexcept { return m_data.get(); }
+    double *data() && = delete;
+    const double *data() const && = delete;
+    VectorView view() & noexcept { return {data(), size(), device()}; }
+    ConstVectorView view() const & noexcept { return {data(), size(), device()}; }
+    VectorView view() && = delete;
+    ConstVectorView view() const && = delete;
     void upload(cg::ConstVectorView host, const Context &context);
     void download(cg::VectorView host, const Context &context) const;
     void copy_from_device(ConstVectorView source, const Context &context);

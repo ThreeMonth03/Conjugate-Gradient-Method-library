@@ -23,11 +23,17 @@ class Workspace
     void prepare(std::size_t size);
     std::size_t size() const noexcept { return m_r.size(); }
     std::size_t capacity() const noexcept;
-    VectorView residual() noexcept { return m_r; }
-    VectorView direction() noexcept { return m_p; }
-    VectorView product() noexcept { return m_ap; }
-    VectorView scratch() noexcept { return m_scratch; }
-    VectorView preconditioned() noexcept { return m_z; }
+    // Buffer views borrow this workspace and cannot outlive its current storage.
+    VectorView residual() & noexcept { return m_r; }
+    VectorView residual() && = delete;
+    VectorView direction() & noexcept { return m_p; }
+    VectorView direction() && = delete;
+    VectorView product() & noexcept { return m_ap; }
+    VectorView product() && = delete;
+    VectorView scratch() & noexcept { return m_scratch; }
+    VectorView scratch() && = delete;
+    VectorView preconditioned() & noexcept { return m_z; }
+    VectorView preconditioned() && = delete;
 
     private:
     std::vector<double> m_r;

@@ -14,7 +14,7 @@ double CpuBackend::dot(ConstVectorView x, ConstVectorView y) const
     double sum = 0.0;
 #ifdef _OPENMP
 #pragma omp parallel for simd reduction(+ : sum) schedule(static)                                                      \
-    num_threads(m_threads) if (m_threads > 1 && x.size() >= 16384)
+    num_threads(m_num_threads) if (m_num_threads > 1 && x.size() >= 16384)
 #endif
     for (std::size_t i = 0; i < x.size(); ++i)
     {

@@ -38,11 +38,9 @@ struct DeviceArray
 };
 
 DeviceArray device_array(py::object object, int ndim, const gpu::Context &context, bool writable, bool integer = false);
-gpu::ConstVectorView as_vector_view(const DeviceArray &array);
+gpu::ConstVectorView as_const_vector_view(const DeviceArray &array);
 gpu::VectorView as_mutable_vector_view(const DeviceArray &array);
 gpu::DenseMatrixView as_dense_matrix_view(const DeviceArray &array);
-void validate_host_array(const py::array &array, int ndim);
-cg::DenseMatrixView as_host_matrix_view(const py::array &array);
 
 } // namespace python
 } // namespace cg

@@ -23,14 +23,14 @@ const CsrMatrix &operator_view(const CsrMatrix &matrix)
 
 } // namespace
 
-PreparedSolver::PreparedSolver(DenseMatrix matrix, const Context &context, DenseKernel kernel,
-                               PreconditionerKind preconditioner)
+PreparedSolver::PreparedSolver(DenseMatrix matrix, const Context &context, PreconditionerKind preconditioner,
+                               DenseKernel kernel)
     : m_matrix(std::move(matrix)), m_device(context.device()), m_kernel(kernel)
 {
     prepare(context, preconditioner);
 }
-PreparedSolver::PreparedSolver(CsrMatrix matrix, const Context &context, DenseKernel kernel,
-                               PreconditionerKind preconditioner)
+PreparedSolver::PreparedSolver(CsrMatrix matrix, const Context &context, PreconditionerKind preconditioner,
+                               DenseKernel kernel)
     : m_matrix(std::move(matrix)), m_device(context.device()), m_kernel(kernel)
 {
     prepare(context, preconditioner);

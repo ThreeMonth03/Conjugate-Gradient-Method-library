@@ -19,9 +19,13 @@ class DenseMatrix
     void swap(DenseMatrix &other) noexcept;
     std::size_t rows() const noexcept { return m_rows; }
     std::size_t cols() const noexcept { return m_cols; }
-    double *data() noexcept { return m_values.data(); }
-    const double *data() const noexcept { return m_values.data(); }
-    DenseMatrixView view() const { return {data(), m_rows, m_cols}; }
+    // Borrowed storage requires a live owner; replacing the owner invalidates it.
+    double *data() & noexcept { return m_values.data(); }
+    const double *data() const & noexcept { return m_values.data(); }
+    double *data() && = delete;
+    const double *data() const && = delete;
+    DenseMatrixView view() const & { return {data(), m_rows, m_cols}; }
+    DenseMatrixView view() const && = delete;
 
     private:
     std::size_t m_rows;

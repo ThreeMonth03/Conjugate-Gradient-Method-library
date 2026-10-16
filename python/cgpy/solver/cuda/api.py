@@ -170,17 +170,12 @@ def solve(
 
 
 def _initial_output(b, x0, device, stream):
-    """Allocate/reset fresh output without retaining caller inputs."""
-    if not hasattr(b, "__cuda_array_interface__"):
-        raise ValueError(
-            "b must be a device vector with __cuda_array_interface__"
-        )
-    shape = tuple(b.__cuda_array_interface__["shape"])
-    if len(shape) != 1:
-        raise ValueError("b must be a one-dimensional device vector")
-    x = storage.Vector._empty(shape[0], device, stream)
-    if x0 is None:
-        x.fill(0.0, stream=stream)
-    else:
-        x.copy_from_device(x0, stream=stream)
-    return x, shape[0]
+    """Validate device inputs, then allocate/reset a fresh owning output."""
+    x = storage.Vector.__new__(storage.Vector)
+    x._native = cuda_runtime.load()._initial_output(
+        cuda_interop.native_object(b),
+        cuda_interop.native_object(x0),
+        device,
+        stream,
+    )
+    return x, x.size

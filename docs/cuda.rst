@@ -256,6 +256,16 @@ owns its handle and 4 MiB scratch allocation; overlapping
 reuse raises an error. It fixes the device, stream, kernel and execution mode
 used for its solve. No API reinterprets a NumPy host pointer as a device pointer.
 
+All device entry points use the same native CUDA Array Interface parser.
+Missing required fields and invalid built-in metadata types, dimensions,
+layout or pointers raise ``ValueError``. An absent interface or ``AttributeError``
+from its getter is treated as a missing protocol. Other exceptions from custom
+descriptor getters, and exceptions from integer conversion callbacks,
+propagate unchanged. Convenience and session solves validate ``b`` and optional
+``x0``, including matching vector sizes, before allocating or initializing their
+fresh output. Host uploads use the same aligned contiguous float64 checks as
+CPU borrowing boundaries.
+
 Native C++ vector and matrix views are lightweight borrowing descriptors.
 Their pointer, extent, index type and device metadata are private, accessed
 through methods such as ``data()``, ``size()`` and ``device()``. They neither

@@ -70,20 +70,20 @@ std::unique_ptr<gpu::PreparedSolver> prepare_device(py::object matrix, int devic
     {
         const auto &source = matrix.cast<const gpu::CsrMatrix &>();
         py::gil_scoped_release release;
-        return std::make_unique<gpu::PreparedSolver>(gpu::CsrMatrix(source.view(), context), context, kernel,
-                                                     preconditioner);
+        return std::make_unique<gpu::PreparedSolver>(gpu::CsrMatrix(source.view(), context), context, preconditioner,
+                                                     kernel);
     }
     if (py::isinstance<gpu::DenseMatrix>(matrix))
     {
         const auto &source = matrix.cast<const gpu::DenseMatrix &>();
         py::gil_scoped_release release;
-        return std::make_unique<gpu::PreparedSolver>(gpu::DenseMatrix(source.view(), context), context, kernel,
-                                                     preconditioner);
+        return std::make_unique<gpu::PreparedSolver>(gpu::DenseMatrix(source.view(), context), context, preconditioner,
+                                                     kernel);
     }
     const auto source = device_array(matrix, 2, context, false);
     py::gil_scoped_release release;
     return std::make_unique<gpu::PreparedSolver>(gpu::DenseMatrix(as_dense_matrix_view(source), context), context,
-                                                 kernel, preconditioner);
+                                                 preconditioner, kernel);
 }
 
 std::unique_ptr<gpu::PreparedSolver> prepare_host(py::object matrix, int device, std::uintptr_t stream,
@@ -97,12 +97,12 @@ std::unique_ptr<gpu::PreparedSolver> prepare_host(py::object matrix, int device,
     {
         const auto &source = matrix.cast<const cg::CsrMatrix &>();
         py::gil_scoped_release release;
-        return std::make_unique<gpu::PreparedSolver>(gpu::CsrMatrix(source, context), context, kernel, preconditioner);
+        return std::make_unique<gpu::PreparedSolver>(gpu::CsrMatrix(source, context), context, preconditioner, kernel);
     }
     const auto source = matrix.cast<py::array>();
-    const auto view = as_host_matrix_view(source);
+    const auto view = as_dense_matrix_view(source);
     py::gil_scoped_release release;
-    return std::make_unique<gpu::PreparedSolver>(gpu::DenseMatrix(view, context), context, kernel, preconditioner);
+    return std::make_unique<gpu::PreparedSolver>(gpu::DenseMatrix(view, context), context, preconditioner, kernel);
 }
 
 cg::SolveInfo solve_prepared(const gpu::PreparedSolver &solver, py::object b, py::object x, gpu::Workspace &workspace,
@@ -113,7 +113,7 @@ cg::SolveInfo solve_prepared(const gpu::PreparedSolver &solver, py::object b, py
     const auto bv = device_array(b, 1, workspace.context(), false);
     const auto xv = device_array(x, 1, workspace.context(), true);
     py::gil_scoped_release release;
-    return solver.solve_into(as_vector_view(bv), as_mutable_vector_view(xv), workspace, settings, fused);
+    return solver.solve_into(as_const_vector_view(bv), as_mutable_vector_view(xv), workspace, settings, fused);
 }
 
 cg::SolveInfo solve(py::object matrix, py::object b, py::object x, gpu::Workspace &workspace, double rtol, double atol,
@@ -128,7 +128,7 @@ cg::SolveInfo solve(py::object matrix, py::object b, py::object x, gpu::Workspac
     {
         const auto &A = matrix.cast<const gpu::CsrMatrix &>();
         py::gil_scoped_release release;
-        return gpu::solve_into(A, as_vector_view(bv), as_mutable_vector_view(xv), workspace, settings, fused,
+        return gpu::solve_into(A, as_const_vector_view(bv), as_mutable_vector_view(xv), workspace, settings, fused,
                                preconditioner);
     }
     gpu::DenseMatrixView A;
@@ -143,7 +143,7 @@ cg::SolveInfo solve(py::object matrix, py::object b, py::object x, gpu::Workspac
         A = as_dense_matrix_view(owner);
     }
     py::gil_scoped_release release;
-    return gpu::solve_into(A, as_vector_view(bv), as_mutable_vector_view(xv), workspace, settings, fused,
+    return gpu::solve_into(A, as_const_vector_view(bv), as_mutable_vector_view(xv), workspace, settings, fused,
                            preconditioner);
 }
 

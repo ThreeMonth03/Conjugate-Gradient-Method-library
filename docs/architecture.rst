@@ -74,6 +74,12 @@ so C++ consumers use them without importing Python. Python
 modules import their defining peers rather than private helpers from the
 package root. ``cgpy.__init__`` supplies explicit public re-exports.
 
+Shared host array-to-view functions validate dtype, dimensions, contiguity,
+alignment and output writability. CPU solves and CUDA uploads use these same
+functions. The separate CUDA Array Interface parser retains producer owners
+and validates device layout and readiness. Fresh CUDA output is initialized
+only after the right-hand side and optional initial guess pass that parser.
+
 Workspace and ownership
 -----------------------
 
@@ -82,6 +88,9 @@ views use ``std::span``. CPU dense and CUDA vector/dense/CSR views keep their
 pointer, extent and layout/device metadata private and expose read-only
 accessors such as ``data()``, ``size()``, ``rows()`` and ``device()``. Replacing
 a view replaces its whole descriptor; callers cannot edit individual fields.
+Owners provide borrowed pointers, views and references only through lvalue
+getters; calls on temporary owners are rejected at compile time. Moving,
+replacing or destroying a live owner can still invalidate an existing borrow.
 CUDA views remain trivially copyable descriptors with host/device accessors
 and no allocation or synchronization. Device pointer inspection and stream
 readiness checks remain at operation and foreign-array boundaries. Metadata
@@ -121,6 +130,9 @@ borrows compatible arrays and uses caller-owned output/workspace. ``prepare``
 owns a matrix snapshot and optional Jacobi inverse; immutable preparation can
 be shared across calls. Dense and CSR preparation return the same concrete
 ``PreparedSolver`` type. ``CsrMatrix`` has the same spelling in C++ and Python.
+Python prepared solvers are constructed through ``prepare`` or CUDA
+``prepare_host``; their public types expose results and operations without a
+second constructor path. Native C++ constructors remain available.
 Preparation fixes thread count and dense-kernel
 selection. Keep output/workspace disjoint from inputs and use separate
 workspace/output for overlapping solves. Every public solve completes before

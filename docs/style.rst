@@ -63,6 +63,9 @@ Return borrowed contiguous ranges as spans by value, with ``const`` element
 types for read-only access. Reject borrowing from temporary owners and document
 invalidation. An ``auto`` copy of a span still borrows; use an owning container
 for an independent snapshot.
+Owner getters that return borrowed pointers, views or references use ``&`` or
+``const &`` qualifiers and delete their rvalue overloads. Descriptor accessors
+remain usable on temporary views because descriptors do not own storage.
 
 Carry borrowed ranges through host kernels as spans and index the span
 directly. Keep strided matrix and device views lightweight, with private
