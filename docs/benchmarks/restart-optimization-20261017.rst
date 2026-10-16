@@ -3745,4 +3745,3 @@ with capture-range=cudaProfilerApi and cuda,cublas,nvtx tracing. The ignored
 orchestrator is not needed. Nsight installation, WSL permissions and GPU
 availability are external prerequisites. Exact frozen command argv and all
 original summary CSV rows are retained in the analysis JSON.
-
