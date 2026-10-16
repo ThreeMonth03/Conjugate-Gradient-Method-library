@@ -92,6 +92,8 @@ CSR and results
    >>> result = cgpy.solve(A, np.array([1.0, 2.0]), preconditioner="jacobi")
    >>> result.converged
    True
+   >>> result.restarts == result.info.restarts
+   True
    >>> np.testing.assert_allclose(result.x, [1 / 11, 7 / 11])
    >>> repeated = cgpy.solve(A, np.array([1.0, 2.0]), preconditioner="jacobi")
    >>> result == repeated
@@ -105,7 +107,9 @@ finite positive inverse. It supports ``algorithm="standard"`` only.
 
 ``SolveResult`` fields cannot be rebound, but solution contents remain
 writable. Equality compares result object identity; compare numerical
-solutions explicitly with a suitable tolerance, as above.
+solutions explicitly with a suitable tolerance, as above. The ``iterations``,
+``matvecs`` and ``restarts`` properties expose the corresponding ``SolveInfo``
+counts directly; they do not keep a second copy of the metadata.
 
 .. autoclass:: cgpy.SolveResult
    :members:

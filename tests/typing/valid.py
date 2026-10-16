@@ -90,6 +90,7 @@ def cpu_examples(
     )
     assert_type(result.x, npt.NDArray[np.float64])
     assert_type(result.info, cgpy.SolveInfo)
+    assert_type(result.restarts, int)
     assert_type(cgpy.solve(sparse, [1.0, 2.0]).x, npt.NDArray[np.float64])
 
 
@@ -128,6 +129,7 @@ def cuda_examples(
         cuda.solve(matrix, rhs), cgpy.SolveResult[cuda.Vector]
     )
     assert_type(result.x, cuda.Vector)
+    assert_type(result.restarts, int)
     assert_type(result.x.to_host(), npt.NDArray[np.float64])
     session = cuda.Session(2, dense_kernel="cublas", execution_mode="device")
     assert_type(session.solve(matrix, rhs), cgpy.SolveResult[cuda.Vector])

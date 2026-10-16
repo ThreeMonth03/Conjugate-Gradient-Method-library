@@ -60,7 +60,7 @@ if(CG_ENABLE_CUDA)
         cpp/cg/matrix/pymod/cuda.cpp
         cpp/cg/solver/pymod/cuda.cpp
     )
-    target_link_libraries(_cuda PRIVATE cg_cuda)
+    target_link_libraries(_cuda PRIVATE cg_cuda CUDA::cudart)
     string(REPLACE ";" "," CG_CUDA_ARCHITECTURES_INFO "${CMAKE_CUDA_ARCHITECTURES}")
     string(TOUPPER "${CMAKE_BUILD_TYPE}" CG_CUDA_BUILD_CONFIG)
     set_target_properties(_cuda PROPERTIES

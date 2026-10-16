@@ -1,8 +1,10 @@
 """Install, relocate and test the standalone C++ package consumer."""
 
 import argparse
+import json
 import os
 import pathlib
+import shlex
 import shutil
 import subprocess
 import tempfile
@@ -40,12 +42,51 @@ def check_consumer_cache(build, prefix, source, producer):
         raise AssertionError(f"consumer found the wrong package: {package}")
     if any(name.startswith(("Python_", "Python3_")) for name in cache):
         raise AssertionError("native consumer unexpectedly discovered Python")
-    commands = build / "compile_commands.json"
-    if commands.is_file():
-        content = commands.read_text()
-        for path in (source / "cpp", producer):
-            if str(path) in content:
-                raise AssertionError(f"consumer uses private headers: {path}")
+    content = (build / "compile_commands.json").read_text()
+    for path in (source / "cpp", producer):
+        if str(path) in content:
+            raise AssertionError(f"consumer uses private headers: {path}")
+    explicit = set(
+        shlex.split(
+            cache.get("CMAKE_CXX_FLAGS", "")
+            + " "
+            + cache.get(
+                f"CMAKE_CXX_FLAGS_{cache.get('CMAKE_BUILD_TYPE', '').upper()}",
+                "",
+            )
+        )
+    )
+    openmp = set(shlex.split(cache.get("OpenMP_CXX_FLAGS", "")))
+    openmp.difference_update(("-Xclang", "-Xpreprocessor"))
+    for command in json.loads(content):
+        arguments = command.get("arguments") or shlex.split(command["command"])
+        inherited = set(arguments) - explicit
+        if openmp & inherited:
+            raise AssertionError("consumer inherits OpenMP compiler flags")
+        if any(
+            value.startswith(("-DCG_ENABLE_BLAS", "-D_OPENMP"))
+            for value in inherited
+        ):
+            raise AssertionError("consumer inherits implementation macros")
+        for index, value in enumerate(arguments):
+            directory = None
+            for flag in ("-I", "-isystem", "-iquote", "-idirafter"):
+                if value == flag:
+                    directory = arguments[index + 1]
+                    break
+                if value.startswith(flag):
+                    directory = value[len(flag) :]
+                    break
+            if directory is None or directory in explicit:
+                continue
+            if value != flag and value in explicit:
+                continue
+            include = pathlib.Path(command["directory"]) / directory
+            if any(
+                (include / header).is_file()
+                for header in ("cuda_runtime_api.h", "cublas_v2.h")
+            ):
+                raise AssertionError("consumer inherits CUDA SDK headers")
 
 
 def main():

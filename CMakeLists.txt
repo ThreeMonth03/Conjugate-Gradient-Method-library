@@ -75,7 +75,7 @@ if(CG_ENABLE_BLAS)
         "$<BUILD_INTERFACE:cg_private_blas>"
         "$<INSTALL_INTERFACE:cg::private_blas>"
     )
-    target_compile_definitions(cg_core PUBLIC CG_ENABLE_BLAS=1)
+    target_compile_definitions(cg_core PRIVATE CG_ENABLE_BLAS=1)
     target_compile_definitions(cg_core PRIVATE
         cblas_dgemv=cgpy_cblas_dgemv
         CG_BLAS_PROVIDER_INFO="${CG_BLAS_PROVIDER_INFO}"
@@ -83,7 +83,7 @@ if(CG_ENABLE_BLAS)
 endif()
 if(CG_ENABLE_OPENMP)
     find_package(OpenMP REQUIRED COMPONENTS CXX)
-    target_link_libraries(cg_core PUBLIC OpenMP::OpenMP_CXX)
+    target_link_libraries(cg_core PRIVATE OpenMP::OpenMP_CXX)
 endif()
 if(CG_ENABLE_SANITIZERS)
     if(CG_ENABLE_CUDA OR CG_BUILD_PYTHON)
@@ -153,7 +153,8 @@ if(BUILD_TESTING)
     add_custom_target(cg_native_tests DEPENDS cg_gtests cg_allocation_gtests)
     if(CG_ENABLE_CUDA)
         add_executable(cg_cuda_gtests tests/cpp/cuda/test_cuda.cpp)
-        target_link_libraries(cg_cuda_gtests PRIVATE cg_cuda GTest::gtest_main)
+        target_link_libraries(cg_cuda_gtests PRIVATE
+            cg_cuda CUDA::cudart CUDA::cublas GTest::gtest_main)
         gtest_discover_tests(cg_cuda_gtests PROPERTIES LABELS "cpp;cuda")
         add_dependencies(cg_native_tests cg_cuda_gtests)
     endif()

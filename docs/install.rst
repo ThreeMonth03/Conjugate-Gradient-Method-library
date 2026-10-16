@@ -74,10 +74,12 @@ PCG, reuses a prepared solver/workspace, and checks the solution and true
 residual independently. Its checks remain active in Release builds.
 
 Set ``CG_ENABLE_OPENMP=ON`` or ``CG_ENABLE_BLAS=ON`` when building the library;
-consumers inherit those dependencies. The BLAS installation retains the
-private provider archive and license, without requiring a system BLAS or
-the original build directory. Installations are relocatable: set
-``CMAKE_PREFIX_PATH`` to the new prefix after moving it. CMake metadata belongs
+consumers inherit the necessary runtime link dependencies. Library-only
+OpenMP compiler flags and the BLAS build macro stay private. The BLAS
+installation retains the private provider archive and license, without
+requiring a system BLAS or the original build directory. Installations are
+relocatable: set ``CMAKE_PREFIX_PATH`` to the new prefix after moving it.
+CMake metadata belongs
 to the ``development`` component and is not included in Python wheels.
 
 A CUDA-enabled installation additionally provides an explicit component:
@@ -88,7 +90,8 @@ A CUDA-enabled installation additionally provides an explicit component:
    target_link_libraries(app PRIVATE cg::cuda)
 
 Requesting CUDA locates Toolkit >=12.8 and <13 for its link dependencies;
-the consumer itself can remain a CXX-only project. A core-only request does
+the consumer itself can remain a CXX-only project without CUDA SDK include
+directories in its compile settings. A core-only request does
 not search for CUDA, even when the installation also contains that backend.
 Set ``CG_CONSUMER_CUDA=ON`` when configuring ``examples/cpp`` to build its CUDA
 example. Compilation and linking need no GPU; CTest explicitly skips CUDA

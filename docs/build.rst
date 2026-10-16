@@ -35,8 +35,10 @@ disabled in ``build/<preset>-native``. It installs the development component,
 moves the installation prefix, and configures an independent C++ consumer
 outside the checkout. The consumer checks dense/CSR CG and PCG, reusable
 workspaces, true residuals and basic operation counts. Native, OpenMP and BLAS
-CI configurations run these checks. CUDA CI also compiles/links the optional
-consumer and reports device-dependent skips; the GPU job uses
+CI configurations run these checks. Consumer compile settings are checked for
+leaked library-only macros, OpenMP flags and CUDA SDK include directories.
+CUDA CI also compiles/links the optional consumer and reports device-dependent
+skips; the GPU job uses
 ``NATIVE_ARGS=--require-cuda``. ``NATIVE_BUILD_DIR`` overrides its build path.
 See :doc:`install` for direct CMake commands and imported targets.
 
