@@ -40,6 +40,11 @@ class SolveResult[Solution]:
         return self.info.matvecs
 
     @property
+    def restarts(self) -> int:
+        """Search-direction restarts after true-residual refreshes."""
+        return self.info.restarts
+
+    @property
     def residual_norm(self) -> float:
         """Independently evaluated final Euclidean residual norm."""
         return self.info.residual_norm

@@ -51,7 +51,7 @@ set_target_properties(cg_cuda PROPERTIES
     CUDA_VISIBILITY_PRESET hidden
     VISIBILITY_INLINES_HIDDEN ON
 )
-target_link_libraries(cg_cuda PUBLIC cg_core CUDA::cudart CUDA::cublas)
+target_link_libraries(cg_cuda PUBLIC cg_core PRIVATE CUDA::cudart CUDA::cublas)
 set(CG_CUDA_PUBLIC_HEADERS
     cuda.hpp
     runtime/cuda/context.hpp
