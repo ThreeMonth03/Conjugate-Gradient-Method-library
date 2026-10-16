@@ -7,6 +7,14 @@ its measured source and environment; filenames such as ``current`` and
 ``main`` identify historical baselines, not the current checkout.
 Existing report URLs remain unchanged.
 
+2026-10-17
+----------
+
+.. toctree::
+   :maxdepth: 1
+
+   Restart-aware baseline — all CPU/CUDA scopes, remaining losses and seventeen diagnostics <restart-baseline-20261017>
+
 2026-10-16
 ----------
 
