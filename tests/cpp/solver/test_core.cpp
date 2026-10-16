@@ -4,6 +4,7 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdint>
@@ -701,16 +702,18 @@ TEST(FusedOperations, MatchesReferenceDenseReductionAndResidual)
 TEST(DenseRows, NativeMatvecIsIndependentOfFusionSelection)
 {
     // Cancellation makes different GEMV accumulation policies observable.
-    // Include a row pair, a leftover row, a column tail and poisoned padding.
-    constexpr std::size_t rows = 3, columns = 5, stride = 8;
-    const std::array<double, rows * columns> values{1e16, 1, -1e16, 1, 4, -1e16, 1, 1e16, 1, -3, 1e16, 1, -1e16, 1, 7};
+    // Include a four-row block, a pair, a single row and poisoned padding.
+    constexpr std::size_t rows = 7, columns = 5, stride = 8;
+    const std::array<double, 3 * columns> values{1e16, 1, -1e16, 1, 4, -1e16, 1, 1e16, 1, -3, 1e16, 1, -1e16, 1, 7};
+    // The two rounded pair sums cancel before adding the fifth-column tail.
+    const std::array<double, rows> expected{4, -3, 7, 4, -3, 7, 4};
     std::array<double, rows * stride> storage;
     storage.fill(std::numeric_limits<double>::quiet_NaN());
     for (std::size_t row = 0; row < rows; ++row)
     {
         for (std::size_t column = 0; column < columns; ++column)
         {
-            storage[row * stride + column] = values[row * columns + column];
+            storage[row * stride + column] = values[(row % 3) * columns + column];
         }
     }
     const cg::DenseMatrixView A(storage.data(), rows, columns, stride);
@@ -721,6 +724,7 @@ TEST(DenseRows, NativeMatvecIsIndependentOfFusionSelection)
     for (std::size_t row = 0; row < rows; ++row)
     {
         EXPECT_TRUE(std::isfinite(fused_output[row]));
+        EXPECT_EQ(fused_output[row], expected[row]);
         EXPECT_EQ(separate_output[row], fused_output[row]);
     }
 }
@@ -729,7 +733,9 @@ TEST(DenseRows, FusionPoliciesMatchLongDoubleWithOddTailsAndPaddedRows)
 {
     for (const std::size_t columns : {1u, 3u, 5u, 7u, 17u, 65u, 129u, 257u})
     {
-        const std::size_t rows = 3;
+        // Exercise four-row bulk plus both pair and single tails independently
+        // of the scalar long-double reference's accumulation order.
+        const std::size_t rows = 7;
         const std::size_t stride = columns + 5;
         std::vector<double> storage(rows * stride, std::numeric_limits<double>::quiet_NaN());
         std::vector<double> x(columns), output(rows);
@@ -789,9 +795,9 @@ TEST(DenseRows, FusionPoliciesPreserveNonfiniteMultiplicationBehavior)
 TEST(DenseRows, PairBoundariesPreserveExactProductsAndBothResidualSigns)
 {
     // Fully populated integer products stay exactly representable in double.
-    // The odd size exercises a leftover row after parallel pairs; the even
-    // size exercises the all-pair path. NaN padding detects stride overreads.
-    for (const std::size_t size : {129u, 130u})
+    // Exercise four-row bulk followed by single, pair, and pair+single tails,
+    // along with 1/2/3 column tails. NaN padding detects stride overreads.
+    for (const std::size_t size : {129u, 130u, 131u})
     {
         SCOPED_TRACE(size);
         const auto stride = size + 5;
@@ -862,7 +868,7 @@ TEST(DenseRows, NonfiniteValuesStayInTheAffectedPairOrLeftoverRow)
 {
     constexpr std::size_t size = 129;
     constexpr std::size_t stride = size + 5;
-    for (const std::size_t affected_row : {1u, 128u})
+    for (const std::size_t affected_row : {1u, 2u, 3u, 128u})
     {
         SCOPED_TRACE(affected_row);
         for (const std::size_t affected_column : {3u, 128u})
@@ -907,6 +913,115 @@ TEST(DenseRows, NonfiniteValuesStayInTheAffectedPairOrLeftoverRow)
                         EXPECT_TRUE(std::isnan(backend.apply_and_dot(A, zero, output)));
                         EXPECT_TRUE(std::isnan(backend.residual_squared_norm(A, zero, zero, output)));
                         EXPECT_TRUE(std::isnan(output[affected_row]));
+                    }
+                }
+            }
+        }
+    }
+}
+
+TEST(DenseRows, OpenMPOddRowPartitionsMeetIndependentCGAndPCGToleranceWithWorkspaceReuse)
+{
+    if (!cg::CpuBackend::openmp_enabled())
+    {
+        GTEST_SKIP() << "requires the explicit OpenMP build";
+    }
+    for (const std::size_t size : {130u, 131u})
+    {
+        SCOPED_TRACE(size);
+        const auto stride = size + 5;
+        std::vector<double> storage(size * stride, std::numeric_limits<double>::quiet_NaN());
+        std::vector<double> truth(size), b(size), x(size);
+        for (std::size_t i = 0; i < size; ++i)
+        {
+            truth[i] = 0.25 + std::sin(0.23 * static_cast<double>(i));
+            double off_diagonal_sum = 0.0;
+            for (std::size_t j = 0; j < size; ++j)
+            {
+                const double value =
+                    i == j ? 0.0 : 0.03 * std::cos(0.17 * static_cast<double>(i + j + 1)) / static_cast<double>(size);
+                storage[i * stride + j] = value;
+                off_diagonal_sum += std::abs(value);
+            }
+            // Symmetry and strict diagonal dominance give an SPD system with
+            // a modest diagonal range; all active rows contain noninteger data.
+            storage[i * stride + i] = 1.25 + 0.071 * static_cast<double>(i % 11) + off_diagonal_sum;
+        }
+        const cg::DenseMatrixView A(storage.data(), size, size, stride);
+        long double b_norm = 0.0L;
+        for (std::size_t i = 0; i < size; ++i)
+        {
+            long double sum = 0.0L;
+            for (std::size_t j = 0; j < size; ++j)
+            {
+                sum += static_cast<long double>(storage[i * stride + j]) * static_cast<long double>(truth[j]);
+            }
+            b[i] = static_cast<double>(sum);
+            b_norm = std::hypot(b_norm, static_cast<long double>(b[i]));
+        }
+        const auto independent_residual = [&]
+        {
+            long double norm = 0.0L;
+            for (std::size_t i = 0; i < size; ++i)
+            {
+                long double product = 0.0L;
+                for (std::size_t j = 0; j < size; ++j)
+                {
+                    product += static_cast<long double>(storage[i * stride + j]) * static_cast<long double>(x[j]);
+                }
+                norm = std::hypot(norm, static_cast<long double>(b[i]) - product);
+            }
+            return norm;
+        };
+        const cg::JacobiPreconditioner M(A);
+        cg::Workspace workspace(size);
+        const auto *residual_storage = workspace.residual().data();
+        const auto *preconditioned_storage = workspace.preconditioned().data();
+        for (const bool fused : {false, true})
+        {
+            SCOPED_TRACE(fused);
+            const cg::CpuBackend backend(2, fused);
+            for (const bool preconditioned : {false, true})
+            {
+                SCOPED_TRACE(preconditioned);
+                for (const std::size_t refresh : {0u, 1u})
+                {
+                    SCOPED_TRACE(refresh);
+                    cg::CgOptions options;
+                    options.algorithm = cg::Algorithm::recurrence;
+                    options.rtol = 1e-10;
+                    options.atol = 1e-12;
+                    options.maxiter = 256;
+                    options.residual_refresh = refresh;
+                    const long double tolerance = std::max(static_cast<long double>(options.atol),
+                                                           static_cast<long double>(options.rtol) * b_norm);
+                    for (int reuse = 0; reuse < 2; ++reuse)
+                    {
+                        SCOPED_TRACE(reuse);
+                        for (std::size_t i = 0; i < size; ++i)
+                        {
+                            x[i] = reuse == 0 ? 0.0 : 0.125 * std::cos(0.31 * static_cast<double>(i));
+                        }
+                        const auto info =
+                            cg::solve_into(A, b, x, workspace, backend, options, preconditioned ? &M : nullptr);
+                        ASSERT_EQ(info.status, cg::Status::converged);
+                        const long double residual = independent_residual();
+                        ASSERT_TRUE(std::isfinite(residual));
+                        EXPECT_LE(residual, tolerance);
+                        EXPECT_TRUE(std::isfinite(info.residual_norm));
+                        EXPECT_LE(info.restarts, info.iterations);
+                        if (refresh == 1)
+                        {
+                            EXPECT_GT(info.iterations, 1u);
+                            EXPECT_GT(info.restarts, 0u);
+                        }
+                        EXPECT_EQ(workspace.residual().data(), residual_storage);
+                        EXPECT_EQ(workspace.preconditioned().data(), preconditioned_storage);
+                        for (std::size_t i = 0; i < size; ++i)
+                        {
+                            EXPECT_TRUE(std::isfinite(x[i]));
+                            EXPECT_NEAR(x[i], truth[i], 1e-8);
+                        }
                     }
                 }
             }
