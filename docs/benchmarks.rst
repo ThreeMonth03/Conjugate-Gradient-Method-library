@@ -1,107 +1,72 @@
 Benchmarks
 ==========
 
-Run the comparison suite with:
+Benchmarks measure time to an independently verified solution. The selected
+results below are historical measurements from **2026-10-16**, using frozen
+compiled revisions. They are not new measurements of the current ``main``.
 
-.. code-block:: bash
+Representative results
+----------------------
 
-   .venv/bin/python -m pip install --cache-dir .cache/pip -r requirements/benchmark.lock
-   make pyprof PYPROF_SUITE=sparse-solvers
+.. csv-table:: Results and remaining limitations
+   :header: "Comparison and scope", "Observation", "Limit"
+   :widths: 32, 34, 34
 
-Benchmarks measure time to an independently verified solution. Choose
-``prepared`` to reuse setup, ``api`` to include per-call allocation, or CUDA
-``session`` to reuse execution resources with fresh output and per-call Jacobi.
-:doc:`benchmarks/methodology` defines their exact boundaries, fixtures,
-correctness checks and sampling.
+   "CPU dense, n=2048, unfused; none/Jacobi, prepared/API", "32–42% lower median completed-wall time versus baseline", "Across n=64–2048, all 16 unfused rows meet the 5% budget; the original fused none/API batch retains 3 regressions and its pooled confirmation is inconclusive"
+   "CUDA launch A/B, prepared/device, fused=True; dense/CSR, none/Jacobi", "21 of 24 native/cuBLAS rows meet the 5% regression budget; 3 remain inconclusive", "The complete batch is inconclusive; meeting the budget does not prove a speedup"
+   "CUDA cuBLAS dense Jacobi, fresh API; host/device", "cuBLAS solve median times are higher than eager Torch in all 8 size/mode rows", "Per-call output, workspace and Jacobi setup are charged; prepared/Session results cannot replace this contract"
+
+Every selected answer passes an independent true-residual check. Strict A/B
+rows also preserve iteration/matvec counts. Framework median comparisons are
+descriptive; Torch runs this project's eager CG/PCG recurrence, not an official
+Torch CG solver. The :doc:`complete report <benchmarks/execution-reuse-20261016>`
+retains every result, uncertainty interval and framework control.
+
+Measurement context
+-------------------
+
+Hardware: Intel Core i7-13700K under WSL2/Linux 6.6.87.2; NVIDIA GeForce
+RTX 2060 (sm75) for CUDA. Runs use one thread and logical CPU 0 affinity.
+CPU builds use GNU 16.0.1; CUDA builds use GNU 13.3.0 and CUDA 12.8.93.
+Both use Release ``-O3 -DNDEBUG``. NumPy is 2.2.6 and Torch is 2.8.0
+(separate CPU/CUDA environments). GPU clocks, display activity and Windows
+background load were not controlled.
+
+.. csv-table:: Frozen compiled versions used by the summary
+   :header: "Cohort", "Baseline", "Measured version"
+   :widths: 34, 33, 33
+
+   "CPU GEMV A/B", "`6bfb7b4905e7 <https://github.com/ThreeMonth03/Conjugate-Gradient-Method-library/tree/6bfb7b4905e79381a3d09772016aab7a860a0dad>`_", "`7a7e6ea6e998 <https://github.com/ThreeMonth03/Conjugate-Gradient-Method-library/tree/7a7e6ea6e998a193514a1bb060d3cc67c0aaac45>`_"
+   "CUDA launch A/B", "`03379431a8cc <https://github.com/ThreeMonth03/Conjugate-Gradient-Method-library/tree/03379431a8cc4426447f1d5dfd011d908d9976bb>`_", "`ca0d6afebeda <https://github.com/ThreeMonth03/Conjugate-Gradient-Method-library/tree/ca0d6afebedaef1a1c4c7a5a2d2b4ffded6e1e2d>`_"
+
+The CUDA fresh-API characterization also uses ``ca0d6afebeda``. Source, stage
+and loaded-binary hashes are retained in the complete report; later rebases
+do not replace those compiled identities.
+
+FP64 inputs use rtol=1e-8, atol=1e-12 and residual refresh every 50 updates.
+``prepared`` reuses output/workspace/Jacobi; ``api`` charges per-call setup.
+CUDA ``session`` reuses execution resources with fresh output and per-call
+Jacobi. CUDA timings use resident inputs and include host dispatch, scalar
+synchronization, output reset and completion fences; uploads and correctness
+downloads are excluded. These are completed solves, not kernel-only or
+host-to-host latency. The methodology defines fixtures, sampling and scopes.
+
+Read further
+------------
 
 .. toctree::
    :maxdepth: 1
 
-   benchmarks/current
-   benchmarks/execution-reuse-20261016
-   benchmarks/api-lifecycle-20261016
-   benchmarks/optimization-20261016
-   benchmarks/main-20261016
-   benchmarks/cub
    benchmarks/methodology
-   benchmarks/cpu
-   benchmarks/sparse
-   benchmarks/cuda
+   benchmarks/reports
 
-Each report names its measurement dates and source revisions. The tables are
-historical results, not fresh measurements of the current checkout.
-
-Version control keeps the scripts and summary tables. New raw samples,
-input hashes and environment metadata go under ``build/``; CI publishes its
-smoke-run JSON as workflow artifacts. Documentation builds never require
-benchmark execution.
+Version control keeps scripts and summary tables. Raw samples, input hashes
+and environment metadata belong under ``build/``; CI publishes smoke-run JSON
+as workflow artifacts. Reproduction generates fresh measurements without
+requiring previous JSON, and documentation builds never run benchmarks.
 
 Diagnostic profiling
 --------------------
 
-``make pyprof`` remains the comparison entry point: it launches the shared
-``cgbench`` harness with independently verified solutions, multiple candidates
-and recorded sampling schedules. Use ``scripts/profile_solve.py`` to inspect
-one implementation and one exact suite case in a fresh process. It reuses the
-shared CLI, fixtures, executors and true-residual gates; its samples are
-diagnostics, not framework comparison scores.
-
-Build the selected preset before profiling, then keep its package path and
-environment fixed. For a native CPU solve:
-
-.. code-block:: bash
-
-   taskset -c 0 env PYTHONPATH="$PWD/build/cpu-release/python" \
-       .venv/bin/python scripts/profile_solve.py \
-       --suite cpu-dense-f64-v1 --case dense-1024 --implementation native \
-       --scope prepared --probe solve --threads 1 --warmups 3 --repetitions 10 \
-       --output build/profiles/cpu-native-prepared-dense1024.json
-
-``--probe solve`` times the existing adapter's completed call, including its
-initial-guess reset. API scope includes per-call result/workspace/preconditioner
-setup and lifecycle; prepared scope reuses the resources defined by the
-adapter. Native ``--probe workspace`` and ``--probe prepare`` instead time
-public resource construction **and destruction**, including completion fences.
-The prepare probe snapshots the operator and sets up the selected
-preconditioner. They are separate observations: do not subtract independently
-sampled medians to attribute a solve's internal costs.
-
-For CUDA, use the project-local CUDA environment and an existing Nsight Systems
-installation. ``--cuda-profiler`` brackets only the repeated diagnostic calls;
-the script loads the public NVIDIA runtime from that virtual environment and
-adds an NVTX range per call. For example:
-
-.. code-block:: bash
-
-   nsys profile --capture-range=cudaProfilerApi --capture-range-end=stop \
-       --trace=cuda,cublas,nvtx --sample=none --cpuctxsw=none \
-       --output build/profiles/cublas-jacobi-api-dense1024 \
-       taskset -c 0 env PYTHONPATH="$PWD/build/cuda-release/python" \
-       .venv-cuda/bin/python scripts/profile_solve.py \
-       --suite cuda-dense-f64-v1 --case dense-1024 \
-       --implementation cuda-cublas --device cuda --cuda-device 0 \
-       --scope api --probe solve --preconditioner jacobi --threads 1 \
-       --warmups 3 --repetitions 10 --cuda-profiler \
-       --output build/profiles/cublas-jacobi-api-dense1024.json
-
-Change the probe to ``workspace`` or ``prepare`` for a separate resource
-capture. Fixture creation, input uploads, independent correctness downloads,
-warmups, metadata collection, NVTX push/pop and profiler start/stop are outside
-the recorded wall interval. Profiling adds overhead, and CUDA API durations
-include host waiting; API and kernel totals are not additive components of
-unprofiled solve latency.
-
-JSON records raw completed-wall samples, input hashes, solver options,
-before/after correctness gates, adapter setup and environment metadata. Its
-``metric`` is ``diagnostic_phase_completed_wall`` and ``framework_score`` is
-false. For a frozen staged package, optionally pass its ``identity.json`` using
-``--stage-identity``; loaded module hashes are checked before and after capture.
-Keep raw JSON and profiler output under ``build/`` and retain unsuccessful
-captures when reporting evidence.
-
-When investigating host readback, inspect allocation, transfer and completion
-calls alongside kernels. ``cudaMemcpyAsync`` can block for pageable host
-memory; its name alone does not establish overlap. Preserve stream completion
-and storage lifetime when comparing readback strategies, as described in the
-`NVIDIA CUDA 12.8.1 synchronization documentation
-<https://docs.nvidia.com/cuda/archive/12.8.1/cuda-runtime-api/api-sync-behavior.html>`_.
+See :ref:`benchmark-diagnostic-profiling` for single-case resource and
+Nsight Systems captures.

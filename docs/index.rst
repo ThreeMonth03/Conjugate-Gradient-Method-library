@@ -1,22 +1,9 @@
 Conjugate Gradient Method Library
 =================================
 
-``cgpy`` solves nonempty real symmetric positive-definite systems ``A x = b``
-with a C++20 core. It supports dense and canonical CSR storage, CG and
-Jacobi PCG, reusable workspace, optional OpenMP, an optional dense BLAS
-kernel, and an explicit optional CUDA backend. Symmetry and positive
-definiteness are caller preconditions.
-
-.. toctree::
-   :maxdepth: 2
-
-   install
-   build
-   api
-   cuda
-   architecture
-   benchmarks
-   style
+``cgpy`` solves real symmetric positive-definite systems ``A x = b`` with CG
+and Jacobi PCG. Its C++20 core and CPython 3.12 interface support float64
+dense and canonical CSR matrices on CPU or an explicit optional CUDA backend.
 
 First solve
 -----------
@@ -35,6 +22,65 @@ First solve
    True
 
 The convenience call preserves its inputs and returns an owned solution.
-For repeated solves, prepare the matrix once and provide one workspace and
-output per concurrent call. See :doc:`api` for strict array and ownership
-contracts, and :doc:`install` for package installation.
+See :doc:`install` for package installation.
+
+API choices
+-----------
+
+CPU and CUDA provide corresponding solve, strict and prepared APIs.
+Choose based on what should be owned or reused:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 30 45
+
+   * - API
+     - Use case
+     - Ownership and reuse
+   * - ``solve``
+     - One solve
+     - Fresh output, workspace and any Jacobi setup per call.
+   * - ``solve_into``
+     - Caller-managed buffers
+     - Borrow the matrix and RHS; use caller-owned output and workspace.
+   * - ``prepare(...).solve_into``
+     - Fixed matrix, repeated RHS
+     - Own a matrix snapshot and cache optional Jacobi; use caller-owned output
+       and workspace.
+   * - ``cuda.Session.solve``
+     - CUDA matrices that may change between calls
+     - Reuse one fixed-size workspace; borrow each matrix and return a fresh
+       output, with Jacobi rebuilt per call.
+
+Each overlapping solve needs its own workspace and output. See :doc:`api`
+for strict CPU array contracts and :doc:`cuda` for device data, preparation
+and stream lifetimes.
+
+Architecture and limits
+-----------------------
+
+* Storage, backend kernels, solver coordination and bindings have separate
+  responsibilities; the native core builds without Python.
+* RAII owners manage storage and execution resources. Lightweight views borrow
+  them, while prepared solvers and sessions expose explicit reuse choices.
+* Host and device execution share small numerical policies, including
+  true-residual convergence checks, while retaining their own scheduling.
+
+Symmetry and positive definiteness are caller preconditions; the library does
+not verify them through factorization. Arithmetic is float64. See
+:doc:`architecture` for design decisions and :doc:`benchmarks` for representative
+performance, measurement scope and remaining limitations.
+
+Guides
+------
+
+.. toctree::
+   :maxdepth: 1
+
+   architecture
+   api
+   cuda
+   benchmarks
+   install
+   build
+   style

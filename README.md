@@ -1,17 +1,20 @@
 # Conjugate Gradient Method Library
 
-A C++20 library with Python bindings for solving real symmetric
-positive-definite systems using CG and Jacobi PCG.
+A C++20 library with CPython 3.12 bindings for solving real symmetric
+positive-definite systems using CG and Jacobi PCG. Dense and canonical CSR
+matrices use float64 arithmetic on CPU or an explicit optional CUDA backend.
 
-- Dense and canonical CSR matrices with float64 arithmetic.
-- Prepared solves and reusable workspaces for repeated systems.
-- Explicit CUDA sessions reuse execution resources with fresh outputs and per-call setup.
-- Native CPU kernels, optional OpenMP and dense BLAS.
-- Optional CUDA backend with native kernels, dense cuBLAS and explicit host/device scalar control.
+- A native core independent of Python, with storage, kernels and solver
+  coordination separated by feature.
+- RAII owners and borrowed views make lifetimes explicit; prepared solves,
+  workspaces and CUDA sessions offer distinct forms of reuse.
+- True-residual convergence checks and shared numerical policies, with
+  separate host/device execution flows.
 
 [Documentation](https://ThreeMonth03.github.io/Conjugate-Gradient-Method-library/)
 · [Architecture](https://ThreeMonth03.github.io/Conjugate-Gradient-Method-library/architecture.html)
-· [Benchmarks](https://ThreeMonth03.github.io/Conjugate-Gradient-Method-library/benchmarks.html)
+· [API choices](https://ThreeMonth03.github.io/Conjugate-Gradient-Method-library/#api-choices)
+· [Performance and limits](https://ThreeMonth03.github.io/Conjugate-Gradient-Method-library/benchmarks.html)
 
 ## Quick start
 
@@ -34,34 +37,14 @@ assert result.converged
 np.testing.assert_allclose(result.x, [1 / 11, 7 / 11])
 ```
 
-Convergence is verified against the true residual. Symmetry and positive
-definiteness are caller preconditions. See the
+Symmetry and positive definiteness are caller preconditions. See the
 [API guide](https://ThreeMonth03.github.io/Conjugate-Gradient-Method-library/api.html)
-for sparse matrices, prepared solves and ownership rules.
+for sparse matrices, strict inputs and ownership rules.
 
-## Development
+## Build and contribute
 
-```bash
-.venv/bin/python -m pip install --cache-dir .cache/pip \
-    -r requirements/test.lock -r requirements/docs.lock
-make test lint docs doctest
-```
-
-See the [build guide](https://ThreeMonth03.github.io/Conjugate-Gradient-Method-library/build.html)
-for optional backends, sanitizer and distribution checks. Follow the
+The [build guide](https://ThreeMonth03.github.io/Conjugate-Gradient-Method-library/build.html)
+covers optional OpenMP, BLAS and CUDA backends, tests and documentation. Follow the
 [coding conventions](https://ThreeMonth03.github.io/Conjugate-Gradient-Method-library/style.html)
-when contributing.
-
-## Benchmarks
-
-Compare sparse CG, Jacobi PCG and direct solves with the same correctness gates
-and benchmark harness exercised by pytest:
-
-```bash
-make pyprof PYPROF_SUITE=sparse-solvers
-```
-
-The [benchmark guide](https://ThreeMonth03.github.io/Conjugate-Gradient-Method-library/benchmarks.html)
-covers local optional dependencies, CPU/CUDA modes and reproducible sampling.
-The [latest performance report](https://ThreeMonth03.github.io/Conjugate-Gradient-Method-library/benchmarks/execution-reuse-20261016.html)
-retains every measured case, including remaining losses and inconclusive results.
+when contributing. The benchmark guide summarizes measured performance and
+limitations, with reproducible commands and detailed historical reports.
