@@ -997,7 +997,8 @@ TEST_F(Cuda, JacobiOddInverseSnapshotSurvivesMoveConstructionAssignmentAndSelfMo
         EXPECT_DOUBLE_EQ(inverse[0], 1.0 / 3.0);
         EXPECT_DOUBLE_EQ(inverse[1], 1.0 / 7.0);
         EXPECT_DOUBLE_EQ(inverse[2], 1.0 / 11.0);
-        EXPECT_NEAR(source.apply_and_dot(r.view(), z.view(), backend), 1.0 / 3.0 + 4.0 / 7.0 + 9.0 / 11.0, 1e-14);
+        EXPECT_NEAR(backend.multiply_and_dot(source.inverse_diagonal(), r.view(), z.view()),
+                    1.0 / 3.0 + 4.0 / 7.0 + 9.0 / 11.0, 1e-14);
         z.download(output, *context);
         for (std::size_t i = 0; i < output.size(); ++i)
         {

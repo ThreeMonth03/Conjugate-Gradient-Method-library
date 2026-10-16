@@ -160,6 +160,9 @@ floating-point rounding and iteration counts; both policies retain
 true-residual verification. Dense fused reductions support odd tails and
 padded row strides without fast-math or host-specific compiler flags.
 
+CUDA Jacobi owns the immutable inverse diagonal; the private backend applies
+it, keeping backend implementation types out of the public preconditioner API.
+
 OpenMP activation uses named private constants for vector length, dense
 row/column counts and CSR row counts. These are existing heuristics;
 tuning their values requires measurements on the target workloads.

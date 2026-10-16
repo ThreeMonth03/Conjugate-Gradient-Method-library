@@ -5,12 +5,13 @@ import dataclasses
 from .. import _core
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True, eq=False)
 class SolveResult[Solution]:
     """Owned solution and independently checked native convergence data.
 
     ``x`` is a NumPy array for CPU solves or a CUDA Vector for device solves.
-    Fields cannot be rebound; solution contents remain writable. Check
+    Fields cannot be rebound; solution contents remain writable. Results
+    compare by object identity; compare solution values explicitly. Check
     ``converged`` before using an approximation.
     """
 
