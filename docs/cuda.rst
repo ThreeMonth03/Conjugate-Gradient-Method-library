@@ -252,6 +252,21 @@ metadata: make their writes ready on the selected stream or synchronize them
 before passing their arrays. Explicit host/device-copy methods complete
 before returning; exported native vectors have no pending producer work.
 
+``cuda.SupportsCudaArrayInterface`` describes a readable
+``__cuda_array_interface__`` property returning ``object``. External exporters
+need not inherit from it. Solver matrix inputs also accept the owning
+``DenseMatrix`` and ``CsrMatrix`` types, which expose no array interface;
+``Vector`` already satisfies the protocol. Device factories and vector inputs
+require the array interface rather than a matrix owner.
+
+This is a static capability declaration. The native parser still requires a
+``dict`` descriptor and validates its contents and actual device storage.
+The protocol does not prove float64 layout, writable output, stream readiness
+or owner lifetime. Torch and CuPy remain optional external producers; incomplete
+third-party annotations can weaken checks. A Torch CPU tensor can satisfy
+the static declaration even though accessing its interface fails at runtime.
+No runtime protocol check or third-party import is added.
+
 Prepared matrix and Jacobi snapshots can be shared, but each overlapping solve
 needs its own output and workspace. The workspace owns device vectors,
 reduction buffers and inline host scalar storage. A cuBLAS workspace additionally

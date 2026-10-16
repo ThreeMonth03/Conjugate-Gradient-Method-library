@@ -11,6 +11,7 @@ from ..._typing import (
     CudaDenseKernel,
     ExecutionMode,
     Preconditioner,
+    SupportsCudaArrayInterface,
 )
 from ...storage import cuda as storage
 from . import workspace as workspace_module
@@ -92,8 +93,8 @@ class PreparedSolver:
 
     def solve_into(
         self,
-        b: object,
-        x: object,
+        b: SupportsCudaArrayInterface,
+        x: SupportsCudaArrayInterface,
         *,
         workspace: workspace_module.Workspace,
         rtol: float = 1e-8,

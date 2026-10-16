@@ -9,6 +9,7 @@ import numpy.typing as npt
 
 from .._interop import host
 from .._runtime import cuda as cuda_runtime
+from .._typing import SupportsCudaArrayInterface
 
 if typing.TYPE_CHECKING:
     from .. import _cuda
@@ -89,7 +90,9 @@ class Vector:
             host.normalize_host_array(source, 1), stream
         )
 
-    def copy_from_device(self, source: object, *, stream: int = 0) -> None:
+    def copy_from_device(
+        self, source: SupportsCudaArrayInterface, *, stream: int = 0
+    ) -> None:
         """Copy a matching contiguous float64 device vector on a stream.
 
         CUDA Array Interface version 3 producer dependencies are honored. A

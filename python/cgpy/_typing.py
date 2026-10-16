@@ -1,6 +1,14 @@
-"""Shared static declarations for existing solver option strings."""
+"""Shared static declarations for solver options and CUDA array inputs."""
 
-from typing import Literal
+from typing import Literal, Protocol
+
+
+class SupportsCudaArrayInterface(Protocol):
+    """Expose a CUDA descriptor whose metadata is validated at runtime."""
+
+    @property
+    def __cuda_array_interface__(self) -> object: ...
+
 
 type Algorithm = Literal["standard", "explicit"]
 type Preconditioner = Literal["none", "jacobi"]

@@ -1,12 +1,40 @@
 """Public API examples checked statically, never executed."""
 
-from typing import Literal, assert_type
+from typing import Literal, TypedDict, assert_type
 
 import cgpy
 import numpy as np
 import numpy.typing as npt
 from cgpy import Workspace as CpuWorkspace
 from cgpy import cuda
+
+
+class DeviceArray:
+    @property
+    def __cuda_array_interface__(self) -> object:
+        return {}
+
+
+class AttributeDeviceArray:
+    __cuda_array_interface__: dict[str, object]
+
+
+class DeviceDescriptor(TypedDict):
+    shape: tuple[int, ...]
+    typestr: str
+    data: tuple[int, bool]
+    version: int
+
+
+class TypedDeviceArray:
+    @property
+    def __cuda_array_interface__(self) -> DeviceDescriptor:
+        return {
+            "shape": (2,),
+            "typestr": "<f8",
+            "data": (1, False),
+            "version": 3,
+        }
 
 
 def cpu_examples(
@@ -103,3 +131,46 @@ def cuda_examples(
     assert_type(result.x.to_host(), npt.NDArray[np.float64])
     session = cuda.Session(2, dense_kernel="cublas", execution_mode="device")
     assert_type(session.solve(matrix, rhs), cgpy.SolveResult[cuda.Vector])
+    assert_type(cuda.solve(sparse, rhs), cgpy.SolveResult[cuda.Vector])
+    assert_type(
+        cuda.solve_into(sparse, rhs, output, workspace=workspace),
+        cgpy.SolveInfo,
+    )
+    assert_type(session.solve(sparse, rhs), cgpy.SolveResult[cuda.Vector])
+
+
+def cuda_exporter_examples(
+    matrix: DeviceArray,
+    rhs: AttributeDeviceArray,
+    output: TypedDeviceArray,
+    vector: cuda.Vector,
+    plan: cuda.PreparedSolver,
+    workspace: cuda.Workspace,
+    session: cuda.Session,
+) -> None:
+    exporters: tuple[cuda.SupportsCudaArrayInterface, ...] = (
+        matrix,
+        rhs,
+        output,
+        vector,
+    )
+    for exporter in exporters:
+        assert_type(exporter.__cuda_array_interface__, object)
+    assert_type(cuda.DenseMatrix.from_device(matrix), cuda.DenseMatrix)
+    assert_type(
+        cuda.CsrMatrix.from_device(matrix, rhs, output, (2, 2)), cuda.CsrMatrix
+    )
+    vector.copy_from_device(rhs)
+    vector.copy_from_device(output)
+    assert_type(cuda.prepare(matrix), cuda.PreparedSolver)
+    assert_type(
+        cuda.solve_into(matrix, rhs, output, workspace=workspace),
+        cgpy.SolveInfo,
+    )
+    assert_type(cuda.solve(matrix, rhs, output), cgpy.SolveResult[cuda.Vector])
+    assert_type(
+        plan.solve_into(rhs, output, workspace=workspace), cgpy.SolveInfo
+    )
+    assert_type(
+        session.solve(matrix, rhs, output), cgpy.SolveResult[cuda.Vector]
+    )

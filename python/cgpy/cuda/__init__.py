@@ -12,6 +12,7 @@ from .._runtime.cuda import (
     runtime_info,
     synchronize,
 )
+from .._typing import SupportsCudaArrayInterface
 from ..matrix.cuda import CsrMatrix, DenseMatrix
 from ..solver.cuda import (
     PreparedSolver,
@@ -31,6 +32,7 @@ __all__ = [
     "PreparedSolver",
     "Session",
     "SolveResult",
+    "SupportsCudaArrayInterface",
     "Vector",
     "Workspace",
     "build_info",
