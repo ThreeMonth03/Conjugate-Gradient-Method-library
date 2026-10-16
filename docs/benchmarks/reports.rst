@@ -13,6 +13,7 @@ Existing report URLs remain unchanged.
 .. toctree::
    :maxdepth: 1
 
+   Restart-aware optimization decisions — rejected variants, allocation ownership and launch evaluation <restart-optimization-20261017>
    Restart-aware baseline — all CPU/CUDA scopes, remaining losses and seventeen diagnostics <restart-baseline-20261017>
 
 2026-10-16
