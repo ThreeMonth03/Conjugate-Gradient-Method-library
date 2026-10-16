@@ -82,6 +82,44 @@ std::array<double, 2> row_pair_dot(ConstVectorView first, ConstVectorView second
     return sums;
 }
 
+// Keep each row's four-lane accumulation and tail order while sharing x
+// between four independent rows. Callers pass only complete four-row blocks.
+std::array<double, 4> row_quad_dot(DenseMatrixView A, std::size_t first_row, ConstVectorView x)
+{
+    const std::array<ConstVectorView, 4> rows{ConstVectorView{A.data() + first_row * A.row_stride(), A.cols()},
+                                              ConstVectorView{A.data() + (first_row + 1) * A.row_stride(), A.cols()},
+                                              ConstVectorView{A.data() + (first_row + 2) * A.row_stride(), A.cols()},
+                                              ConstVectorView{A.data() + (first_row + 3) * A.row_stride(), A.cols()}};
+    std::array<std::array<double, 4>, 4> accumulators{};
+    const auto bulk = x.size() - x.size() % 4;
+    std::size_t j = 0;
+    for (; j < bulk; j += 4)
+    {
+        for (std::size_t lane = 0; lane < 4; ++lane)
+        {
+            const double value = x[j + lane];
+            accumulators[0][lane] += rows[0][j + lane] * value;
+            accumulators[1][lane] += rows[1][j + lane] * value;
+            accumulators[2][lane] += rows[2][j + lane] * value;
+            accumulators[3][lane] += rows[3][j + lane] * value;
+        }
+    }
+    std::array<double, 4> sums{};
+    for (std::size_t row = 0; row < 4; ++row)
+    {
+        sums[row] = (accumulators[row][0] + accumulators[row][1]) + (accumulators[row][2] + accumulators[row][3]);
+    }
+    for (; j < x.size(); ++j)
+    {
+        const double value = x[j];
+        sums[0] += rows[0][j] * value;
+        sums[1] += rows[1][j] * value;
+        sums[2] += rows[2][j] * value;
+        sums[3] += rows[3][j] * value;
+    }
+    return sums;
+}
+
 } // namespace
 
 void CpuBackend::apply(DenseMatrixView A, ConstVectorView x, VectorView output) const
@@ -97,24 +135,34 @@ void CpuBackend::apply(DenseMatrixView A, ConstVectorView x, VectorView output) 
         std::ranges::fill(output, 0.0);
         return;
     }
-    const auto paired_rows = A.rows() - A.rows() % 2;
+    const auto blocked_rows = A.rows() - A.rows() % 4;
 #ifdef _OPENMP
 #pragma omp parallel for schedule(static)                                                                              \
     num_threads(m_num_threads) if (m_num_threads > 1 && A.rows() >= detail::openmp_min_dense_rows &&                   \
                                        A.cols() >= detail::openmp_min_dense_columns)
 #endif
-    for (std::size_t i = 0; i < paired_rows; i += 2)
+    for (std::size_t i = 0; i < blocked_rows; i += 4)
     {
-        const ConstVectorView first{A.data() + i * A.row_stride(), A.cols()};
-        const ConstVectorView second{A.data() + (i + 1) * A.row_stride(), A.cols()};
-        const auto sums = row_pair_dot(first, second, x);
-        output[i] = sums[0];
-        output[i + 1] = sums[1];
+        const auto sums = row_quad_dot(A, i, x);
+        for (std::size_t row = 0; row < 4; ++row)
+        {
+            output[i + row] = sums[row];
+        }
     }
-    if (paired_rows != A.rows())
+    auto tail = blocked_rows;
+    if (A.rows() - tail >= 2)
     {
-        const ConstVectorView row{A.data() + paired_rows * A.row_stride(), A.cols()};
-        output[paired_rows] = row_dot(row, x);
+        const ConstVectorView first{A.data() + tail * A.row_stride(), A.cols()};
+        const ConstVectorView second{A.data() + (tail + 1) * A.row_stride(), A.cols()};
+        const auto sums = row_pair_dot(first, second, x);
+        output[tail] = sums[0];
+        output[tail + 1] = sums[1];
+        tail += 2;
+    }
+    if (tail != A.rows())
+    {
+        const ConstVectorView row{A.data() + tail * A.row_stride(), A.cols()};
+        output[tail] = row_dot(row, x);
     }
 }
 
@@ -128,28 +176,41 @@ double CpuBackend::apply_and_dot(DenseMatrixView A, ConstVectorView p, VectorVie
         return dot(p, ap);
     }
     double product = 0.0;
-    const auto paired_rows = A.rows() - A.rows() % 2;
+    const auto blocked_rows = A.rows() - A.rows() % 4;
 #ifdef _OPENMP
 #pragma omp parallel for reduction(+ : product) schedule(static)                                                       \
     num_threads(m_num_threads) if (m_num_threads > 1 && A.rows() >= detail::openmp_min_dense_rows &&                   \
                                        A.cols() >= detail::openmp_min_dense_columns)
 #endif
-    for (std::size_t i = 0; i < paired_rows; i += 2)
+    for (std::size_t i = 0; i < blocked_rows; i += 4)
     {
-        const ConstVectorView first{A.data() + i * A.row_stride(), A.cols()};
-        const ConstVectorView second{A.data() + (i + 1) * A.row_stride(), A.cols()};
-        const auto sums = row_pair_dot(first, second, p);
-        ap[i] = sums[0];
-        ap[i + 1] = sums[1];
-        product += p[i] * sums[0];
-        product += p[i + 1] * sums[1];
+        const auto sums = row_quad_dot(A, i, p);
+        for (std::size_t pair = 0; pair < 4; pair += 2)
+        {
+            ap[i + pair] = sums[pair];
+            ap[i + pair + 1] = sums[pair + 1];
+            product += p[i + pair] * sums[pair];
+            product += p[i + pair + 1] * sums[pair + 1];
+        }
     }
-    if (paired_rows != A.rows())
+    auto tail = blocked_rows;
+    if (A.rows() - tail >= 2)
     {
-        const ConstVectorView row{A.data() + paired_rows * A.row_stride(), A.cols()};
+        const ConstVectorView first{A.data() + tail * A.row_stride(), A.cols()};
+        const ConstVectorView second{A.data() + (tail + 1) * A.row_stride(), A.cols()};
+        const auto sums = row_pair_dot(first, second, p);
+        ap[tail] = sums[0];
+        ap[tail + 1] = sums[1];
+        product += p[tail] * sums[0];
+        product += p[tail + 1] * sums[1];
+        tail += 2;
+    }
+    if (tail != A.rows())
+    {
+        const ConstVectorView row{A.data() + tail * A.row_stride(), A.cols()};
         const double sum = row_dot(row, p);
-        ap[paired_rows] = sum;
-        product += p[paired_rows] * sum;
+        ap[tail] = sum;
+        product += p[tail] * sum;
     }
     return product;
 }
@@ -190,30 +251,46 @@ double CpuBackend::residual_squared_norm(DenseMatrixView A, ConstVectorView b, C
         return squared_norm(r);
     }
     double squared_norm = 0.0;
-    const auto paired_rows = A.rows() - A.rows() % 2;
+    const auto blocked_rows = A.rows() - A.rows() % 4;
 #ifdef _OPENMP
 #pragma omp parallel for reduction(+ : squared_norm) schedule(static)                                                  \
     num_threads(m_num_threads) if (m_num_threads > 1 && A.rows() >= detail::openmp_min_dense_rows &&                   \
                                        A.cols() >= detail::openmp_min_dense_columns)
 #endif
-    for (std::size_t i = 0; i < paired_rows; i += 2)
+    for (std::size_t i = 0; i < blocked_rows; i += 4)
     {
-        const ConstVectorView first{A.data() + i * A.row_stride(), A.cols()};
-        const ConstVectorView second{A.data() + (i + 1) * A.row_stride(), A.cols()};
+        const auto sums = row_quad_dot(A, i, x);
+        for (std::size_t pair = 0; pair < 4; pair += 2)
+        {
+            const double first_value = b_minus_ax ? b[i + pair] - sums[pair] : sums[pair] - b[i + pair];
+            const double second_value =
+                b_minus_ax ? b[i + pair + 1] - sums[pair + 1] : sums[pair + 1] - b[i + pair + 1];
+            r[i + pair] = first_value;
+            r[i + pair + 1] = second_value;
+            squared_norm += first_value * first_value;
+            squared_norm += second_value * second_value;
+        }
+    }
+    auto tail = blocked_rows;
+    if (A.rows() - tail >= 2)
+    {
+        const ConstVectorView first{A.data() + tail * A.row_stride(), A.cols()};
+        const ConstVectorView second{A.data() + (tail + 1) * A.row_stride(), A.cols()};
         const auto sums = row_pair_dot(first, second, x);
-        const double first_value = b_minus_ax ? b[i] - sums[0] : sums[0] - b[i];
-        const double second_value = b_minus_ax ? b[i + 1] - sums[1] : sums[1] - b[i + 1];
-        r[i] = first_value;
-        r[i + 1] = second_value;
+        const double first_value = b_minus_ax ? b[tail] - sums[0] : sums[0] - b[tail];
+        const double second_value = b_minus_ax ? b[tail + 1] - sums[1] : sums[1] - b[tail + 1];
+        r[tail] = first_value;
+        r[tail + 1] = second_value;
         squared_norm += first_value * first_value;
         squared_norm += second_value * second_value;
+        tail += 2;
     }
-    if (paired_rows != A.rows())
+    if (tail != A.rows())
     {
-        const ConstVectorView row{A.data() + paired_rows * A.row_stride(), A.cols()};
+        const ConstVectorView row{A.data() + tail * A.row_stride(), A.cols()};
         const double sum = row_dot(row, x);
-        const double value = b_minus_ax ? b[paired_rows] - sum : sum - b[paired_rows];
-        r[paired_rows] = value;
+        const double value = b_minus_ax ? b[tail] - sum : sum - b[tail];
+        r[tail] = value;
         squared_norm += value * value;
     }
     return squared_norm;
