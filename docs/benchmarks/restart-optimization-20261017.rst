@@ -123,9 +123,10 @@ including improvements and inconclusive results, remain in the tables.
 
 The separate 84 fixed-vector component probes are retained below. They are one
 descriptive baseline pass and one candidate pass, not a confidence study.
-They use the four official seeded dense fixtures and three padded integer
-tails, with the vector fixed to b rather than a changing CG direction. Matvec,
-fused reduction and whole-solve observations answer different questions;
+They use the four official seeded dense fixtures with vector=b and three
+padded integer tails with a separate fixed vector. Neither represents a
+changing CG direction. Matvec, fused reduction and whole-solve observations
+answer different questions;
 component medians cannot be summed into CG latency attribution or used to
 overrule the complete rejection. Odd-shape OpenMP rounding still requires the
 retained correctness tests; the component probes themselves use one thread.
@@ -497,9 +498,10 @@ direction. Integer sizes129/130/131 have padded row stride n+5:
 A[i,j]=((i+3j)%7)-3, vector[i]=(i%5)-2, b[i]=(i%7)-3, with NaN
 padding excluded from arithmetic. Both sides reuse identical bytes.
 
-File reads, allocations, finite scans, independent reference arithmetic,
-validation, warmups and output are outside operation timing. The
-source-pinned C++ probe checks every vector entry and applicable scalar
+Probe file reads, allocations, finite scans, independent oracle validation,
+warmups and output are outside operation timing. Public backend metadata and
+alias checks remain inside the timed call. The source-pinned C++ probe checks
+every vector entry and applicable scalar
 against scalar long-double arithmetic and propagated FP64 bounds
 before and after measurement. Successful exit proves both checks;
 the stored error/bound fields below are the post-measurement checks.
