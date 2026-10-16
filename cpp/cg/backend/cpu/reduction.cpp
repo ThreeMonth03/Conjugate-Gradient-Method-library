@@ -1,4 +1,5 @@
 #include <cg/backend/cpu/backend.hpp>
+#include <cg/backend/cpu/detail/parallel_thresholds.hpp>
 #include <cg/backend/cpu/detail/reduction.hpp>
 #include <cg/backend/cpu/detail/validation.hpp>
 
@@ -14,7 +15,7 @@ double CpuBackend::dot(ConstVectorView x, ConstVectorView y) const
     double sum = 0.0;
 #ifdef _OPENMP
 #pragma omp parallel for simd reduction(+ : sum) schedule(static)                                                      \
-    num_threads(m_num_threads) if (m_num_threads > 1 && x.size() >= 16384)
+    num_threads(m_num_threads) if (m_num_threads > 1 && x.size() >= detail::openmp_min_vector_elements)
 #endif
     for (std::size_t i = 0; i < x.size(); ++i)
     {

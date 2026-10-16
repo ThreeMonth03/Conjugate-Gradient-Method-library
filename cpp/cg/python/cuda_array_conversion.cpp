@@ -186,7 +186,7 @@ DeviceArray device_array(py::object object, int ndim, const gpu::Context &contex
             ready.wait(gpu::detail::stream(context));
         }
     }
-    return {std::move(object), reinterpret_cast<void *>(address), shape, itemsize, context.device(), typestr};
+    return {std::move(object), reinterpret_cast<void *>(address), shape, itemsize, context.device()};
 }
 
 gpu::ConstVectorView as_const_vector_view(const DeviceArray &array)
