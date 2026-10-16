@@ -268,7 +268,7 @@ SolveInfo solve_device_impl(const Matrix &A, ConstVectorView b, VectorView x, Wo
     }
     else if (M != nullptr)
     {
-        rho = M->apply_and_dot(r, z, backend);
+        rho = backend.multiply_and_dot(M->inverse_diagonal(), r, z);
         if (cg::detail::unusable_squared_scalar(rho))
         {
             return finish(Status::non_finite);
@@ -371,7 +371,7 @@ SolveInfo solve_device_impl(const Matrix &A, ConstVectorView b, VectorView x, Wo
             backend.copy(true_r, r);
             if (M != nullptr)
             {
-                rho = M->apply_and_dot(r, z, backend);
+                rho = backend.multiply_and_dot(M->inverse_diagonal(), r, z);
                 if (cg::detail::unusable_squared_scalar(rho))
                 {
                     info.status = Status::non_finite;

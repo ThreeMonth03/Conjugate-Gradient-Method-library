@@ -126,7 +126,7 @@ SolveInfo solve_recurrence(const Matrix &A, Input b, Output x, Work &workspace, 
     };
     if (M != nullptr)
     {
-        rho = M->apply_and_dot(r, z, backend);
+        rho = backend.multiply_and_dot(M->inverse_diagonal(), r, z);
         if (unusable_squared_scalar(rho))
         {
             return finish(Status::non_finite);
@@ -187,7 +187,7 @@ SolveInfo solve_recurrence(const Matrix &A, Input b, Output x, Work &workspace, 
             backend.copy(true_r, r);
             if (M != nullptr)
             {
-                rho = M->apply_and_dot(r, z, backend);
+                rho = backend.multiply_and_dot(M->inverse_diagonal(), r, z);
                 if (unusable_squared_scalar(rho))
                 {
                     info.status = Status::non_finite;
@@ -203,7 +203,7 @@ SolveInfo solve_recurrence(const Matrix &A, Input b, Output x, Work &workspace, 
             ++info.restarts;
             continue;
         }
-        const double next_rho = M == nullptr ? residual_squared : M->apply_and_dot(r, z, backend);
+        const double next_rho = M == nullptr ? residual_squared : backend.multiply_and_dot(M->inverse_diagonal(), r, z);
         if (unusable_squared_scalar(next_rho))
         {
             return finish(Status::non_finite);

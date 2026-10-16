@@ -6,6 +6,9 @@ defaults; use ``cgpy.cuda`` for device operations. Importing this module works
 with a CPU-only wheel and does not import PyTorch. ``cuda.enabled()`` checks
 whether its extension and runtime libraries load; ``cuda.is_available()``
 additionally checks the requested GPU. Neither query selects another backend.
+Successful runtime-library loads are retained by path. If a library or the
+extension fails to load, a later call retries without reopening libraries
+already loaded successfully; failures are not permanently cached.
 
 Local build
 -----------

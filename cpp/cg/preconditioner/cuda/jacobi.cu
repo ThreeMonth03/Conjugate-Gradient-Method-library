@@ -1,4 +1,3 @@
-#include <cg/backend/cuda/detail/backend.hpp>
 #include <cg/matrix/cuda/detail/validation.hpp>
 #include <cg/preconditioner/cuda/detail/kernels.hpp>
 #include <cg/preconditioner/cuda/jacobi.hpp>
@@ -75,10 +74,6 @@ JacobiPreconditioner &JacobiPreconditioner::operator=(JacobiPreconditioner &&oth
         std::swap(m_inverse, temporary.m_inverse);
     }
     return *this;
-}
-double JacobiPreconditioner::apply_and_dot(ConstVectorView r, VectorView z, const detail::Backend &backend) const
-{
-    return backend.multiply_and_dot(m_inverse, r, z);
 }
 
 } // namespace cuda

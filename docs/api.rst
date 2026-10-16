@@ -83,11 +83,19 @@ CSR and results
    >>> result.converged
    True
    >>> np.testing.assert_allclose(result.x, [1 / 11, 7 / 11])
+   >>> repeated = cgpy.solve(A, np.array([1.0, 2.0]), preconditioner="jacobi")
+   >>> result == repeated
+   False
+   >>> np.testing.assert_allclose(result.x, repeated.x)
 
 CSR row pointers start at zero, are monotone, and end at ``nnz``. Columns must
 be in range, sorted and unique within each row. Construction owns a copy of
 the arrays. Jacobi requires a stored finite strictly positive diagonal and a
 finite positive inverse. It supports ``algorithm="standard"`` only.
+
+``SolveResult`` fields cannot be rebound, but solution contents remain
+writable. Equality compares result object identity; compare numerical
+solutions explicitly with a suitable tolerance, as above.
 
 .. autoclass:: cgpy.SolveResult
    :members:

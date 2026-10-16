@@ -7,7 +7,7 @@ import importlib.util
 import pathlib
 
 _extension = None
-_libraries = []
+_libraries = {}
 
 
 def load():
@@ -34,10 +34,10 @@ def load():
             path = pathlib.Path(
                 distribution.locate_file(f"nvidia/{directory}/lib/{name}")
             )
-            if path.is_file():
+            if path not in _libraries and path.is_file():
                 try:
-                    _libraries.append(
-                        ctypes.CDLL(str(path), mode=ctypes.RTLD_GLOBAL)
+                    _libraries[path] = ctypes.CDLL(
+                        str(path), mode=ctypes.RTLD_GLOBAL
                     )
                 except OSError as error:
                     raise RuntimeError(
