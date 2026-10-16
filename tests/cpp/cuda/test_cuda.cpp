@@ -764,104 +764,140 @@ TEST_F(Cuda, DevicePacketResetPreservesCompletedStepsAcrossBreakdownRestartAndRe
 
 TEST_F(Cuda, DeviceResidualExitPrecedesNextRhoFailureRefreshAndIterationLimit)
 {
-    const std::vector<double> rhs{1.0, 0.0};
-    gpu::Vector b(rhs, *context), x(2, *context);
-    for (const double off_diagonal : {0.0, 1e200})
+    for (const std::size_t size : {2u, 257u})
     {
-        SCOPED_TRACE(off_diagonal);
-        // Both systems take the exact first step x=(1,0). Identity converges
-        // with next-rho=0; the other has finite norm 1e200 but squared norm and
-        // next-rho overflow. Residual policy must win before beta/last/refresh.
-        const cg::DenseMatrix host(2, 2, {1, 0, off_diagonal, 1});
-        const auto check = [&](const auto &A, gpu::DenseKernel kernel)
+        SCOPED_TRACE(size);
+        std::vector<double> rhs(size, 0.0);
+        rhs.front() = 1.0;
+        gpu::Vector b(rhs, *context), x(size, *context);
+        for (const double off_diagonal : {0.0, 1e200})
         {
-            const gpu::JacobiPreconditioner M(A, *context);
-            gpu::Workspace workspace(2, *context, kernel, gpu::ExecutionMode::device);
-            for (const bool fused : {false, true})
+            SCOPED_TRACE(off_diagonal);
+            // Both systems take the exact first step x=e0. Identity converges
+            // with next-rho=0; finite off-diagonal residuals overflow their squared
+            // sum. Size257 exercises separate lanes and a second lane-zero item.
+            // Residual policy must win before beta/last/refresh.
+            cg::DenseMatrix host(size, size);
+            for (std::size_t row = 0; row < size; ++row)
             {
-                SCOPED_TRACE(fused);
-                for (const auto algorithm : {cg::Algorithm::recurrence, cg::Algorithm::explicit_residual})
+                host.data()[row * size + row] = 1.0;
+            }
+            host.data()[size] = off_diagonal;
+            if (size > 2)
+            {
+                host.data()[(size - 1) * size] = off_diagonal;
+            }
+            const double expected_norm = size == 2 ? off_diagonal : std::hypot(off_diagonal, off_diagonal);
+            const auto check = [&](const auto &A, gpu::DenseKernel kernel)
+            {
+                const gpu::JacobiPreconditioner M(A, *context);
+                gpu::Workspace workspace(size, *context, kernel, gpu::ExecutionMode::device);
+                for (const bool fused : {false, true})
                 {
-                    SCOPED_TRACE(static_cast<int>(algorithm));
-                    for (const bool preconditioned : {false, true})
+                    SCOPED_TRACE(fused);
+                    for (const auto algorithm : {cg::Algorithm::recurrence, cg::Algorithm::explicit_residual})
                     {
-                        if (preconditioned && algorithm != cg::Algorithm::recurrence)
+                        SCOPED_TRACE(static_cast<int>(algorithm));
+                        for (const bool preconditioned : {false, true})
                         {
-                            continue;
-                        }
-                        SCOPED_TRACE(preconditioned);
-                        for (const std::size_t maxiter : {1u, 2u})
-                        {
-                            SCOPED_TRACE(maxiter);
-                            cg::CgOptions options;
-                            options.algorithm = algorithm;
-                            options.rtol = 0.0;
-                            options.atol = 0.0;
-                            options.maxiter = maxiter;
-                            options.residual_refresh = 1;
-                            x.fill(0.0, *context);
-                            const auto result = gpu::solve_into(A, b.view(), x.view(), workspace, options, fused,
-                                                                preconditioned ? &M : nullptr);
-                            EXPECT_EQ(result.status,
-                                      off_diagonal == 0.0 ? cg::Status::converged : cg::Status::non_finite);
-                            EXPECT_EQ(result.iterations, 1u);
-                            EXPECT_EQ(result.matvecs, 3u);
-                            EXPECT_EQ(result.restarts, 0u);
-                            EXPECT_DOUBLE_EQ(result.residual_norm, off_diagonal);
-                            std::vector<double> actual(2);
-                            x.download(actual, *context);
-                            EXPECT_EQ(actual, (std::vector<double>{1.0, 0.0}));
-                            EXPECT_DOUBLE_EQ(result.residual_norm, true_norm(host.view(), rhs, actual));
+                            if (preconditioned && algorithm != cg::Algorithm::recurrence)
+                            {
+                                continue;
+                            }
+                            SCOPED_TRACE(preconditioned);
+                            for (const std::size_t maxiter : {1u, 2u})
+                            {
+                                SCOPED_TRACE(maxiter);
+                                cg::CgOptions options;
+                                options.algorithm = algorithm;
+                                options.rtol = 0.0;
+                                options.atol = 0.0;
+                                options.maxiter = maxiter;
+                                options.residual_refresh = 1;
+                                x.fill(0.0, *context);
+                                const auto result = gpu::solve_into(A, b.view(), x.view(), workspace, options, fused,
+                                                                    preconditioned ? &M : nullptr);
+                                EXPECT_EQ(result.status,
+                                          off_diagonal == 0.0 ? cg::Status::converged : cg::Status::non_finite);
+                                EXPECT_EQ(result.iterations, 1u);
+                                EXPECT_EQ(result.matvecs, 3u);
+                                EXPECT_EQ(result.restarts, 0u);
+                                EXPECT_DOUBLE_EQ(result.residual_norm, expected_norm);
+                                std::vector<double> actual(size), expected(size, 0.0);
+                                expected.front() = 1.0;
+                                x.download(actual, *context);
+                                EXPECT_EQ(actual, expected);
+                                EXPECT_DOUBLE_EQ(result.residual_norm, true_norm(host.view(), rhs, actual));
+                            }
                         }
                     }
                 }
+            };
+            for (const auto kernel : {gpu::DenseKernel::native, gpu::DenseKernel::cublas})
+            {
+                SCOPED_TRACE(static_cast<int>(kernel));
+                const gpu::DenseMatrix A(host.view(), *context);
+                check(A.view(), kernel);
             }
-        };
-        for (const auto kernel : {gpu::DenseKernel::native, gpu::DenseKernel::cublas})
-        {
-            SCOPED_TRACE(static_cast<int>(kernel));
-            const gpu::DenseMatrix A(host.view(), *context);
-            check(A.view(), kernel);
+            const gpu::CsrMatrix sparse(as_csr(host.view()), *context);
+            check(sparse, gpu::DenseKernel::native);
         }
-        const gpu::CsrMatrix sparse(as_csr(host.view()), *context);
-        check(sparse, gpu::DenseKernel::native);
     }
 }
 
 TEST_F(Cuda, AsyncMetricsKeepIndependentDeviceResultsAndStableNormFallbacks)
 {
-    constexpr std::size_t size = 257;
     gpu::detail::ExecutionResources resources(*context);
     const gpu::detail::Backend backend(resources);
     const auto metrics = gpu::detail::device_allocation<double>(4, *context);
-    const std::vector<double> rhs(size, 2.0);
-    gpu::Vector y(rhs, *context), x(size, *context);
-    for (const double magnitude : {0.0, 1e-200, 1e-160, 1e200, std::numeric_limits<double>::infinity(),
-                                   std::numeric_limits<double>::quiet_NaN()})
+    for (const std::size_t size : {0u, 1u, 255u, 256u, 257u, 513u})
     {
-        SCOPED_TRACE(magnitude);
-        std::vector<double> values(size, 0.0);
-        values.back() = magnitude;
-        x.upload(values, *context);
-        backend.dot_into(x.view(), x.view(), metrics.get());
-        backend.norm_from_squared_into(x.view(), metrics.get(), metrics.get() + 1);
-        backend.dot_into(y.view(), y.view(), metrics.get() + 2);
-        backend.norm_from_squared_into(y.view(), metrics.get() + 2, metrics.get() + 3);
-        std::array<double, 4> result{};
-        ASSERT_EQ(cudaMemcpyAsync(result.data(), metrics.get(), sizeof(result), cudaMemcpyDeviceToHost,
-                                  reinterpret_cast<cudaStream_t>(context->stream())),
-                  cudaSuccess);
-        context->synchronize();
-        if (std::isnan(magnitude))
+        SCOPED_TRACE(size);
+        const std::vector<double> rhs(size, 2.0);
+        gpu::Vector y(rhs, *context), x(size, *context);
+        for (const double magnitude : {0.0, 3.0, 1e-200, 1e-160, 1e200, std::numeric_limits<double>::infinity(),
+                                       std::numeric_limits<double>::quiet_NaN()})
         {
-            EXPECT_TRUE(std::isnan(result[1]));
+            SCOPED_TRACE(magnitude);
+            std::vector<double> values(size, 0.0);
+            if (size != 0)
+            {
+                values.front() = magnitude;
+            }
+            if (size > 1)
+            {
+                values[1] = -magnitude;
+            }
+            if (size > 2)
+            {
+                values.back() = magnitude;
+            }
+            double expected_norm = 0.0;
+            for (const double value : values)
+            {
+                expected_norm = std::hypot(expected_norm, value);
+            }
+            x.upload(values, *context);
+            backend.dot_into(x.view(), x.view(), metrics.get());
+            backend.norm_from_squared_into(x.view(), metrics.get(), metrics.get() + 1);
+            backend.dot_into(y.view(), y.view(), metrics.get() + 2);
+            backend.norm_from_squared_into(y.view(), metrics.get() + 2, metrics.get() + 3);
+            std::array<double, 4> result{};
+            ASSERT_EQ(cudaMemcpyAsync(result.data(), metrics.get(), sizeof(result), cudaMemcpyDeviceToHost,
+                                      reinterpret_cast<cudaStream_t>(context->stream())),
+                      cudaSuccess);
+            context->synchronize();
+            if (std::isnan(expected_norm))
+            {
+                EXPECT_TRUE(std::isnan(result[1]));
+            }
+            else
+            {
+                EXPECT_DOUBLE_EQ(result[1], expected_norm);
+            }
+            EXPECT_DOUBLE_EQ(result[2], 4.0 * size);
+            EXPECT_DOUBLE_EQ(result[3], std::sqrt(4.0 * size));
         }
-        else
-        {
-            EXPECT_DOUBLE_EQ(result[1], magnitude);
-        }
-        EXPECT_DOUBLE_EQ(result[2], 4.0 * size);
-        EXPECT_DOUBLE_EQ(result[3], std::sqrt(4.0 * size));
     }
 }
 

@@ -207,6 +207,12 @@ residual decisions, true-residual final status and checkpoint exits. Vector
 operations, launch ordering, synchronization and restart work stay in each
 execution flow.
 
+Device execution and backend norm kernels share a private stable-norm block
+helper. The device residual/beta block computes the norm before applying its
+scalar policy, retaining the fallback summation tree, failure priority and
+completed packet synchronization. Initial and true-residual checks keep their
+separate norm calls.
+
 Workspace construction fixes the device, stream, dense kernel and host/device
 execution mode. Strict solves borrow those settings from the workspace;
 prepared solves additionally check their fixed kernel is compatible. Device
