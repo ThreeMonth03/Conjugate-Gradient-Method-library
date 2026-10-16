@@ -13,7 +13,6 @@ option(CG_ENABLE_CUDA "Build the optional CUDA backend and Python extension" OFF
 option(CG_ENABLE_SANITIZERS "Enable address and undefined-behavior sanitizers" OFF)
 option(CG_ENABLE_CLANG_TIDY "Run clang-tidy while compiling project sources" OFF)
 
-find_package(Threads REQUIRED)
 add_library(cg_core STATIC
     cpp/cg/storage/detail/validation.cpp
     cpp/cg/matrix/dense_matrix.cpp
@@ -41,7 +40,6 @@ target_include_directories(cg_core PUBLIC
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/cpp>"
     "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
 )
-target_link_libraries(cg_core PUBLIC Threads::Threads)
 set(CG_PUBLIC_HEADERS
     cg.hpp
     storage/vector_view.hpp
@@ -120,6 +118,7 @@ if(CG_BUILD_PYTHON)
 endif()
 
 if(BUILD_TESTING)
+    find_package(Threads REQUIRED)
     include(FetchContent)
     set(FETCHCONTENT_BASE_DIR "${CMAKE_CURRENT_BINARY_DIR}/_deps" CACHE PATH "Local dependency directory")
     FetchContent_Declare(googletest
@@ -139,7 +138,7 @@ if(BUILD_TESTING)
         tests/cpp/solver/test_prepared.cpp
         tests/cpp/backend/test_blas.cpp
     )
-    target_link_libraries(cg_gtests PRIVATE cg_core GTest::gtest_main)
+    target_link_libraries(cg_gtests PRIVATE cg_core GTest::gtest_main Threads::Threads)
     include(GoogleTest)
     gtest_discover_tests(cg_gtests PROPERTIES LABELS cpp)
     add_executable(cg_allocation_gtests
@@ -154,7 +153,7 @@ if(BUILD_TESTING)
     if(CG_ENABLE_CUDA)
         add_executable(cg_cuda_gtests tests/cpp/cuda/test_cuda.cpp)
         target_link_libraries(cg_cuda_gtests PRIVATE
-            cg_cuda CUDA::cudart CUDA::cublas GTest::gtest_main)
+            cg_cuda CUDA::cudart CUDA::cublas GTest::gtest_main Threads::Threads)
         gtest_discover_tests(cg_cuda_gtests PROPERTIES LABELS "cpp;cuda")
         add_dependencies(cg_native_tests cg_cuda_gtests)
     endif()

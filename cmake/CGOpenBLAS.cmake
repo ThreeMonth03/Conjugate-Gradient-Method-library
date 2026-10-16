@@ -8,6 +8,7 @@ endif()
 
 enable_language(C)
 include(ExternalProject)
+find_package(Threads REQUIRED)
 find_program(CG_BLAS_NM NAMES llvm-nm nm REQUIRED)
 find_program(CG_BLAS_OBJCOPY NAMES llvm-objcopy objcopy REQUIRED)
 set(CG_BLAS_BUILD_JOBS 2 CACHE STRING "Maximum jobs in the private OpenBLAS build")

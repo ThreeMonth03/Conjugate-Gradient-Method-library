@@ -154,6 +154,13 @@ def main():
         "YES",
         "Y",
     )
+    blas = cache.get("CG_ENABLE_BLAS", "OFF").upper() in (
+        "1",
+        "ON",
+        "TRUE",
+        "YES",
+        "Y",
+    )
     if options.require_cuda and not cuda:
         parser.error("--require-cuda requires a CUDA-enabled producer build")
     for name in ("CMAKE_INSTALL_LIBDIR", "CMAKE_INSTALL_INCLUDEDIR"):
@@ -224,7 +231,10 @@ def main():
         for mode in ("cpu", "cuda") if cuda else ("cpu",):
             build = work / f"build-{mode}"
             arguments = ["-DCMAKE_DISABLE_FIND_PACKAGE_CUDAToolkit=ON"]
+            if not blas:
+                arguments.append("-DCMAKE_DISABLE_FIND_PACKAGE_Threads=ON")
             if mode == "cuda":
+                # CUDA Toolkit discovers its own Threads dependencies.
                 arguments = [
                     "-DCG_CONSUMER_CUDA=ON",
                     f"-DCG_CONSUMER_REQUIRE_CUDA={'ON' if options.require_cuda else 'OFF'}",
@@ -288,6 +298,8 @@ def main():
                 False,
             ),
         ]
+        if blas:
+            cases.append(("required-threads", "", "Threads", False))
         if not cuda:
             cases.append(
                 (
@@ -322,6 +334,11 @@ def main():
                     str(probe / "build"),
                     *settings,
                     "-DCMAKE_DISABLE_FIND_PACKAGE_CUDAToolkit=ON",
+                    *(
+                        ["-DCMAKE_DISABLE_FIND_PACKAGE_Threads=ON"]
+                        if not blas or name == "required-threads"
+                        else []
+                    ),
                 ],
                 cwd=work,
                 env=environment,
