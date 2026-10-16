@@ -78,15 +78,14 @@ def solve_into(
     fused: bool = True,
     residual_refresh: int = 50,
     preconditioner: str = "none",
-    dense_kernel: str = "native",
 ) -> _core.SolveInfo:
     """Solve a device-resident system with caller-owned output and workspace.
 
     A is an owned CUDA matrix or a contiguous float64 CUDA Array Interface
     dense matrix; b/x are device float64 vectors. No host conversion or CPU
     fallback occurs. Output and workspace must be disjoint from inputs and
-    unused by overlapping calls. The workspace fixes the device, stream and
-    host/device scalar-control execution_mode; no second mode selector is used.
+    unused by overlapping calls. The workspace fixes the device, stream,
+    dense kernel and host/device scalar-control execution_mode.
     Version-2 producers must be ready on that stream; version-3 dependencies
     are honored. Each call constructs Jacobi when selected. Use prepare to
     cache setup. Options, exceptions, synchronous completion and SolveInfo
@@ -105,7 +104,6 @@ def solve_into(
         fused=fused,
         residual_refresh=residual_refresh,
         preconditioner=preconditioner,
-        dense_kernel=dense_kernel,
     )
 
 
@@ -167,7 +165,6 @@ def solve(
         fused=fused,
         residual_refresh=residual_refresh,
         preconditioner=preconditioner,
-        dense_kernel=dense_kernel,
     )
     return result.SolveResult(x, info)
 

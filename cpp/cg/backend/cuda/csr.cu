@@ -49,7 +49,7 @@ __global__ void csr_kernel(CsrMatrixView A, ConstVectorView x, ConstVectorView b
 
 void Backend::apply(const CsrMatrix &A, ConstVectorView x, VectorView output) const
 {
-    if (m_kernel != DenseKernel::native)
+    if (m_resources.dense_kernel() != DenseKernel::native)
     {
         throw std::invalid_argument("CUDA cuBLAS dense kernels do not support CSR");
     }
@@ -68,7 +68,7 @@ double Backend::apply_and_dot(const CsrMatrix &A, ConstVectorView p, VectorView 
 
 void Backend::apply_and_dot_into(const CsrMatrix &A, ConstVectorView p, VectorView ap, double *result) const
 {
-    if (m_kernel != DenseKernel::native)
+    if (m_resources.dense_kernel() != DenseKernel::native)
     {
         throw std::invalid_argument("CUDA cuBLAS dense kernels do not support CSR");
     }
@@ -99,7 +99,7 @@ void Backend::residual_squared_norm_into(const CsrMatrix &A, ConstVectorView b, 
                                          double *result, ResidualSign sign) const
 {
     const bool b_minus_ax = sign == ResidualSign::rhs_minus_product;
-    if (m_kernel != DenseKernel::native)
+    if (m_resources.dense_kernel() != DenseKernel::native)
     {
         throw std::invalid_argument("CUDA cuBLAS dense kernels do not support CSR");
     }

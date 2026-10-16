@@ -33,7 +33,7 @@ struct ExecutionResources
     // Scalar copies are consumed only after the workspace stream is synchronized.
     double host = 0.0;
     std::optional<CublasResources> cublas;
-    DenseKernel kernel;
+    DenseKernel dense_kernel() const noexcept { return cublas ? DenseKernel::cublas : DenseKernel::native; }
 };
 
 } // namespace detail

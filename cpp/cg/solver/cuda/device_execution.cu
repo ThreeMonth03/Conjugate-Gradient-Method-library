@@ -2,12 +2,11 @@
 #include <cg/backend/cuda/detail/reduction.cuh>
 #include <cg/runtime/cuda/detail/launch.hpp>
 #include <cg/solver/cuda/detail/device_execution.hpp>
-#include <cg/solver/detail/engine.hpp>
+#include <cg/solver/detail/numerical_policy.hpp>
 
-#include <algorithm>
-#include <cfloat>
 #include <cmath>
 #include <cstdint>
+#include <limits>
 
 namespace cg
 {
@@ -34,9 +33,11 @@ struct DeviceState
 namespace
 {
 
+constexpr double minimum_squared_scalar = std::numeric_limits<double>::min();
+
 __device__ bool unusable(double value)
 {
-    return !isfinite(value) || value < DBL_MIN;
+    return !isfinite(value) || value < minimum_squared_scalar;
 }
 __device__ void stop(DeviceState *state, Status status)
 {
@@ -52,7 +53,7 @@ __global__ void initialize_state(DeviceState *state, double rho, double toleranc
     state->packet.residual_norm = norm;
 }
 
-__global__ void check_alpha(DeviceState *state, bool explicit_residual, bool last, bool refresh)
+__global__ void prepare_iteration_alpha(DeviceState *state, bool explicit_residual, bool last, bool refresh)
 {
     // Metric kernels only write denominator/numerator, so reset the packet
     // here after they finish on the workspace stream. Keep the prior residual
@@ -89,7 +90,7 @@ __global__ void check_alpha(DeviceState *state, bool explicit_residual, bool las
     state->packet.advanced = true;
 }
 
-__device__ void check_residual(DeviceState *state, bool explicit_residual)
+__device__ void decide_residual_exit(DeviceState *state, bool explicit_residual)
 {
     if (state->packet.decision != IterationDecision::proceed)
     {
@@ -124,12 +125,12 @@ __device__ void check_residual(DeviceState *state, bool explicit_residual)
     }
 }
 
-__global__ void check_residual_and_beta(DeviceState *state, bool explicit_residual, bool preconditioned)
+__global__ void evaluate_residual_and_compute_beta(DeviceState *state, bool explicit_residual, bool preconditioned)
 {
     // Residual exits take priority over an unusable next-rho or beta. The
     // next-rho kernels do not consume this decision and were always submitted
     // before the packet read, including candidate/refresh/last/failure paths.
-    check_residual(state, explicit_residual);
+    decide_residual_exit(state, explicit_residual);
     if (state->packet.decision != IterationDecision::proceed)
     {
         return;
@@ -246,36 +247,19 @@ SolveInfo solve_device_impl(const Matrix &A, ConstVectorView b, VectorView x, Wo
         A, b, x, r, explicit_residual ? ResidualSign::product_minus_rhs : ResidualSign::rhs_minus_product);
     ++info.matvecs;
     info.residual_norm = backend.norm_from_squared(r, rho);
-    if (!std::isfinite(b_norm) || !std::isfinite(info.residual_norm))
+    const auto initial = cg::detail::initial_residual_decision(b_norm, info.residual_norm, rho, options);
+    if (initial.status)
     {
-        info.status = Status::non_finite;
+        info.status = *initial.status;
         return info;
     }
-    const double tolerance = std::max(options.atol, options.rtol * b_norm);
-    if (info.residual_norm <= tolerance)
-    {
-        info.status = Status::converged;
-        return info;
-    }
-    if (options.maxiter == 0)
-    {
-        return info;
-    }
-    if (cg::detail::unusable_squared_scalar(rho))
-    {
-        info.status = Status::non_finite;
-        return info;
-    }
+    const double tolerance = initial.tolerance;
     const auto finish = [&](Status status)
     {
         const double true_rho = backend.residual_squared_norm(A, b, x, true_r);
         ++info.matvecs;
         info.residual_norm = backend.norm_from_squared(true_r, true_rho);
-        info.status = std::isfinite(info.residual_norm) ? status : Status::non_finite;
-        if (status != Status::non_finite && info.residual_norm <= tolerance)
-        {
-            info.status = Status::converged;
-        }
+        info.status = cg::detail::true_residual_status(status, info.residual_norm, tolerance);
         return info;
     };
     if (explicit_residual)
@@ -307,7 +291,7 @@ SolveInfo solve_device_impl(const Matrix &A, ConstVectorView b, VectorView x, Wo
         {
             backend.dot_into(r, p, &state->numerator);
         }
-        check_alpha<<<1, 1, 0, stream(context)>>>(state, explicit_residual, last, refresh);
+        prepare_iteration_alpha<<<1, 1, 0, stream(context)>>>(state, explicit_residual, last, refresh);
         launch_check();
         if (explicit_residual)
         {
@@ -349,7 +333,7 @@ SolveInfo solve_device_impl(const Matrix &A, ConstVectorView b, VectorView x, Wo
         {
             backend.multiply_and_dot_into(M->inverse_diagonal(), r, z, &state->next_rho);
         }
-        check_residual_and_beta<<<1, 1, 0, stream(context)>>>(state, explicit_residual, M != nullptr);
+        evaluate_residual_and_compute_beta<<<1, 1, 0, stream(context)>>>(state, explicit_residual, M != nullptr);
         launch_check();
         guarded_direction<<<blocks(p.size()), block_size, 0, stream(context)>>>(M == nullptr ? r : z, p, state,
                                                                                 explicit_residual ? -1.0 : 1.0);
@@ -378,23 +362,10 @@ SolveInfo solve_device_impl(const Matrix &A, ConstVectorView b, VectorView x, Wo
             const double true_rho = backend.residual_squared_norm(A, b, x, true_r);
             ++info.matvecs;
             info.residual_norm = backend.norm_from_squared(true_r, true_rho);
-            if (!std::isfinite(info.residual_norm))
+            if (const auto status =
+                    cg::detail::residual_checkpoint_status(info.residual_norm, true_rho, tolerance, last))
             {
-                info.status = Status::non_finite;
-                return info;
-            }
-            if (info.residual_norm <= tolerance)
-            {
-                info.status = Status::converged;
-                return info;
-            }
-            if (cg::detail::unusable_squared_scalar(true_rho))
-            {
-                info.status = Status::non_finite;
-                return info;
-            }
-            if (last)
-            {
+                info.status = *status;
                 return info;
             }
             backend.copy(true_r, r);

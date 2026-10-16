@@ -132,6 +132,14 @@ the selected Jacobi inverse. ``solve`` allocates its result and workspace;
 ``solve_into`` treats ``x`` as the initial guess/output and requires an
 explicit workspace. Reinitialize ``x`` before repeated comparisons.
 
+The workspace fixes the device, borrowed stream, dense kernel and execution
+mode. Strict ``cuda.solve_into(A, b, x, workspace=workspace, ...)`` uses those
+settings directly; it has no separate ``dense_kernel`` or ``execution_mode``
+argument. Choose the kernel when constructing a workspace, session or prepared
+solver. A prepared solver rejects a workspace with a different kernel before
+writing output. Convenience ``cuda.solve`` accepts explicit kernel and mode
+choices when it creates its fresh workspace.
+
 ``dense_kernel="native"`` selects project CUDA kernels; ``"cublas"`` selects
 double-precision cuBLAS GEMV for dense operators only. CSR rejects cuBLAS.
 ``fused`` independently selects supported vector/reduction fusion. Standard
@@ -182,14 +190,14 @@ The mode belongs to a workspace and is fixed at construction:
 
    workspace = plan.create_workspace(execution_mode="device")
    info = plan.solve_into(b, x, workspace=workspace)
-   # A strict cuda.solve_into call also uses workspace.execution_mode.
+   # Strict solve_into also uses this workspace's device, stream and kernel.
    result = cuda.solve(device_A, b, execution_mode="device")
 
 ``cuda.Workspace(..., execution_mode="device")`` provides the same selection.
 The readonly ``workspace.execution_mode`` reports ``"host"`` or ``"device"``.
 Preparation fixes the operator, preconditioner and dense kernel; the same
 immutable plan can serve separate host/device workspaces. There is no
-execution-mode argument on strict or prepared ``solve_into`` methods.
+kernel or execution-mode argument on strict or prepared ``solve_into`` methods.
 Kernel selection, vector fusion, algorithm and execution mode are independent.
 Both modes support native/cuBLAS dense and native CSR, standard CG/Jacobi PCG
 and the unpreconditioned explicit formulation. Neither choice selects another
@@ -245,8 +253,8 @@ Prepared matrix and Jacobi snapshots can be shared, but each overlapping solve
 needs its own output and workspace. The workspace owns device vectors,
 reduction buffers and inline host scalar storage. A cuBLAS workspace additionally
 owns its handle and 4 MiB scratch allocation; overlapping
-reuse raises an error. It fixes the device/stream and execution mode used for its solve. No API
-reinterprets a NumPy host pointer as a device pointer.
+reuse raises an error. It fixes the device, stream, kernel and execution mode
+used for its solve. No API reinterprets a NumPy host pointer as a device pointer.
 
 Native C++ vector and matrix views are lightweight borrowing descriptors.
 Their pointer, extent, index type and device metadata are private, accessed

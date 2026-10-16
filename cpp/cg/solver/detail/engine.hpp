@@ -1,22 +1,16 @@
 #pragma once
 
 #include <cg/backend/residual_sign.hpp>
+#include <cg/solver/detail/numerical_policy.hpp>
 #include <cg/solver/options.hpp>
 #include <cg/solver/solve_info.hpp>
 
-#include <algorithm>
 #include <cmath>
-#include <limits>
 
 namespace cg
 {
 namespace detail
 {
-
-inline bool unusable_squared_scalar(double value)
-{
-    return !std::isfinite(value) || value < std::numeric_limits<double>::min();
-}
 
 template <class Matrix, class Input, class Output, class Work, class Backend, class Norm>
 SolveInfo solve_explicit(const Matrix &A, Input b, Output x, Work &workspace, const Backend &backend,
@@ -30,26 +24,13 @@ SolveInfo solve_explicit(const Matrix &A, Input b, Output x, Work &workspace, co
     double rho = backend.residual_squared_norm(A, b, x, r, ResidualSign::product_minus_rhs);
     ++info.matvecs;
     info.residual_norm = norm_from_squared(r, rho);
-    if (!std::isfinite(b_norm) || !std::isfinite(info.residual_norm))
+    const auto initial = initial_residual_decision(b_norm, info.residual_norm, rho, options);
+    if (initial.status)
     {
-        info.status = Status::non_finite;
+        info.status = *initial.status;
         return info;
     }
-    const double tolerance = std::max(options.atol, options.rtol * b_norm);
-    if (info.residual_norm <= tolerance)
-    {
-        info.status = Status::converged;
-        return info;
-    }
-    if (options.maxiter == 0)
-    {
-        return info;
-    }
-    if (unusable_squared_scalar(rho))
-    {
-        info.status = Status::non_finite;
-        return info;
-    }
+    const double tolerance = initial.tolerance;
     backend.axpby(-1.0, r, 0.0, r, p);
     for (std::size_t iteration = 0; iteration < options.maxiter; ++iteration)
     {
@@ -126,26 +107,13 @@ SolveInfo solve_recurrence(const Matrix &A, Input b, Output x, Work &workspace, 
     double rho = backend.residual_squared_norm(A, b, x, r);
     ++info.matvecs;
     info.residual_norm = norm_from_squared(r, rho);
-    if (!std::isfinite(b_norm) || !std::isfinite(info.residual_norm))
+    const auto initial = initial_residual_decision(b_norm, info.residual_norm, rho, options);
+    if (initial.status)
     {
-        info.status = Status::non_finite;
+        info.status = *initial.status;
         return info;
     }
-    const double tolerance = std::max(options.atol, options.rtol * b_norm);
-    if (info.residual_norm <= tolerance)
-    {
-        info.status = Status::converged;
-        return info;
-    }
-    if (options.maxiter == 0)
-    {
-        return info;
-    }
-    if (unusable_squared_scalar(rho))
-    {
-        info.status = Status::non_finite;
-        return info;
-    }
+    const double tolerance = initial.tolerance;
     // Recurrence residuals can drift. Every exit after an iteration reports a
     // freshly computed norm, including breakdown and iteration-limit exits.
     const auto finish = [&](Status status)
@@ -153,11 +121,7 @@ SolveInfo solve_recurrence(const Matrix &A, Input b, Output x, Work &workspace, 
         const double true_rho = backend.residual_squared_norm(A, b, x, true_r);
         ++info.matvecs;
         info.residual_norm = norm_from_squared(true_r, true_rho);
-        info.status = std::isfinite(info.residual_norm) ? status : Status::non_finite;
-        if (status != Status::non_finite && info.residual_norm <= tolerance)
-        {
-            info.status = Status::converged;
-        }
+        info.status = true_residual_status(status, info.residual_norm, tolerance);
         return info;
     };
     if (M != nullptr)
@@ -213,23 +177,9 @@ SolveInfo solve_recurrence(const Matrix &A, Input b, Output x, Work &workspace, 
             const double true_rho = backend.residual_squared_norm(A, b, x, true_r);
             ++info.matvecs;
             info.residual_norm = norm_from_squared(true_r, true_rho);
-            if (!std::isfinite(info.residual_norm))
+            if (const auto status = residual_checkpoint_status(info.residual_norm, true_rho, tolerance, last_iteration))
             {
-                info.status = Status::non_finite;
-                return info;
-            }
-            if (info.residual_norm <= tolerance)
-            {
-                info.status = Status::converged;
-                return info;
-            }
-            if (unusable_squared_scalar(true_rho))
-            {
-                info.status = Status::non_finite;
-                return info;
-            }
-            if (last_iteration)
-            {
+                info.status = *status;
                 return info;
             }
             // Replacing the residual also restarts the direction. This avoids

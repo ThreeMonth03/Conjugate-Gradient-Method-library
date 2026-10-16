@@ -1,6 +1,5 @@
 #pragma once
 
-#include <cg/backend/cuda/dense_kernel.hpp>
 #include <cg/backend/residual_sign.hpp>
 #include <cg/matrix/cuda/csr_matrix.hpp>
 #include <cg/matrix/cuda/dense_matrix_view.hpp>
@@ -21,7 +20,7 @@ struct ExecutionResources;
 class Backend
 {
     public:
-    Backend(ExecutionResources &resources, bool fused = true, DenseKernel kernel = DenseKernel::native);
+    Backend(ExecutionResources &resources, bool fused = true);
     void copy(ConstVectorView source, VectorView destination) const;
     double dot(ConstVectorView x, ConstVectorView y) const;
     // Asynchronous scalar destinations are borrowed device storage, disjoint
@@ -59,7 +58,6 @@ class Backend
     double read_scalar(const double *result) const;
     ExecutionResources &m_resources;
     bool m_fused;
-    DenseKernel m_kernel;
 };
 
 } // namespace detail

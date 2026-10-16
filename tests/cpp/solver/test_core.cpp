@@ -1,4 +1,5 @@
 #include <cg/cg.hpp>
+#include <cg/solver/detail/numerical_policy.hpp>
 #include <cg/storage/detail/validation.hpp>
 
 #include <gtest/gtest.h>
@@ -322,6 +323,66 @@ TEST(Backend, StableNormHandlesTinyLargeAndSubnormalValues)
     const std::vector<double> nan({std::numeric_limits<double>::quiet_NaN(), 1.0});
     EXPECT_TRUE(std::isinf(backend.norm(infinite)));
     EXPECT_TRUE(std::isnan(backend.norm(nan)));
+}
+
+TEST(NumericalPolicy, InitialConvergenceAndZeroBudgetPrecedeSquaredRangeFailure)
+{
+    cg::CgOptions options;
+    options.atol = 1e-199;
+    options.maxiter = 0;
+    auto decision = cg::detail::initial_residual_decision(1e-200, 1e-200, 0.0, options);
+    EXPECT_EQ(decision.status, cg::Status::converged);
+    EXPECT_DOUBLE_EQ(decision.tolerance, options.atol);
+
+    options.atol = 0.0;
+    decision = cg::detail::initial_residual_decision(1e-200, 1e-200, 0.0, options);
+    EXPECT_EQ(decision.status, cg::Status::max_iterations);
+
+    options.maxiter = 1;
+    decision = cg::detail::initial_residual_decision(1e-200, 1e-200, 0.0, options);
+    EXPECT_EQ(decision.status, cg::Status::non_finite);
+    decision = cg::detail::initial_residual_decision(std::numeric_limits<double>::infinity(), 0.0, 0.0, options);
+    EXPECT_EQ(decision.status, cg::Status::non_finite);
+}
+
+TEST(NumericalPolicy, InitialUsableResidualComputesTheRelativeTolerance)
+{
+    cg::CgOptions options;
+    options.atol = 0.25;
+    options.rtol = 0.125;
+    const auto decision = cg::detail::initial_residual_decision(4.0, 1.0, 1.0, options);
+    EXPECT_FALSE(decision.status.has_value());
+    EXPECT_DOUBLE_EQ(decision.tolerance, 0.5);
+}
+
+TEST(NumericalPolicy, TrueResidualCannotEraseANumericalFailure)
+{
+    EXPECT_EQ(cg::detail::true_residual_status(cg::Status::non_finite, 0.0, 1e-8), cg::Status::non_finite);
+    for (const auto requested : {cg::Status::max_iterations, cg::Status::non_positive_curvature})
+    {
+        EXPECT_EQ(cg::detail::true_residual_status(requested, 1e-8, 1e-8), cg::Status::converged);
+        EXPECT_EQ(cg::detail::true_residual_status(requested, 1.0, 1e-8), requested);
+        EXPECT_EQ(cg::detail::true_residual_status(requested, std::numeric_limits<double>::infinity(), 1e-8),
+                  cg::Status::non_finite);
+    }
+}
+
+TEST(NumericalPolicy, CheckpointRequiresAUsableProductBeforeRestartOrIterationLimit)
+{
+    EXPECT_EQ(cg::detail::residual_checkpoint_status(0.0, 0.0, 0.0, true), cg::Status::converged);
+    for (const bool last : {false, true})
+    {
+        for (const double rho : {0.0, std::nextafter(std::numeric_limits<double>::min(), 0.0),
+                                 std::numeric_limits<double>::infinity(), std::numeric_limits<double>::quiet_NaN()})
+        {
+            EXPECT_EQ(cg::detail::residual_checkpoint_status(1.0, rho, 0.0, last), cg::Status::non_finite);
+        }
+    }
+    const double usable = std::numeric_limits<double>::min();
+    EXPECT_FALSE(cg::detail::residual_checkpoint_status(1.0, usable, 0.0, false).has_value());
+    EXPECT_EQ(cg::detail::residual_checkpoint_status(1.0, usable, 0.0, true), cg::Status::max_iterations);
+    EXPECT_EQ(cg::detail::residual_checkpoint_status(std::numeric_limits<double>::quiet_NaN(), usable, 0.0, false),
+              cg::Status::non_finite);
 }
 
 TEST(CGRange, DoesNotClaimConvergenceWhenSquaredResidualUnderflowsOrOverflows)

@@ -25,6 +25,9 @@ class Workspace:
 
     Notes
     -----
+    Device, stream, kernel and execution mode come from this workspace when
+    calling solve_into. A prepared solver additionally requires a matching
+    kernel because its matrix setup fixes that choice.
     Distinct workspaces permit overlapping calls against an immutable plan.
     Each workspace owns its backend resources and reduction storage. Reuse on the same
     stream is safe because public solves return only after completion.

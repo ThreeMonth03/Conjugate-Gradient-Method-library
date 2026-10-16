@@ -167,15 +167,25 @@ CUDA owns explicit device matrices/vectors and borrows a device stream. Host
 execution uses the shared solver engine with CUDA adapters. Explicit device
 execution keeps recurrence scalars on the GPU and reads completed status
 packets; it follows the same recurrence, true-residual policy and failure
-statuses. Workspace construction fixes host/device execution independently of
-dense-kernel and vector-fusion choices. Device workspace composes solver
-vectors and private backend execution resources on one device/stream. A
+statuses. Both engines share small numerical policy functions for initial
+residual decisions, true-residual final status and checkpoint exits. Vector
+operations, launch ordering, synchronization and restart work stay in each
+execution flow.
+
+Workspace construction fixes the device, stream, dense kernel and host/device
+execution mode. Strict solves borrow those settings from the workspace;
+prepared solves additionally check their fixed kernel is compatible. Device
+workspace composes solver vectors and private backend execution resources on
+one device/stream. A
 solver-local RAII guard acquires the workspace and lends those resources to
 the backend; the backend never sees solver state. Only resources prepared
 for the cuBLAS kernel own a handle and 4 MiB scratch allocation.
 The optional cuBLAS resource bundle is held directly in the execution state;
-its device allocations retain their own RAII owners. A prepared solver derives
-its preconditioner kind from the optional cached Jacobi state.
+its device allocations retain their own RAII owners. The selected kernel and
+execution mode are derived from optional cuBLAS and device-control resources.
+A prepared solver derives its preconditioner kind from optional cached Jacobi
+state. Python bindings register the native workspace directly and borrow its
+context without keeping a second copy.
 
 Python ``cuda.Session`` owns one existing CUDA workspace with fixed size,
 device, stream, kernel and execution mode. It borrows matrix inputs for each

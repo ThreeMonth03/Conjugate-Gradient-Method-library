@@ -87,6 +87,10 @@ allocation is unnecessary. Call shared type interfaces directly; keep an
 adapter only when it translates a real difference. Share pure size checks
 without introducing a generic arithmetic framework.
 
+Select fixed execution settings at resource construction and borrow them at
+use sites. Share small numerical decisions as private free functions while
+keeping backend operations and device scheduling explicit.
+
 Preserve const correctness and state lifetime, aliasing and concurrency
 requirements at public boundaries. Types with coupled representation
 invariants must remain valid when copying or allocation fails. Prepare a
