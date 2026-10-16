@@ -30,6 +30,23 @@ std::size_t storage_bytes(std::size_t size)
     }
     return inverse_bytes + sizeof(int);
 }
+std::size_t validated_size(DenseMatrixView A, const Context &context)
+{
+    detail::validate(A, context);
+    if (A.rows() == 0 || A.rows() != A.cols())
+    {
+        throw std::invalid_argument("CUDA Jacobi requires a nonempty square matrix");
+    }
+    return A.rows();
+}
+std::size_t validated_size(const CsrMatrix &A, const Context &context)
+{
+    if (A.device() != context.device() || A.rows() == 0 || A.rows() != A.cols())
+    {
+        throw std::invalid_argument("CUDA Jacobi requires a square matrix on the selected device");
+    }
+    return A.rows();
+}
 
 } // namespace
 
@@ -43,22 +60,13 @@ int *JacobiPreconditioner::invalid_flag() noexcept
     return reinterpret_cast<int *>(m_storage.get() + m_inverse.size() * sizeof(double));
 }
 JacobiPreconditioner::JacobiPreconditioner(DenseMatrixView A, const Context &context)
-    : JacobiPreconditioner(A.rows(), context)
+    : JacobiPreconditioner(validated_size(A, context), context)
 {
-    detail::validate(A, context);
-    if (A.rows() == 0 || A.rows() != A.cols())
-    {
-        throw std::invalid_argument("CUDA Jacobi requires a nonempty square matrix");
-    }
     detail::initialize_jacobi(A, m_inverse, invalid_flag(), context);
 }
 JacobiPreconditioner::JacobiPreconditioner(const CsrMatrix &A, const Context &context)
-    : JacobiPreconditioner(A.rows(), context)
+    : JacobiPreconditioner(validated_size(A, context), context)
 {
-    if (A.device() != context.device() || A.rows() == 0 || A.rows() != A.cols())
-    {
-        throw std::invalid_argument("CUDA Jacobi requires a square matrix on the selected device");
-    }
     detail::initialize_jacobi(A.view(), m_inverse, invalid_flag(), context);
 }
 JacobiPreconditioner::JacobiPreconditioner(JacobiPreconditioner &&other) noexcept

@@ -15,6 +15,12 @@ namespace cuda
 namespace
 {
 
+std::size_t validated_size(cg::ConstVectorView host)
+{
+    cg::detail::validate(host);
+    return host.size();
+}
+
 __global__ void fill_kernel(VectorView output, double value)
 {
     for (std::size_t i = blockIdx.x * blockDim.x + threadIdx.x; i < output.size();
@@ -42,7 +48,7 @@ Vector::Vector(std::size_t size, const Context &context)
     : m_data(detail::device_allocation<double>(size, context)), m_size(size)
 {
 }
-Vector::Vector(cg::ConstVectorView host, const Context &context) : Vector(host.size(), context)
+Vector::Vector(cg::ConstVectorView host, const Context &context) : Vector(validated_size(host), context)
 {
     upload(host, context);
 }

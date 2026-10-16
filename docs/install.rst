@@ -90,6 +90,10 @@ relocatable: set ``CMAKE_PREFIX_PATH`` to the new prefix after moving it.
 CMake metadata belongs
 to the ``development`` component and is not included in Python wheels.
 
+Core-only native/OpenMP consumers do not require a separate Threads package
+lookup. BLAS installations discover it for their private provider. The CUDA
+component retains the toolkit's own dependency discovery.
+
 A CUDA-enabled installation additionally provides an explicit component:
 
 .. code-block:: cmake

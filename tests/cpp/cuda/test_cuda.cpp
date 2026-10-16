@@ -156,6 +156,59 @@ TEST_F(Cuda, OwnsUploadsAndDeviceSnapshotsAndSupportsDeviceOnlyReset)
     gpu::Vector empty(0, *context);
     EXPECT_NO_THROW(empty.fill(0, *context));
     EXPECT_NO_THROW(empty.download({}, *context));
+    const gpu::Vector empty_upload(cg::ConstVectorView{}, *context);
+    EXPECT_EQ(empty_upload.size(), 0u);
+    EXPECT_EQ(empty_upload.device(), context->device());
+    EXPECT_NO_THROW(empty_upload.download({}, *context));
+}
+
+TEST_F(Cuda, ConstructorsRejectWrongDeviceBeforeAttemptingOversizedAllocation)
+{
+    // The byte count is representable, but no device can allocate this span.
+    // Metadata errors must take precedence over a cudaMalloc failure.
+    const auto size = std::numeric_limits<std::size_t>::max() / sizeof(double) - 1;
+    const gpu::DenseMatrixView wrong_device(nullptr, size, 1, 1, context->device() + 1);
+    try
+    {
+        const gpu::DenseMatrix snapshot(wrong_device, *context);
+        FAIL() << "wrong-device matrix storage must be rejected before allocation";
+    }
+    catch (const std::invalid_argument &error)
+    {
+        EXPECT_STREQ(error.what(), "CUDA storage belongs to a different device");
+    }
+    try
+    {
+        const gpu::JacobiPreconditioner M(wrong_device, *context);
+        FAIL() << "wrong-device Jacobi input must be rejected before allocation";
+    }
+    catch (const std::invalid_argument &error)
+    {
+        EXPECT_STREQ(error.what(), "CUDA storage belongs to a different device");
+    }
+}
+
+TEST_F(Cuda, DenseSnapshotsAndJacobiValidateDescriptorsAndShapes)
+{
+    const cg::DenseMatrix host(2, 3, {1, 2, 3, 4, 5, 6});
+    const gpu::DenseMatrix A(host.view(), *context);
+    const gpu::CsrMatrix sparse(as_csr(host.view()), *context);
+    EXPECT_THROW(gpu::DenseMatrix(gpu::DenseMatrixView{nullptr, 2, 3, 3, context->device()}, *context),
+                 std::invalid_argument);
+    EXPECT_THROW(gpu::DenseMatrix(gpu::DenseMatrixView{A.view().data(), 2, 3, 2, context->device()}, *context),
+                 std::invalid_argument);
+    EXPECT_THROW(gpu::JacobiPreconditioner(A.view(), *context), std::invalid_argument);
+    EXPECT_THROW(gpu::JacobiPreconditioner(sparse, *context), std::invalid_argument);
+
+    const gpu::DenseMatrix empty_host(cg::DenseMatrixView{}, *context);
+    const gpu::DenseMatrix empty_snapshot(gpu::DenseMatrixView{nullptr, 0, 3, 3, -1}, *context);
+    EXPECT_EQ(empty_host.rows(), 0u);
+    EXPECT_EQ(empty_host.cols(), 0u);
+    EXPECT_EQ(empty_snapshot.rows(), 0u);
+    EXPECT_EQ(empty_snapshot.cols(), 3u);
+    EXPECT_THROW(gpu::JacobiPreconditioner(empty_host.view(), *context), std::invalid_argument);
+    const gpu::CsrMatrix empty_csr(cg::CsrMatrix(0, 0, {0}, {}, {}), *context);
+    EXPECT_THROW(gpu::JacobiPreconditioner(empty_csr, *context), std::invalid_argument);
 }
 
 TEST_F(Cuda, DenseProductsHandlePaddingOddTailsAndBothResidualSigns)

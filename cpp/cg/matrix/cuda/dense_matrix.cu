@@ -10,11 +10,25 @@ namespace cg
 {
 namespace cuda
 {
+namespace
+{
 
-DenseMatrix::DenseMatrix(cg::DenseMatrixView host, const Context &context)
-    : m_rows(host.rows()), m_cols(host.cols()), m_values(cg::detail::checked_product(host.rows(), host.cols()), context)
+std::size_t validated_size(cg::DenseMatrixView host)
 {
     cg::detail::validate(host);
+    return cg::detail::checked_product(host.rows(), host.cols());
+}
+std::size_t validated_size(DenseMatrixView source, const Context &context)
+{
+    detail::validate(source, context);
+    return cg::detail::checked_product(source.rows(), source.cols());
+}
+
+} // namespace
+
+DenseMatrix::DenseMatrix(cg::DenseMatrixView host, const Context &context)
+    : m_rows(host.rows()), m_cols(host.cols()), m_values(validated_size(host), context)
+{
     detail::DeviceGuard guard(context.device());
     if (m_rows != 0 && m_cols != 0)
     {
@@ -26,10 +40,8 @@ DenseMatrix::DenseMatrix(cg::DenseMatrixView host, const Context &context)
     context.synchronize();
 }
 DenseMatrix::DenseMatrix(DenseMatrixView source, const Context &context)
-    : m_rows(source.rows()), m_cols(source.cols()),
-      m_values(cg::detail::checked_product(source.rows(), source.cols()), context)
+    : m_rows(source.rows()), m_cols(source.cols()), m_values(validated_size(source, context), context)
 {
-    detail::validate(source, context);
     detail::DeviceGuard guard(context.device());
     if (m_rows != 0 && m_cols != 0)
     {

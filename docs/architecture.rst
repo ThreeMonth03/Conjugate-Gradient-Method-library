@@ -71,6 +71,10 @@ not depend on Python or pybind11. ``CG_BUILD_PYTHON=OFF`` must build without
 locating either dependency. The optional ``cg_cuda`` target owns CUDA SDK
 requirements.
 
+Threads belongs to the private BLAS provider and native tests that use
+``std::async``. Core-only native and OpenMP consumers do not discover it
+separately; requesting CUDA retains the toolkit's own dependency discovery.
+
 The ``cgpy._core`` and optional ``cgpy._cuda`` extension entry points register
 feature bindings; they contain no numerical recurrence. Per-feature ``pymod``
 code validates layout and ownership, retains borrowed Python owners, guards
@@ -119,6 +123,12 @@ Copy explicitly when an independent snapshot is needed:
 CPU and CUDA allocation/layout checks share the same checked multiplication
 and strided-storage extent functions. Backend-specific pointer and device
 validation stays at its existing boundary.
+
+CUDA constructors that upload or snapshot data, and Jacobi construction, check
+source metadata, dimensions and device compatibility before allocating
+owned storage. Jacobi diagonal contents are still checked by the existing
+setup kernel. This rejects invalid arguments before a storage allocation can
+obscure them with an allocation failure.
 
 CPU workspace owns five vectors: residual ``r``, direction ``p``, product
 ``Ap``, true-residual scratch and preconditioned residual ``z``. Prepare its
