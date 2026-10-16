@@ -39,6 +39,9 @@ def invalid_cuda_calls(
     output: cuda.Vector,
     cpu_workspace: cgpy.Workspace,
 ) -> None:
+    cuda.PreparedSolver()  # type: ignore[call-arg]
+    cuda.DenseMatrix()  # type: ignore[call-arg]
+    cuda.CsrMatrix()  # type: ignore[call-arg]
     cuda.solve(matrix, rhs, algorithm="standrad")  # type: ignore[arg-type]
     cuda.prepare(matrix, dense_kernel="blas")  # type: ignore[arg-type]
     cuda.Workspace(2, execution_mode="automatic")  # type: ignore[arg-type]

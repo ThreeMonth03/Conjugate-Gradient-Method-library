@@ -1,5 +1,6 @@
 #include <cg/matrix/csr_matrix.hpp>
 #include <cg/matrix/detail/csr_validation.hpp>
+#include <cg/matrix/detail/validation.hpp>
 #include <cg/storage/detail/validation.hpp>
 
 #include <limits>

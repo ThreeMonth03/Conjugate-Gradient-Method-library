@@ -41,9 +41,4 @@ class CsrMatrix
     std::vector<double> m_values;
 };
 
-namespace detail
-{
-bool overlaps(const CsrMatrix &A, ConstVectorView x);
-} // namespace detail
-
 } // namespace cg

@@ -6,10 +6,13 @@
 namespace cg
 {
 
+class CsrMatrix;
+
 namespace detail
 {
 void validate(DenseMatrixView view);
 bool overlaps(DenseMatrixView a, ConstVectorView b);
+bool overlaps(const CsrMatrix &A, ConstVectorView x);
 } // namespace detail
 
 } // namespace cg

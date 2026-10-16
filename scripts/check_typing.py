@@ -39,6 +39,7 @@ def main():
             )
         # Exercise imports separately; static fixtures never allocate or solve.
         probe = """
+import inspect
 import pathlib
 import sys
 
@@ -57,6 +58,18 @@ for name in ('Vector', 'DenseMatrix', 'CsrMatrix', 'PreparedSolver',
              'solve', 'solve_into'):
     assert hasattr(cuda, name), name
 assert 'SupportsCudaArrayInterface' in cuda.__all__
+for constructor, message in (
+    (cuda.PreparedSolver, 'use prepare or prepare_host'),
+    (cuda.DenseMatrix, 'use DenseMatrix.from_host or DenseMatrix.from_device'),
+    (cuda.CsrMatrix, 'use CsrMatrix.from_host or CsrMatrix.from_device'),
+):
+    assert not inspect.signature(constructor).parameters, constructor
+    try:
+        constructor()
+    except TypeError as error:
+        assert str(error) == message, (constructor, error)
+    else:
+        raise AssertionError(f'{constructor.__name__} accepted direct construction')
 assert 'cgpy._cuda' not in sys.modules
 print(f'Typed consumer package: {package}; CUDA extension remains unloaded.')
 """

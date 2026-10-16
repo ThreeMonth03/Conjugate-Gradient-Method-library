@@ -1,6 +1,7 @@
 #include <cg/backend/cpu/backend.hpp>
 #include <cg/backend/cpu/detail/parallel_thresholds.hpp>
 #include <cg/matrix/csr_matrix.hpp>
+#include <cg/matrix/detail/validation.hpp>
 #include <cg/storage/detail/validation.hpp>
 
 #include <span>
