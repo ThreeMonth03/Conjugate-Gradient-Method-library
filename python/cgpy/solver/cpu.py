@@ -1,10 +1,13 @@
 """CPU entry points for dense and CSR conjugate gradient solves."""
 
+from typing import SupportsIndex
+
 import numpy as np
 import numpy.typing as npt
 
 from .. import _core
 from .._interop import host
+from .._typing import Algorithm, CpuDenseKernel, Preconditioner
 from ..matrix import csr
 from . import _validation, result
 from . import workspace as workspace_module
@@ -14,8 +17,8 @@ def prepare(
     A: npt.ArrayLike | csr.CsrMatrix,
     *,
     num_threads: int = 1,
-    preconditioner: str = "none",
-    dense_kernel: str = "native",
+    preconditioner: Preconditioner = "none",
+    dense_kernel: CpuDenseKernel = "native",
 ) -> _core.PreparedSolver:
     """Snapshot a matrix and cache optional Jacobi setup for repeated solves.
 
@@ -84,20 +87,20 @@ def prepare(
 
 
 def solve_into(
-    A: np.ndarray | csr.CsrMatrix,
-    b: np.ndarray,
-    x: np.ndarray,
+    A: npt.NDArray[np.float64] | csr.CsrMatrix,
+    b: npt.NDArray[np.float64],
+    x: npt.NDArray[np.float64],
     *,
     workspace: workspace_module.Workspace,
     num_threads: int = 1,
     rtol: float = 1e-8,
     atol: float = 0.0,
-    maxiter: int = 1000,
-    algorithm: str = "standard",
+    maxiter: SupportsIndex = 1000,
+    algorithm: Algorithm = "standard",
     fused: bool = True,
-    residual_refresh: int = 50,
-    preconditioner: str = "none",
-    dense_kernel: str = "native",
+    residual_refresh: SupportsIndex = 50,
+    preconditioner: Preconditioner = "none",
+    dense_kernel: CpuDenseKernel = "native",
 ) -> _core.SolveInfo:
     """Solve in place with strict arrays and caller-owned workspace.
 
@@ -195,13 +198,13 @@ def solve(
     num_threads: int = 1,
     rtol: float = 1e-8,
     atol: float = 0.0,
-    maxiter: int = 1000,
-    algorithm: str = "standard",
+    maxiter: SupportsIndex = 1000,
+    algorithm: Algorithm = "standard",
     fused: bool = True,
-    residual_refresh: int = 50,
-    preconditioner: str = "none",
-    dense_kernel: str = "native",
-) -> result.SolveResult[np.ndarray]:
+    residual_refresh: SupportsIndex = 50,
+    preconditioner: Preconditioner = "none",
+    dense_kernel: CpuDenseKernel = "native",
+) -> result.SolveResult[npt.NDArray[np.float64]]:
     """Solve a real SPD system and return an owned solution.
 
     Parameters

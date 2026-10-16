@@ -1,11 +1,17 @@
 """Owned CUDA vector storage and explicit synchronous transfers."""
 
+from __future__ import annotations
+
 import typing
 
 import numpy as np
+import numpy.typing as npt
 
 from .._interop import host
 from .._runtime import cuda as cuda_runtime
+
+if typing.TYPE_CHECKING:
+    from .. import _cuda
 
 
 class Vector:
@@ -29,6 +35,8 @@ class Vector:
     and host transfers belong outside a prepared-solve timing interval.
     """
 
+    _native: _cuda.Vector
+
     def __init__(self, size: int, *, device: int = 0, stream: int = 0) -> None:
         self._native = cuda_runtime.load().Vector(size, device, stream)
         self.fill(0.0, stream=stream)
@@ -41,7 +49,7 @@ class Vector:
 
     @classmethod
     def from_host(
-        cls, source: object, *, device: int = 0, stream: int = 0
+        cls, source: npt.ArrayLike, *, device: int = 0, stream: int = 0
     ) -> typing.Self:
         """Snapshot a real host vector, normalizing and uploading it once."""
         source = host.normalize_host_array(source, 1)
@@ -55,7 +63,7 @@ class Vector:
         return self._native.size
 
     @property
-    def shape(self) -> tuple[int, ...]:
+    def shape(self) -> tuple[int]:
         """tuple: One-dimensional shape."""
         return (self.size,)
 
@@ -69,11 +77,13 @@ class Vector:
         """dict: Version-3 device view, with all producer work complete."""
         return self._native.__cuda_array_interface__
 
-    def fill(self, value, *, stream: int = 0) -> None:
+    def fill(self, value: float, *, stream: int = 0) -> None:
         """Fill the vector on a borrowed stream and wait for completion."""
         self._native.fill(value, stream)
 
-    def copy_from_host(self, source: object, *, stream: int = 0) -> None:
+    def copy_from_host(
+        self, source: npt.ArrayLike, *, stream: int = 0
+    ) -> None:
         """Normalize and synchronously upload a matching host vector."""
         self._native.copy_from_host(
             host.normalize_host_array(source, 1), stream
@@ -90,6 +100,6 @@ class Vector:
             source._native if isinstance(source, Vector) else source, stream
         )
 
-    def to_host(self, *, stream: int = 0) -> np.ndarray:
+    def to_host(self, *, stream: int = 0) -> npt.NDArray[np.float64]:
         """Synchronously download an independent NumPy float64 snapshot."""
         return self._native.to_host(stream)

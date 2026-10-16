@@ -22,6 +22,11 @@ def main():
     import cgpy
 
     core = importlib.import_module("cgpy._core")
+    package = pathlib.Path(cgpy.__file__).parent
+    for name in ("py.typed", "_core.pyi", "_cuda.pyi"):
+        assert (package / name).is_file(), (
+            f"installed typing file missing: {name}"
+        )
 
     assert importlib.util.find_spec("_cgpy") is None
     assert importlib.util.find_spec("utils") is None
@@ -104,6 +109,7 @@ def main():
     assert not hasattr(cgpy, "PreparedCsrSolver")
     from cgpy import cuda
 
+    assert "cgpy._cuda" not in sys.modules
     assert cuda.enabled() is expected_cuda
     modules = [core]
     if expected_cuda:

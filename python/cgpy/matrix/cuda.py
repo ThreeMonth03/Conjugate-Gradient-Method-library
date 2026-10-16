@@ -1,10 +1,17 @@
 """Immutable device matrix snapshots, independent of solver policy."""
 
+from __future__ import annotations
+
 import typing
+
+import numpy.typing as npt
 
 from .._interop import host
 from .._runtime import cuda as cuda_runtime
 from . import csr
+
+if typing.TYPE_CHECKING:
+    from .. import _cuda
 
 
 class DenseMatrix:
@@ -14,12 +21,14 @@ class DenseMatrix:
     mutable storage view; prepared solvers take a further owning snapshot.
     """
 
+    _native: _cuda.DenseMatrix
+
     def __init__(self) -> None:
         raise TypeError("use DenseMatrix.from_host or DenseMatrix.from_device")
 
     @classmethod
     def from_host(
-        cls, source: object, *, device: int = 0, stream: int = 0
+        cls, source: npt.ArrayLike, *, device: int = 0, stream: int = 0
     ) -> typing.Self:
         """Normalize a real 2D host array and explicitly upload a snapshot."""
         result = cls.__new__(cls)
@@ -44,7 +53,7 @@ class DenseMatrix:
         return result
 
     @property
-    def shape(self) -> tuple[int, ...]:
+    def shape(self) -> tuple[int, int]:
         """tuple: Matrix dimensions (rows, columns)."""
         return self._native.shape
 
@@ -62,12 +71,14 @@ class CsrMatrix:
     it does not silently sort or coalesce them. Use native CUDA CSR kernels.
     """
 
+    _native: _cuda.CsrMatrix
+
     def __init__(self) -> None:
         raise TypeError("use CsrMatrix.from_host or CsrMatrix.from_device")
 
     @classmethod
     def from_host(
-        cls, source: object, *, device: int = 0, stream: int = 0
+        cls, source: csr.CsrMatrix, *, device: int = 0, stream: int = 0
     ) -> typing.Self:
         """Explicitly upload a public CPU cgpy.CsrMatrix snapshot."""
         if not isinstance(source, csr.CsrMatrix):
@@ -80,7 +91,14 @@ class CsrMatrix:
 
     @classmethod
     def from_device(
-        cls, indptr, indices, data, shape, *, device: int = 0, stream: int = 0
+        cls,
+        indptr: object,
+        indices: object,
+        data: object,
+        shape: tuple[int, int],
+        *,
+        device: int = 0,
+        stream: int = 0,
     ) -> typing.Self:
         """Validate canonical structure and snapshot device CSR arrays.
 
@@ -95,7 +113,7 @@ class CsrMatrix:
         return result
 
     @property
-    def shape(self) -> tuple[int, ...]:
+    def shape(self) -> tuple[int, int]:
         """tuple: Matrix dimensions (rows, columns)."""
         return self._native.shape
 

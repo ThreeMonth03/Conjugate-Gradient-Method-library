@@ -1,6 +1,14 @@
 """Reusable CUDA solver vectors, reductions and execution resources."""
 
+from __future__ import annotations
+
+import typing
+
 from ..._runtime import cuda as cuda_runtime
+from ..._typing import CudaDenseKernel, ExecutionMode
+
+if typing.TYPE_CHECKING:
+    from ... import _cuda
 
 
 class Workspace:
@@ -33,14 +41,16 @@ class Workspace:
     stream is safe because public solves return only after completion.
     """
 
+    _native: _cuda.Workspace
+
     def __init__(
         self,
         size: int,
         *,
         device: int = 0,
         stream: int = 0,
-        dense_kernel: str = "native",
-        execution_mode: str = "host",
+        dense_kernel: CudaDenseKernel = "native",
+        execution_mode: ExecutionMode = "host",
     ) -> None:
         self._native = cuda_runtime.load().Workspace(
             size, device, stream, dense_kernel, execution_mode
@@ -62,11 +72,11 @@ class Workspace:
         return self._native.stream
 
     @property
-    def dense_kernel(self) -> str:
+    def dense_kernel(self) -> CudaDenseKernel:
         """str: Kernel whose resources were prepared at construction."""
         return self._native.dense_kernel
 
     @property
-    def execution_mode(self) -> str:
+    def execution_mode(self) -> ExecutionMode:
         """str: Fixed host or device scalar-control engine."""
         return self._native.execution_mode

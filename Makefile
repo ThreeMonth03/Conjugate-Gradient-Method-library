@@ -30,7 +30,7 @@ CUDA_CONFIGURE_ARGS = $(if $(filter cuda-release,$(PRESET)),$(call cuda_definiti
 CUDA_DIST_ARGS = $(if $(filter ON,$(DIST_CUDA)),-Ccmake.define.CMAKE_TOOLCHAIN_FILE=cmake/CGCudaToolchain.cmake $(call cuda_definitions,-Ccmake.define.))
 
 .DEFAULT_GOAL := all
-.PHONY: all configure build test pytest gtest lint format wheel sdist dist test-dist docs doctest clean pyprof demo
+.PHONY: all configure build test pytest gtest lint format typecheck wheel sdist dist test-dist docs doctest clean pyprof demo
 
 all: build
 
@@ -51,14 +51,17 @@ gtest: configure
 	$(CMAKE) -E env OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 $(CTEST) --test-dir $(BUILD_DIR) --output-on-failure -L cpp
 
 lint:
-	$(RUFF) check python tests/python examples scripts docs/conf.py
-	$(RUFF) format --check python tests/python examples scripts docs/conf.py
+	$(RUFF) check python tests/python tests/typing examples scripts docs/conf.py
+	$(RUFF) format --check python tests/python tests/typing examples scripts docs/conf.py
 	$(CLANG_FORMAT) --dry-run --Werror $(CPP_FILES)
 
 format:
-	$(RUFF) check --fix python tests/python examples scripts docs/conf.py
-	$(RUFF) format python tests/python examples scripts docs/conf.py
+	$(RUFF) check --fix python tests/python tests/typing examples scripts docs/conf.py
+	$(RUFF) format python tests/python tests/typing examples scripts docs/conf.py
 	$(CLANG_FORMAT) -i $(CPP_FILES)
+
+typecheck: build
+	$(PYTHON) scripts/check_typing.py --package-root $(BUILD_DIR)/python
 
 wheel:
 	PIP_CACHE_DIR=$(CURDIR)/.cache/pip CMAKE_BUILD_PARALLEL_LEVEL=$(JOBS) $(PYTHON) -m build --wheel --outdir $(DIST_DIR) -Ccmake.define.CG_ENABLE_BLAS=$(DIST_BLAS) -Ccmake.define.CG_ENABLE_CUDA=$(DIST_CUDA) $(CUDA_DIST_ARGS) $(DIST_ARGS)

@@ -11,10 +11,14 @@ find_package(pybind11 3.0.1 CONFIG REQUIRED PATHS "${CG_PYBIND11_DIR}" NO_DEFAUL
 # Stage the package beside its private extensions for in-tree execution.
 file(GLOB_RECURSE CG_PYTHON_SOURCES CONFIGURE_DEPENDS RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}/python"
     "${CMAKE_CURRENT_SOURCE_DIR}/python/cgpy/*.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/python/cgpy/*.pyi"
+    "${CMAKE_CURRENT_SOURCE_DIR}/python/cgpy/py.typed"
     "${CMAKE_CURRENT_SOURCE_DIR}/python/cgbench/*.py"
 )
 file(GLOB_RECURSE CG_STAGED_PYTHON RELATIVE "${CMAKE_CURRENT_BINARY_DIR}/python"
-    "${CMAKE_CURRENT_BINARY_DIR}/python/*.py")
+    "${CMAKE_CURRENT_BINARY_DIR}/python/*.py"
+    "${CMAKE_CURRENT_BINARY_DIR}/python/*.pyi"
+    "${CMAKE_CURRENT_BINARY_DIR}/python/py.typed")
 foreach(source IN LISTS CG_STAGED_PYTHON)
     if(NOT source IN_LIST CG_PYTHON_SOURCES)
         file(REMOVE "${CMAKE_CURRENT_BINARY_DIR}/python/${source}")

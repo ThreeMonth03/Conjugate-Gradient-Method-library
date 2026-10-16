@@ -58,6 +58,10 @@ jobs:
       - name: Run native and Python tests
         run: make test PRESET=${{ matrix.preset }} JOBS=2
 
+      - name: Check public Python types without a CUDA extension
+        if: matrix.preset == 'cpu-release'
+        run: make typecheck JOBS=2
+
       - name: Install project-local Sphinx tooling
         if: matrix.preset == 'cpu-blas'
         run: .venv/bin/python -m pip install --cache-dir .cache/pip -r requirements/docs.lock

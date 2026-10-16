@@ -1,8 +1,15 @@
 """Explicit CUDA execution-resource reuse without operator preparation."""
 
 from threading import Lock
+from typing import SupportsIndex
 
 from ... import _core
+from ..._typing import (
+    Algorithm,
+    CudaDenseKernel,
+    ExecutionMode,
+    Preconditioner,
+)
 from ...storage import cuda as storage
 from .. import result
 from . import api
@@ -42,8 +49,8 @@ class Session:
         *,
         device: int = 0,
         stream: int = 0,
-        dense_kernel: str = "native",
-        execution_mode: str = "host",
+        dense_kernel: CudaDenseKernel = "native",
+        execution_mode: ExecutionMode = "host",
     ) -> None:
         self._workspace = Workspace(
             size,
@@ -70,12 +77,12 @@ class Session:
         return self._workspace.stream
 
     @property
-    def dense_kernel(self) -> str:
+    def dense_kernel(self) -> CudaDenseKernel:
         """str: Fixed native or cuBLAS backend."""
         return self._workspace.dense_kernel
 
     @property
-    def execution_mode(self) -> str:
+    def execution_mode(self) -> ExecutionMode:
         """str: Fixed host or device scalar-control engine."""
         return self._workspace.execution_mode
 
@@ -87,11 +94,11 @@ class Session:
         *,
         rtol: float = 1e-8,
         atol: float = 0.0,
-        maxiter: int = 1000,
-        algorithm: str = "standard",
+        maxiter: SupportsIndex = 1000,
+        algorithm: Algorithm = "standard",
         fused: bool = True,
-        residual_refresh: int = 50,
-        preconditioner: str = "none",
+        residual_refresh: SupportsIndex = 50,
+        preconditioner: Preconditioner = "none",
     ) -> result.SolveResult[storage.Vector]:
         """Solve a resident system using fresh output and per-call setup.
 

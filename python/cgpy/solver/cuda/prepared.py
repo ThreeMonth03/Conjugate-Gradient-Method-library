@@ -1,9 +1,22 @@
 """Immutable prepared CUDA solver façade and matching resource factories."""
 
+from __future__ import annotations
+
+import typing
+
 from ... import _core
 from ..._interop import cuda as cuda_interop
+from ..._typing import (
+    Algorithm,
+    CudaDenseKernel,
+    ExecutionMode,
+    Preconditioner,
+)
 from ...storage import cuda as storage
 from . import workspace as workspace_module
+
+if typing.TYPE_CHECKING:
+    from ... import _cuda
 
 
 class PreparedSolver:
@@ -16,6 +29,8 @@ class PreparedSolver:
     for overlapping solves; input storage must stay free of conflicting writes.
     """
 
+    _native: _cuda.PreparedSolver
+
     def __init__(self) -> None:
         raise TypeError("use prepare or prepare_host")
 
@@ -25,7 +40,7 @@ class PreparedSolver:
         return self._native.size
 
     @property
-    def shape(self) -> tuple[int, ...]:
+    def shape(self) -> tuple[int, int]:
         """tuple: Square matrix dimensions."""
         return self.size, self.size
 
@@ -35,12 +50,12 @@ class PreparedSolver:
         return self._native.device
 
     @property
-    def dense_kernel(self) -> str:
+    def dense_kernel(self) -> CudaDenseKernel:
         """str: Explicit native or cublas dense kernel; CSR requires native."""
         return self._native.dense_kernel
 
     @property
-    def preconditioner(self) -> str:
+    def preconditioner(self) -> Preconditioner:
         """str: Fixed none or jacobi selection."""
         return self._native.preconditioner
 
@@ -55,7 +70,7 @@ class PreparedSolver:
         return self._native.preconditioner_nbytes
 
     def create_workspace(
-        self, *, stream: int = 0, execution_mode: str = "host"
+        self, *, stream: int = 0, execution_mode: ExecutionMode = "host"
     ) -> workspace_module.Workspace:
         """Allocate storage with an explicit stream and scalar-control engine.
 
@@ -83,10 +98,10 @@ class PreparedSolver:
         workspace: workspace_module.Workspace,
         rtol: float = 1e-8,
         atol: float = 0.0,
-        maxiter: int = 1000,
-        algorithm: str = "standard",
+        maxiter: typing.SupportsIndex = 1000,
+        algorithm: Algorithm = "standard",
         fused: bool = True,
-        residual_refresh: int = 50,
+        residual_refresh: typing.SupportsIndex = 50,
     ) -> _core.SolveInfo:
         """Solve with cached setup and caller-owned GPU output/workspace.
 
