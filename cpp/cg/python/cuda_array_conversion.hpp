@@ -34,7 +34,6 @@ struct DeviceArray
     std::vector<std::size_t> shape;
     std::size_t itemsize;
     int device;
-    std::string typestr;
 };
 
 DeviceArray device_array(py::object object, int ndim, const gpu::Context &context, bool writable, bool integer = false);

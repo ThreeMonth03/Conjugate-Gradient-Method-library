@@ -1,5 +1,6 @@
 #include <cg/backend/cpu/backend.hpp>
 #include <cg/backend/cpu/detail/blas.hpp>
+#include <cg/backend/cpu/detail/parallel_thresholds.hpp>
 #include <cg/backend/cpu/detail/validation.hpp>
 #include <cg/matrix/detail/validation.hpp>
 
@@ -99,7 +100,8 @@ void CpuBackend::apply(DenseMatrixView A, ConstVectorView x, VectorView output) 
     const auto paired_rows = A.rows() - A.rows() % 2;
 #ifdef _OPENMP
 #pragma omp parallel for schedule(static)                                                                              \
-    num_threads(m_num_threads) if (m_num_threads > 1 && A.rows() >= 64 && A.cols() >= 128)
+    num_threads(m_num_threads) if (m_num_threads > 1 && A.rows() >= detail::openmp_min_dense_rows &&                   \
+                                       A.cols() >= detail::openmp_min_dense_columns)
 #endif
     for (std::size_t i = 0; i < paired_rows; i += 2)
     {
@@ -129,7 +131,8 @@ double CpuBackend::apply_and_dot(DenseMatrixView A, ConstVectorView p, VectorVie
     const auto paired_rows = A.rows() - A.rows() % 2;
 #ifdef _OPENMP
 #pragma omp parallel for reduction(+ : product) schedule(static)                                                       \
-    num_threads(m_num_threads) if (m_num_threads > 1 && A.rows() >= 64 && A.cols() >= 128)
+    num_threads(m_num_threads) if (m_num_threads > 1 && A.rows() >= detail::openmp_min_dense_rows &&                   \
+                                       A.cols() >= detail::openmp_min_dense_columns)
 #endif
     for (std::size_t i = 0; i < paired_rows; i += 2)
     {
@@ -190,7 +193,8 @@ double CpuBackend::residual_squared_norm(DenseMatrixView A, ConstVectorView b, C
     const auto paired_rows = A.rows() - A.rows() % 2;
 #ifdef _OPENMP
 #pragma omp parallel for reduction(+ : squared_norm) schedule(static)                                                  \
-    num_threads(m_num_threads) if (m_num_threads > 1 && A.rows() >= 64 && A.cols() >= 128)
+    num_threads(m_num_threads) if (m_num_threads > 1 && A.rows() >= detail::openmp_min_dense_rows &&                   \
+                                       A.cols() >= detail::openmp_min_dense_columns)
 #endif
     for (std::size_t i = 0; i < paired_rows; i += 2)
     {

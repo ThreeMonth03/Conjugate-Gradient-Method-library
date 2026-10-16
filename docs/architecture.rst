@@ -160,6 +160,10 @@ floating-point rounding and iteration counts; both policies retain
 true-residual verification. Dense fused reductions support odd tails and
 padded row strides without fast-math or host-specific compiler flags.
 
+OpenMP activation uses named private constants for vector length, dense
+row/column counts and CSR row counts. These are existing heuristics;
+tuning their values requires measurements on the target workloads.
+
 The optional explicit ``dense_kernel="blas"`` choice delegates dense matvec
 to a private sequential LP64 OpenBLAS provider. It accepts one CPU thread,
 rejects CSR and preserves vector-fusion policy. Native remains the default.

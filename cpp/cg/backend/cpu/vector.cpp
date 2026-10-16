@@ -1,4 +1,5 @@
 #include <cg/backend/cpu/backend.hpp>
+#include <cg/backend/cpu/detail/parallel_thresholds.hpp>
 #include <cg/backend/cpu/detail/validation.hpp>
 
 #include <algorithm>
@@ -23,7 +24,8 @@ void CpuBackend::multiply(ConstVectorView x, ConstVectorView y, VectorView outpu
     detail::exact_or_disjoint(x, output);
     detail::exact_or_disjoint(y, output);
 #ifdef _OPENMP
-#pragma omp parallel for simd schedule(static) num_threads(m_num_threads) if (m_num_threads > 1 && x.size() >= 16384)
+#pragma omp parallel for simd schedule(static)                                                                         \
+    num_threads(m_num_threads) if (m_num_threads > 1 && x.size() >= detail::openmp_min_vector_elements)
 #endif
     for (std::size_t i = 0; i < x.size(); ++i)
     {
@@ -45,7 +47,7 @@ double CpuBackend::multiply_and_dot(ConstVectorView factors, ConstVectorView r, 
     double product = 0.0;
 #ifdef _OPENMP
 #pragma omp parallel for simd reduction(+ : product) schedule(static)                                                  \
-    num_threads(m_num_threads) if (m_num_threads > 1 && r.size() >= 16384)
+    num_threads(m_num_threads) if (m_num_threads > 1 && r.size() >= detail::openmp_min_vector_elements)
 #endif
     for (std::size_t i = 0; i < r.size(); ++i)
     {
@@ -61,7 +63,8 @@ void CpuBackend::axpy(double alpha, ConstVectorView x, VectorView y) const
     detail::same_size(x, y);
     detail::exact_or_disjoint(x, y);
 #ifdef _OPENMP
-#pragma omp parallel for simd schedule(static) num_threads(m_num_threads) if (m_num_threads > 1 && x.size() >= 16384)
+#pragma omp parallel for simd schedule(static)                                                                         \
+    num_threads(m_num_threads) if (m_num_threads > 1 && x.size() >= detail::openmp_min_vector_elements)
 #endif
     for (std::size_t i = 0; i < x.size(); ++i)
     {
@@ -76,7 +79,8 @@ void CpuBackend::axpby(double alpha, ConstVectorView x, double beta, ConstVector
     detail::exact_or_disjoint(x, output);
     detail::exact_or_disjoint(y, output);
 #ifdef _OPENMP
-#pragma omp parallel for simd schedule(static) num_threads(m_num_threads) if (m_num_threads > 1 && x.size() >= 16384)
+#pragma omp parallel for simd schedule(static)                                                                         \
+    num_threads(m_num_threads) if (m_num_threads > 1 && x.size() >= detail::openmp_min_vector_elements)
 #endif
     for (std::size_t i = 0; i < x.size(); ++i)
     {
@@ -104,7 +108,7 @@ double CpuBackend::update_x_r_squared_norm(VectorView x, VectorView r, ConstVect
     double squared_norm = 0.0;
 #ifdef _OPENMP
 #pragma omp parallel for simd reduction(+ : squared_norm) schedule(static)                                             \
-    num_threads(m_num_threads) if (m_num_threads > 1 && x.size() >= 16384)
+    num_threads(m_num_threads) if (m_num_threads > 1 && x.size() >= detail::openmp_min_vector_elements)
 #endif
     for (std::size_t i = 0; i < x.size(); ++i)
     {
