@@ -6,6 +6,7 @@
 
 #include <cstddef>
 #include <optional>
+#include <span>
 
 namespace cg
 {
@@ -16,8 +17,10 @@ namespace detail
 
 struct CublasResources
 {
-    CublasResources(const Context &context, void *workspace);
+    CublasResources(const Context &context, std::span<std::byte> scratch);
     static constexpr std::size_t workspace_bytes = 4 * 1024 * 1024;
+    // Borrows the full scratch prefix of ExecutionResources::storage.
+    std::span<std::byte> workspace;
     BlasHandle handle;
 };
 

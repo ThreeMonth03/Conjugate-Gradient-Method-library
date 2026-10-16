@@ -27,12 +27,13 @@ static_assert(CublasResources::workspace_bytes % alignof(double) == 0);
 
 } // namespace
 
-CublasResources::CublasResources(const Context &context, void *workspace) : handle(blas_handle(context))
+CublasResources::CublasResources(const Context &context, std::span<std::byte> scratch)
+    : workspace(scratch), handle(blas_handle(context))
 {
     DeviceGuard guard(context.device());
     check(cublasSetPointerMode(handle.get(), CUBLAS_POINTER_MODE_HOST), "cublasSetPointerMode");
     check(cublasSetAtomicsMode(handle.get(), CUBLAS_ATOMICS_NOT_ALLOWED), "cublasSetAtomicsMode");
-    check(cublasSetWorkspace(handle.get(), workspace, workspace_bytes), "cublasSetWorkspace");
+    check(cublasSetWorkspace(handle.get(), workspace.data(), workspace.size_bytes()), "cublasSetWorkspace");
 }
 ExecutionResources::ExecutionResources(const Context &ctx, DenseKernel selected)
     : context(ctx),
@@ -41,7 +42,7 @@ ExecutionResources::ExecutionResources(const Context &ctx, DenseKernel selected)
 {
     if (selected == DenseKernel::cublas)
     {
-        cublas.emplace(ctx, storage.get());
+        cublas.emplace(ctx, std::span<std::byte>{storage.get(), CublasResources::workspace_bytes});
     }
 }
 

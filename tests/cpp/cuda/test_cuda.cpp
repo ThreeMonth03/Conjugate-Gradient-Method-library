@@ -292,6 +292,19 @@ TEST_F(Cuda, ExecutionStorageKeepsProviderScratchDisjointAndReductionReusable)
         EXPECT_EQ(partials % alignof(double), 0u);
         EXPECT_EQ(scalar - partials, gpu::detail::max_blocks * sizeof(double));
         EXPECT_EQ(resources.dense_kernel(), kernel);
+        if (kernel == gpu::DenseKernel::cublas)
+        {
+            ASSERT_TRUE(resources.cublas.has_value());
+            EXPECT_EQ(resources.cublas->workspace.data(), resources.storage.get());
+            EXPECT_EQ(resources.cublas->workspace.size_bytes(), scratch_bytes);
+            EXPECT_EQ(reinterpret_cast<std::uintptr_t>(resources.cublas->workspace.data()) +
+                          resources.cublas->workspace.size_bytes(),
+                      partials);
+        }
+        else
+        {
+            EXPECT_FALSE(resources.cublas.has_value());
+        }
         for (const bool fused : {false, true})
         {
             SCOPED_TRACE(fused);
