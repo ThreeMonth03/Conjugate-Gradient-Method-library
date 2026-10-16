@@ -58,6 +58,9 @@ jobs:
       - name: Run native and Python tests
         run: make test PRESET=${{ matrix.preset }} JOBS=2
 
+      - name: Build without Python and verify relocated C++ consumers
+        run: make test-native PRESET=${{ matrix.preset }} JOBS=2
+
       - name: Check public Python types without a CUDA extension
         if: matrix.preset == 'cpu-release'
         run: make typecheck JOBS=2
@@ -135,6 +138,8 @@ jobs:
         run: .venv/bin/python scripts/setup_cuda.py --prefix .deps/cuda-12.8
       - name: Compile CUDA and run tests with explicit no-device skips
         run: make test PRESET=cuda-release JOBS=2
+      - name: Verify relocated CPU and CUDA C++ consumers without Python
+        run: make test-native PRESET=cuda-release JOBS=2
       - name: Build CUDA API documentation and execute available examples
         run: |
           .venv/bin/python -m pip install --cache-dir .cache/pip -r requirements/docs.lock
@@ -169,6 +174,8 @@ jobs:
         env:
           CG_REQUIRE_CUDA: '1'
         run: make test PRESET=cuda-release JOBS=2
+      - name: Require real CUDA solves through a relocated C++ installation
+        run: make test-native PRESET=cuda-release NATIVE_ARGS=--require-cuda JOBS=2
       - name: Exercise explicit resident CUDA benchmark modes
         run: |
           make pyprof PRESET=cuda-release PYPROF_SUITE=smoke-cuda-dense PYPROF_ROUNDS=6 PYPROF_REPETITIONS=1 JOBS=2 PYPROF_ARGS='--device cuda --cuda-device 0 --implementations cuda-native,cuda-cublas,torch-cuda-eager'

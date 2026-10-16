@@ -12,6 +12,7 @@ Run from the repository root with CPython 3.12.x and a C++20 compiler. Install t
    make gtest PRESET=cpu-asan
    make lint
    make typecheck
+   make test-native
    make demo
 
 ``make test`` runs GoogleTest and pytest through CTest. ``make gtest`` and
@@ -28,6 +29,16 @@ consumer directory, verifies that importing the CUDA façade does not load the
 optional extension, and checks return types and rejected API usage. No GPU or
 Torch/CuPy installation is needed. The checks live under ``tests/typing/``;
 the benchmark package is outside their scope.
+
+``make test-native`` builds the selected preset with Python and internal tests
+disabled in ``build/<preset>-native``. It installs the development component,
+moves the installation prefix, and configures an independent C++ consumer
+outside the checkout. The consumer checks dense/CSR CG and PCG, reusable
+workspaces, true residuals and basic operation counts. Native, OpenMP and BLAS
+CI configurations run these checks. CUDA CI also compiles/links the optional
+consumer and reports device-dependent skips; the GPU job uses
+``NATIVE_ARGS=--require-cuda``. ``NATIVE_BUILD_DIR`` overrides its build path.
+See :doc:`install` for direct CMake commands and imported targets.
 
 No command above upgrades system packages, installs with ``pip --user``, or
 changes shell configuration. CMake downloads pinned GoogleTest into its local

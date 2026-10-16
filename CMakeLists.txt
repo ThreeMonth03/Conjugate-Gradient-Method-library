@@ -3,6 +3,7 @@ project(cgpy LANGUAGES CXX)
 
 include(CTest)
 include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(CG_BUILD_PYTHON "Build the Python extension modules" ON)
@@ -31,7 +32,11 @@ add_library(cg_core STATIC
 )
 add_library(cg::core ALIAS cg_core)
 target_compile_features(cg_core PUBLIC cxx_std_20)
-set_target_properties(cg_core PROPERTIES POSITION_INDEPENDENT_CODE ON CXX_EXTENSIONS OFF)
+set_target_properties(cg_core PROPERTIES
+    EXPORT_NAME core
+    POSITION_INDEPENDENT_CODE ON
+    CXX_EXTENSIONS OFF
+)
 target_include_directories(cg_core PUBLIC
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/cpp>"
     "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
@@ -53,7 +58,8 @@ set(CG_PUBLIC_HEADERS
     backend/residual_sign.hpp
     backend/cpu/backend.hpp
 )
-install(TARGETS cg_core ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}" COMPONENT development)
+install(TARGETS cg_core EXPORT cgpyTargets
+    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}" COMPONENT development)
 foreach(header IN LISTS CG_PUBLIC_HEADERS)
     get_filename_component(directory "${header}" DIRECTORY)
     install(FILES "cpp/cg/${header}"
@@ -65,7 +71,10 @@ endif()
 
 if(CG_ENABLE_BLAS)
     include(cmake/CGOpenBLAS.cmake)
-    target_link_libraries(cg_core PRIVATE cg_private_blas)
+    target_link_libraries(cg_core PRIVATE
+        "$<BUILD_INTERFACE:cg_private_blas>"
+        "$<INSTALL_INTERFACE:cg::private_blas>"
+    )
     target_compile_definitions(cg_core PUBLIC CG_ENABLE_BLAS=1)
     target_compile_definitions(cg_core PRIVATE
         cblas_dgemv=cgpy_cblas_dgemv
@@ -94,6 +103,17 @@ endif()
 if(CG_ENABLE_CUDA)
     include(cmake/CGCuda.cmake)
 endif()
+
+set(CG_INSTALL_CMAKEDIR "${CMAKE_INSTALL_LIBDIR}/cmake/cgpy")
+configure_package_config_file(cmake/cgpyConfig.cmake.in
+    "${CMAKE_CURRENT_BINARY_DIR}/cgpyConfig.cmake"
+    INSTALL_DESTINATION "${CG_INSTALL_CMAKEDIR}"
+    PATH_VARS CMAKE_INSTALL_LIBDIR
+)
+install(EXPORT cgpyTargets FILE cgpyTargets.cmake NAMESPACE cg::
+    DESTINATION "${CG_INSTALL_CMAKEDIR}" COMPONENT development)
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/cgpyConfig.cmake"
+    DESTINATION "${CG_INSTALL_CMAKEDIR}" COMPONENT development)
 
 if(CG_BUILD_PYTHON)
     include(cmake/CGPython.cmake)

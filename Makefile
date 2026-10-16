@@ -3,11 +3,13 @@ CMAKE ?= $(dir $(PYTHON))cmake
 CTEST ?= $(dir $(CMAKE))ctest
 PRESET ?= cpu-release
 BUILD_DIR ?= $(CURDIR)/build/$(PRESET)
+NATIVE_BUILD_DIR ?= $(CURDIR)/build/$(PRESET)-native
+NATIVE_ARGS ?=
 JOBS ?= 2
 RUFF := $(dir $(PYTHON))ruff
 CLANG_FORMAT := $(dir $(PYTHON))clang-format
 recursive_files = $(foreach path,$(wildcard $1/*),$(call recursive_files,$(path),$2) $(filter $2,$(path)))
-CPP_FILES := $(call recursive_files,cpp/cg,%.cpp %.hpp %.cu %.cuh) $(call recursive_files,tests/cpp,%.cpp %.hpp)
+CPP_FILES := $(call recursive_files,cpp/cg,%.cpp %.hpp %.cu %.cuh) $(call recursive_files,tests/cpp,%.cpp %.hpp) $(call recursive_files,examples/cpp,%.cpp %.hpp)
 VERSION = $(shell $(PYTHON) -c 'import pathlib, tomllib; print(tomllib.loads(pathlib.Path("pyproject.toml").read_text())["project"]["version"])')
 CMAKE_ARGS ?=
 PYPROF_SUITE ?= sparse-solvers
@@ -30,7 +32,7 @@ CUDA_CONFIGURE_ARGS = $(if $(filter cuda-release,$(PRESET)),$(call cuda_definiti
 CUDA_DIST_ARGS = $(if $(filter ON,$(DIST_CUDA)),-Ccmake.define.CMAKE_TOOLCHAIN_FILE=cmake/CGCudaToolchain.cmake $(call cuda_definitions,-Ccmake.define.))
 
 .DEFAULT_GOAL := all
-.PHONY: all configure build test pytest gtest lint format typecheck wheel sdist dist test-dist docs doctest clean pyprof demo
+.PHONY: all configure build test pytest gtest lint format typecheck test-native wheel sdist dist test-dist docs doctest clean pyprof demo
 
 all: build
 
@@ -62,6 +64,10 @@ format:
 
 typecheck: build
 	$(PYTHON) scripts/check_typing.py --package-root $(BUILD_DIR)/python
+
+test-native:
+	$(MAKE) build BUILD_DIR="$(NATIVE_BUILD_DIR)" CMAKE_ARGS="$(CMAKE_ARGS) -DCG_BUILD_PYTHON=OFF -DBUILD_TESTING=OFF"
+	$(PYTHON) scripts/check_native_consumer.py --build-dir "$(NATIVE_BUILD_DIR)" --cmake "$(CMAKE)" --cuda-root "$(CUDA_ROOT)" --jobs $(JOBS) $(NATIVE_ARGS)
 
 wheel:
 	PIP_CACHE_DIR=$(CURDIR)/.cache/pip CMAKE_BUILD_PARALLEL_LEVEL=$(JOBS) $(PYTHON) -m build --wheel --outdir $(DIST_DIR) -Ccmake.define.CG_ENABLE_BLAS=$(DIST_BLAS) -Ccmake.define.CG_ENABLE_CUDA=$(DIST_CUDA) $(CUDA_DIST_ARGS) $(DIST_ARGS)

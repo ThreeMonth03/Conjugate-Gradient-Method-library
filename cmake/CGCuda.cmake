@@ -42,6 +42,7 @@ add_library(cg_cuda STATIC
 add_library(cg::cuda ALIAS cg_cuda)
 target_compile_features(cg_cuda PUBLIC cxx_std_20)
 set_target_properties(cg_cuda PROPERTIES
+    EXPORT_NAME cuda
     POSITION_INDEPENDENT_CODE ON
     CUDA_STANDARD 20
     CUDA_STANDARD_REQUIRED ON
@@ -68,7 +69,10 @@ set(CG_CUDA_PUBLIC_HEADERS
     solver/cuda/prepared_solver.hpp
     preconditioner/cuda/jacobi.hpp
 )
-install(TARGETS cg_cuda ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}" COMPONENT development)
+install(TARGETS cg_cuda EXPORT cgpyCudaTargets
+    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}" COMPONENT development)
+install(EXPORT cgpyCudaTargets FILE cgpyCudaTargets.cmake NAMESPACE cg::
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/cgpy" COMPONENT development)
 foreach(header IN LISTS CG_CUDA_PUBLIC_HEADERS)
     get_filename_component(directory "${header}" DIRECTORY)
     install(FILES "cpp/cg/${header}"
