@@ -11,6 +11,7 @@ Run from the repository root with CPython 3.12.x and a C++20 compiler. Install t
    make test PRESET=cpu-openmp
    make gtest PRESET=cpu-asan
    make lint
+   make typecheck
    make demo
 
 ``make test`` runs GoogleTest and pytest through CTest. ``make gtest`` and
@@ -20,6 +21,13 @@ native address and undefined-behavior checks. Python tests live under
 and formatting plus C++ formatting. Build directories are isolated by preset
 under ``build/``. ``JOBS`` controls build parallelism; ``PYTHON``, ``BUILD_DIR``
 and ``CMAKE_ARGS`` allow local toolchain overrides.
+
+``make typecheck`` checks representative public CPU and CUDA calls with the
+pinned mypy development tool. It copies the staged package into an isolated
+consumer directory, verifies that importing the CUDA façade does not load the
+optional extension, and checks return types and rejected API usage. No GPU or
+Torch/CuPy installation is needed. The checks live under ``tests/typing/``;
+the benchmark package is outside their scope.
 
 No command above upgrades system packages, installs with ``pip --user``, or
 changes shell configuration. CMake downloads pinned GoogleTest into its local
@@ -101,8 +109,12 @@ Wheel and source distributions
 sdist`` builds a source distribution, and ``make dist`` builds both through
 the source-distribution path. The pip command builds an sdist with isolation.
 ``make test-dist`` additionally installs that wheel into a separate temporary
-environment outside the source tree and checks dense/CSR APIs and native
-imports. Native and BLAS wheels have the same package version and wheel tag;
+environment outside the source tree and checks dense/CSR APIs, native
+imports and public types against that installed environment. Both native
+stubs and the ``py.typed`` marker must survive the sdist-to-wheel path. The
+type checker runs in the development environment; it is not a runtime
+dependency of the installed wheel.
+Native and BLAS wheels have the same package version and wheel tag;
 use separate output directories to retain both artifacts. Runtime-only
 CPU installs need NumPy; Python 3.12 is required for every package mode.
 

@@ -14,10 +14,10 @@ generator or hash-verified cross-platform resolution in this repository.
 
 | File | Purpose |
 | --- | --- |
-| `dev.lock` | Build tools, formatters and pytest |
+| `dev.lock` | Build tools, formatters, pytest and mypy |
 | `test.lock` | Development tools plus SciPy and thread-pool inspection |
 | `docs.lock` | Development tools plus Sphinx and its dependencies |
-| `packaging.lock` | Tools needed for distribution validation |
+| `packaging.lock` | Build and type-check tools for distribution validation |
 | `benchmark.lock` | CPU comparisons, including CPU-only PyTorch |
 | `cuda.lock` | Public NVIDIA runtime and cuBLAS packages |
 | `cuda-benchmark.lock` | Tests plus CUDA PyTorch and its runtime dependencies |

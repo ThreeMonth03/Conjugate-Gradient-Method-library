@@ -1,9 +1,19 @@
 """Explicit CUDA preparation and one-shot solver entry points."""
 
+from typing import SupportsIndex
+
+import numpy.typing as npt
+
 from ... import _core
 from ..._interop import cuda as cuda_interop
 from ..._interop import host
 from ..._runtime import cuda as cuda_runtime
+from ..._typing import (
+    Algorithm,
+    CudaDenseKernel,
+    ExecutionMode,
+    Preconditioner,
+)
 from ...matrix import csr
 from ...storage import cuda as storage
 from .. import result
@@ -16,8 +26,8 @@ def prepare(
     *,
     device: int = 0,
     stream: int = 0,
-    dense_kernel: str = "native",
-    preconditioner: str = "none",
+    dense_kernel: CudaDenseKernel = "native",
+    preconditioner: Preconditioner = "none",
 ) -> prepared.PreparedSolver:
     """Snapshot a device matrix and cache optional Jacobi setup.
 
@@ -40,12 +50,12 @@ def prepare(
 
 
 def prepare_host(
-    A: object,
+    A: npt.ArrayLike | csr.CsrMatrix,
     *,
     device: int = 0,
     stream: int = 0,
-    dense_kernel: str = "native",
-    preconditioner: str = "none",
+    dense_kernel: CudaDenseKernel = "native",
+    preconditioner: Preconditioner = "none",
 ) -> prepared.PreparedSolver:
     """Upload a real host dense/CPU-CSR matrix and prepare a snapshot.
 
@@ -73,11 +83,11 @@ def solve_into(
     workspace: workspace_module.Workspace,
     rtol: float = 1e-8,
     atol: float = 0.0,
-    maxiter: int = 1000,
-    algorithm: str = "standard",
+    maxiter: SupportsIndex = 1000,
+    algorithm: Algorithm = "standard",
     fused: bool = True,
-    residual_refresh: int = 50,
-    preconditioner: str = "none",
+    residual_refresh: SupportsIndex = 50,
+    preconditioner: Preconditioner = "none",
 ) -> _core.SolveInfo:
     """Solve a device-resident system with caller-owned output and workspace.
 
@@ -116,13 +126,13 @@ def solve(
     stream: int = 0,
     rtol: float = 1e-8,
     atol: float = 0.0,
-    maxiter: int = 1000,
-    algorithm: str = "standard",
+    maxiter: SupportsIndex = 1000,
+    algorithm: Algorithm = "standard",
     fused: bool = True,
-    residual_refresh: int = 50,
-    preconditioner: str = "none",
-    dense_kernel: str = "native",
-    execution_mode: str = "host",
+    residual_refresh: SupportsIndex = 50,
+    preconditioner: Preconditioner = "none",
+    dense_kernel: CudaDenseKernel = "native",
+    execution_mode: ExecutionMode = "host",
 ) -> result.SolveResult[storage.Vector]:
     """Solve a device system with fresh output, workspace and per-call setup.
 
@@ -169,7 +179,9 @@ def solve(
     return result.SolveResult(x, info)
 
 
-def _initial_output(b, x0, device, stream):
+def _initial_output(
+    b: object, x0: object | None, device: int, stream: int
+) -> tuple[storage.Vector, int]:
     """Validate device inputs, then allocate/reset a fresh owning output."""
     x = storage.Vector.__new__(storage.Vector)
     x._native = cuda_runtime.load()._initial_output(

@@ -4,7 +4,7 @@ from ..matrix import cuda as matrix
 from ..storage import cuda as storage
 
 
-def native_object(value):
+def native_object(value: object) -> object:
     return (
         value._native
         if isinstance(

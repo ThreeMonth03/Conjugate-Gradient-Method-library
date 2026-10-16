@@ -83,6 +83,10 @@ def check_sdist(path):
         "cpp/cg/solver/pymod/cuda.cpp",
         "cpp/cg/solver/pymod/options.cpp",
         "python/cgpy/__init__.py",
+        "python/cgpy/_core.pyi",
+        "python/cgpy/_cuda.pyi",
+        "python/cgpy/_typing.py",
+        "python/cgpy/py.typed",
         "python/cgpy/_interop/host.py",
         "python/cgpy/solver/_validation.py",
         "python/cgpy/solver/cuda/api.py",
@@ -104,6 +108,9 @@ def check_sdist(path):
         "docs/benchmarks/cuda.rst",
         "scripts/run_paired_performance.py",
         "scripts/check_installed.py",
+        "scripts/check_typing.py",
+        "tests/typing/valid.py",
+        "tests/typing/invalid.py",
         "scripts/setup_cuda.py",
         "requirements/cuda.lock",
         "requirements/cuda-benchmark.lock",
@@ -245,6 +252,17 @@ def main():
                 str(root / "requirements/packaging.lock"),
                 str(wheel_files[0])
                 + ("[cuda]" if options.cuda == "ON" else ""),
+            ],
+            cwd=work,
+            env=environment,
+            check=True,
+        )
+        subprocess.run(
+            [
+                sys.executable,
+                str(root / "scripts/check_typing.py"),
+                "--python",
+                str(python),
             ],
             cwd=work,
             env=environment,

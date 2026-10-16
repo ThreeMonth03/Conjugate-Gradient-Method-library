@@ -3,6 +3,7 @@
 import dataclasses
 
 from .. import _core
+from .._typing import SolveStatus
 
 
 @dataclasses.dataclass(frozen=True, eq=False)
@@ -24,7 +25,7 @@ class SolveResult[Solution]:
         return self.info.converged
 
     @property
-    def status(self) -> str:
+    def status(self) -> SolveStatus:
         """Convergence, iteration-limit or numerical-failure status."""
         return self.info.status
 

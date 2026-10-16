@@ -19,7 +19,7 @@ def normalize_host_array(
     *,
     name: str = "source",
     copy: bool = False,
-) -> np.ndarray:
+) -> npt.NDArray[np.float64]:
     array = normalize_real_array(value, name)
     result = (
         np.array(array, dtype=np.float64, order="C", copy=True)

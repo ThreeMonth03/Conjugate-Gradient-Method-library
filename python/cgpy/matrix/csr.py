@@ -82,7 +82,7 @@ class CsrMatrix:
         self._native = _core.CsrMatrix(rowptr, columns, values, shape)
 
     @property
-    def shape(self) -> tuple[int, ...]:
+    def shape(self) -> tuple[int, int]:
         """tuple of int: Matrix dimensions ``(rows, columns)``."""
         return self._native.shape
 
