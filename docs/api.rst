@@ -36,6 +36,9 @@ remaining CPU vector operations. A prepared solver fixes its matrix snapshot,
 thread count, preconditioner and dense-kernel choice when it is constructed.
 Dense and CSR inputs return the same ``PreparedSolver`` type. ``CsrMatrix``
 is the public spelling in both CPU and CUDA APIs.
+Create CPU prepared solvers with ``cgpy.prepare``; ``cgpy.PreparedSolver``
+is the return type and has no public constructor. CUDA follows the same
+factory-only contract through ``cuda.prepare`` and ``cuda.prepare_host``.
 
 Repeated solves
 ---------------

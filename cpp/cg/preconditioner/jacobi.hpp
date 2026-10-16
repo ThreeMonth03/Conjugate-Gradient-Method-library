@@ -16,7 +16,8 @@ class JacobiPreconditioner
     explicit JacobiPreconditioner(DenseMatrixView A);
     explicit JacobiPreconditioner(const CsrMatrix &A);
     std::size_t size() const noexcept { return m_inverse.size(); }
-    ConstVectorView inverse_diagonal() const noexcept { return m_inverse; }
+    ConstVectorView inverse_diagonal() const & noexcept { return m_inverse; }
+    ConstVectorView inverse_diagonal() const && = delete;
     void apply(ConstVectorView r, VectorView z, const CpuBackend &backend) const;
     double apply_and_dot(ConstVectorView r, VectorView z, const CpuBackend &backend) const;
 

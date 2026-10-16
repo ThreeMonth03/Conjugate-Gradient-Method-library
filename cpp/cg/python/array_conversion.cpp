@@ -9,6 +9,8 @@ namespace cg
 {
 namespace python
 {
+namespace
+{
 
 void validate_vector_array(const py::array &value, bool writable)
 {
@@ -21,6 +23,19 @@ void validate_vector_array(const py::array &value, bool writable)
         throw std::invalid_argument("Output array must be writable");
     }
     detail::validate_raw_vector(static_cast<const double *>(value.data()), static_cast<std::size_t>(value.size()));
+}
+} // namespace
+
+cg::ConstVectorView as_const_vector_view(const py::array &value)
+{
+    validate_vector_array(value, false);
+    return {static_cast<const double *>(value.data()), static_cast<std::size_t>(value.size())};
+}
+
+cg::VectorView as_mutable_vector_view(py::array &value)
+{
+    validate_vector_array(value, true);
+    return {static_cast<double *>(value.mutable_data()), static_cast<std::size_t>(value.size())};
 }
 
 cg::DenseMatrixView as_dense_matrix_view(const py::array &value)

@@ -40,7 +40,7 @@ PreparedSolver::PreparedSolver(Matrix matrix, int num_threads, PreconditionerKin
     {
         throw std::invalid_argument("BLAS dense kernels do not support CSR matrices");
     }
-    m_num_threads = CpuBackend(num_threads, true, kernel).threads();
+    m_num_threads = CpuBackend(num_threads, true, kernel).num_threads();
     std::visit(
         [](const auto &matrix)
         {

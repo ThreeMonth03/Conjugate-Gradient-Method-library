@@ -38,12 +38,18 @@ class Workspace
     DenseKernel dense_kernel() const noexcept;
     ExecutionMode execution_mode() const noexcept;
     // Borrowed execution context; valid for this workspace's lifetime.
-    const Context &context() const noexcept;
-    VectorView residual() noexcept;
-    VectorView direction() noexcept;
-    VectorView product() noexcept;
-    VectorView scratch() noexcept;
-    VectorView preconditioned() noexcept;
+    const Context &context() const & noexcept;
+    const Context &context() const && = delete;
+    VectorView residual() & noexcept;
+    VectorView residual() && = delete;
+    VectorView direction() & noexcept;
+    VectorView direction() && = delete;
+    VectorView product() & noexcept;
+    VectorView product() && = delete;
+    VectorView scratch() & noexcept;
+    VectorView scratch() && = delete;
+    VectorView preconditioned() & noexcept;
+    VectorView preconditioned() && = delete;
 
     private:
     bool try_acquire() noexcept;

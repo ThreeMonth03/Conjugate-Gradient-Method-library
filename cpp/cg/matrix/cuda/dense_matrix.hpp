@@ -21,7 +21,8 @@ class DenseMatrix
     std::size_t rows() const noexcept { return m_rows; }
     std::size_t cols() const noexcept { return m_cols; }
     int device() const noexcept { return m_values.device(); }
-    DenseMatrixView view() const noexcept { return {m_values.data(), m_rows, m_cols, m_cols, m_values.device()}; }
+    DenseMatrixView view() const & noexcept { return {m_values.data(), m_rows, m_cols, m_cols, m_values.device()}; }
+    DenseMatrixView view() const && = delete;
 
     private:
     std::size_t m_rows;

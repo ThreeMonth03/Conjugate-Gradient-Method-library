@@ -39,6 +39,7 @@ def prepare(
     PreparedSolver
         Owning immutable matrix/preconditioner snapshot. Thread count and
         kernel choice are fixed; each solve selects its tolerances and fusion.
+        Create this type through ``prepare``; it has no public constructor.
 
     Raises
     ------
@@ -74,8 +75,11 @@ def prepare(
     native_matrix = (
         matrix._native if isinstance(matrix, csr.CsrMatrix) else matrix
     )
-    return _core.PreparedSolver(
-        native_matrix, num_threads, preconditioner, dense_kernel
+    return _core.prepare(
+        native_matrix,
+        num_threads=num_threads,
+        preconditioner=preconditioner,
+        dense_kernel=dense_kernel,
     )
 
 

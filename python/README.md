@@ -57,7 +57,7 @@ x.fill(0.0)  # Restore the initial guess before the next solve.
 info = prepared.solve_into(b, x, workspace=workspace, rtol=1e-10)
 ```
 
-`prepare` owns a snapshot of the matrix and caches the selected preconditioner. Changes to the original matrix do not change the prepared solver. Its thread count, preconditioner and `dense_kernel` are selected at preparation time; each call independently selects `fused`. The workspace owns the solver's reusable vectors and must match the system size.
+`prepare` owns a snapshot of the matrix and caches the selected preconditioner. `cgpy.PreparedSolver` is its return type; create it through `prepare` instead of a constructor. Changes to the original matrix do not change the prepared solver. Its thread count, preconditioner and `dense_kernel` are selected at preparation time; each call independently selects `fused`. The workspace owns the solver's reusable vectors and must match the system size.
 
 For an existing dense array or CSR operator, the strict function is:
 

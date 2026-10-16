@@ -20,10 +20,12 @@ namespace cuda
 class PreparedSolver
 {
     public:
-    PreparedSolver(DenseMatrix matrix, const Context &context, DenseKernel kernel = DenseKernel::native,
-                   PreconditionerKind preconditioner = PreconditionerKind::none);
-    PreparedSolver(CsrMatrix matrix, const Context &context, DenseKernel kernel = DenseKernel::native,
-                   PreconditionerKind preconditioner = PreconditionerKind::none);
+    PreparedSolver(DenseMatrix matrix, const Context &context,
+                   PreconditionerKind preconditioner = PreconditionerKind::none,
+                   DenseKernel kernel = DenseKernel::native);
+    PreparedSolver(CsrMatrix matrix, const Context &context,
+                   PreconditionerKind preconditioner = PreconditionerKind::none,
+                   DenseKernel kernel = DenseKernel::native);
     PreparedSolver(const PreparedSolver &) = delete;
     PreparedSolver &operator=(const PreparedSolver &) = delete;
     PreparedSolver(PreparedSolver &&) noexcept = default;

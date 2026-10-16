@@ -19,13 +19,13 @@ enum class DenseKernel
 // never change OpenMP's process-wide defaults. Inputs must remain alive and
 // unmodified by other threads until the operation returns.
 // The optional BLAS kernel uses a private sequential provider and only accepts
-// threads=1. It replaces dense matvecs; vector operations remain native. CSR
+// num_threads=1. It replaces dense matvecs; vector operations remain native. CSR
 // operations reject this kernel selection.
 class CpuBackend
 {
     public:
-    explicit CpuBackend(int threads = 1, bool fused = true, DenseKernel dense_kernel = DenseKernel::native);
-    int threads() const noexcept { return m_threads; }
+    explicit CpuBackend(int num_threads = 1, bool fused = true, DenseKernel dense_kernel = DenseKernel::native);
+    int num_threads() const noexcept { return m_num_threads; }
     bool fused() const noexcept { return m_fused; }
     DenseKernel dense_kernel() const noexcept { return m_dense_kernel; }
     static bool openmp_enabled() noexcept;
@@ -57,7 +57,7 @@ class CpuBackend
     void update_direction(ConstVectorView r, VectorView p, double beta, double residual_scale = 1.0) const;
 
     private:
-    int m_threads;
+    int m_num_threads;
     bool m_fused;
     DenseKernel m_dense_kernel;
 };

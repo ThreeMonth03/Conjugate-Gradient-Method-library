@@ -6,6 +6,7 @@ import warnings
 import cgpy
 import numpy as np
 import pytest
+from cgpy import _core
 
 
 def system(n=9):
@@ -98,10 +99,61 @@ def test_strict_calls_reject_unaligned_buffers_and_keep_workspace_usable(
     solver = cgpy.prepare(A)
     if target == "A":
         with pytest.raises(ValueError, match="aligned"):
-            cgpy.PreparedSolver(values["A"])
+            _core.prepare(values["A"])
     else:
         with pytest.raises(ValueError, match="aligned"):
             solver.solve_into(values["b"], values["x"], workspace=work)
+
+
+@pytest.mark.parametrize("entry", ["strict", "prepared"])
+@pytest.mark.parametrize("target", ["b", "x"])
+@pytest.mark.parametrize(
+    "invalid", ["float32", "strided", "matrix", "byte_swapped"]
+)
+def test_strict_vector_conversion_rejects_layout_without_mutation(
+    entry, target, invalid
+):
+    A, b = system()
+    x = np.zeros_like(b)
+    bad = {
+        "float32": np.zeros(b.size, dtype=np.float32),
+        "strided": np.zeros(2 * b.size)[::2],
+        "matrix": np.zeros((1, b.size)),
+        "byte_swapped": np.zeros(
+            b.size, dtype=np.dtype("float64").newbyteorder("S")
+        ),
+    }[invalid]
+    plan = cgpy.prepare(A)
+    workspace = plan.create_workspace()
+    values = {"b": b, "x": x}
+    values[target] = bad
+    before = bad.copy()
+    with pytest.raises(ValueError, match="one-dimensional float64"):
+        if entry == "strict":
+            cgpy.solve_into(A, **values, workspace=workspace)
+        else:
+            plan.solve_into(**values, workspace=workspace)
+    np.testing.assert_array_equal(bad, before)
+    np.testing.assert_array_equal(x, np.zeros_like(b))
+    assert plan.solve_into(b, x, workspace=workspace).converged
+
+
+@pytest.mark.parametrize("entry", ["strict", "prepared"])
+def test_strict_views_accept_readonly_matrix_and_rhs(entry):
+    A, b = system()
+    A.setflags(write=False)
+    b.setflags(write=False)
+    plan = cgpy.prepare(A)
+    workspace = plan.create_workspace()
+    x = np.zeros_like(b)
+    info = (
+        cgpy.solve_into(A, b, x, workspace=workspace)
+        if entry == "strict"
+        else plan.solve_into(b, x, workspace=workspace)
+    )
+    assert info.converged
+    assert not A.flags.writeable and not b.flags.writeable
+    np.testing.assert_allclose(x, np.linalg.solve(A, b), rtol=1e-6, atol=1e-8)
 
 
 def test_convenience_calls_copy_unaligned_inputs_to_safe_storage():
@@ -375,6 +427,8 @@ def test_prepared_type_and_resource_contract_is_independent_of_matrix_storage(
         if storage == "dense"
         else cgpy.CsrMatrix([0, 2, 4], [0, 1, 0, 1], dense.ravel(), (2, 2))
     )
+    with pytest.raises(TypeError, match="constructor"):
+        cgpy.PreparedSolver(operator, preconditioner=preconditioner)
     plan = cgpy.prepare(operator, preconditioner=preconditioner)
     assert type(plan) is cgpy.PreparedSolver
     assert plan.shape == (2, 2)

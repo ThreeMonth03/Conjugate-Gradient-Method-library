@@ -89,13 +89,12 @@ std::vector<std::size_t> snapshot_indices(const py::array &array)
 
 std::vector<double> snapshot_values(const py::array &array)
 {
-    validate_vector_array(array, false);
-    if (array.size() == 0)
+    const auto view = as_const_vector_view(array);
+    if (view.empty())
     {
         return {};
     }
-    const auto *source = static_cast<const double *>(array.data());
-    return {source, source + static_cast<std::size_t>(array.size())};
+    return {view.begin(), view.end()};
 }
 } // namespace
 

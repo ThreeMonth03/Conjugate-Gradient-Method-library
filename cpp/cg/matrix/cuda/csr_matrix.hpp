@@ -29,7 +29,8 @@ class CsrMatrix
     std::size_t cols() const noexcept;
     std::size_t nnz() const noexcept;
     int device() const noexcept;
-    CsrMatrixView view() const noexcept;
+    CsrMatrixView view() const & noexcept;
+    CsrMatrixView view() const && = delete;
 
     private:
     std::size_t m_rows = 0;

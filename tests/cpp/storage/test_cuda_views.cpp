@@ -1,5 +1,10 @@
+#include <cg/matrix/cuda/csr_matrix.hpp>
 #include <cg/matrix/cuda/csr_matrix_view.hpp>
+#include <cg/matrix/cuda/dense_matrix.hpp>
 #include <cg/matrix/cuda/dense_matrix_view.hpp>
+#include <cg/preconditioner/cuda/jacobi.hpp>
+#include <cg/solver/cuda/workspace.hpp>
+#include <cg/storage/cuda/vector.hpp>
 #include <cg/storage/cuda/vector_view.hpp>
 
 #include <gtest/gtest.h>
@@ -11,6 +16,57 @@
 namespace
 {
 namespace gpu = cg::cuda;
+
+template <class Owner> constexpr bool has_data = requires(Owner &&owner) { std::forward<Owner>(owner).data(); };
+template <class Owner> constexpr bool has_view = requires(Owner &&owner) { std::forward<Owner>(owner).view(); };
+template <class Owner>
+constexpr bool has_inverse_diagonal = requires(Owner &&owner) { std::forward<Owner>(owner).inverse_diagonal(); };
+template <class Owner> constexpr bool has_context = requires(Owner &&owner) { std::forward<Owner>(owner).context(); };
+template <class Owner> constexpr bool has_residual = requires(Owner &&owner) { std::forward<Owner>(owner).residual(); };
+template <class Owner>
+constexpr bool has_direction = requires(Owner &&owner) { std::forward<Owner>(owner).direction(); };
+template <class Owner> constexpr bool has_product = requires(Owner &&owner) { std::forward<Owner>(owner).product(); };
+template <class Owner> constexpr bool has_scratch = requires(Owner &&owner) { std::forward<Owner>(owner).scratch(); };
+template <class Owner>
+constexpr bool has_preconditioned = requires(Owner &&owner) { std::forward<Owner>(owner).preconditioned(); };
+
+// Owner lifetime restrictions are testable without a CUDA toolkit or device.
+static_assert(has_data<gpu::Vector &> && has_data<const gpu::Vector &>);
+static_assert(!has_data<gpu::Vector> && !has_data<const gpu::Vector>);
+static_assert(has_view<gpu::Vector &> && has_view<const gpu::Vector &>);
+static_assert(!has_view<gpu::Vector> && !has_view<const gpu::Vector>);
+static_assert(std::is_same_v<decltype(std::declval<gpu::Vector &>().data()), double *>);
+static_assert(std::is_same_v<decltype(std::declval<const gpu::Vector &>().data()), const double *>);
+static_assert(std::is_same_v<decltype(std::declval<gpu::Vector &>().view()), gpu::VectorView>);
+static_assert(std::is_same_v<decltype(std::declval<const gpu::Vector &>().view()), gpu::ConstVectorView>);
+static_assert(has_view<gpu::DenseMatrix &> && has_view<const gpu::DenseMatrix &>);
+static_assert(!has_view<gpu::DenseMatrix> && !has_view<const gpu::DenseMatrix>);
+static_assert(has_view<gpu::CsrMatrix &> && has_view<const gpu::CsrMatrix &>);
+static_assert(!has_view<gpu::CsrMatrix> && !has_view<const gpu::CsrMatrix>);
+static_assert(has_inverse_diagonal<gpu::JacobiPreconditioner &> &&
+              has_inverse_diagonal<const gpu::JacobiPreconditioner &>);
+static_assert(!has_inverse_diagonal<gpu::JacobiPreconditioner> &&
+              !has_inverse_diagonal<const gpu::JacobiPreconditioner>);
+static_assert(std::is_same_v<decltype(std::declval<const gpu::JacobiPreconditioner &>().inverse_diagonal()),
+                             gpu::ConstVectorView>);
+static_assert(has_context<gpu::Workspace &> && has_context<const gpu::Workspace &>);
+static_assert(!has_context<gpu::Workspace> && !has_context<const gpu::Workspace>);
+static_assert(std::is_same_v<decltype(std::declval<const gpu::Workspace &>().context()), const gpu::Context &>);
+static_assert(has_residual<gpu::Workspace &> && has_direction<gpu::Workspace &> && has_product<gpu::Workspace &> &&
+              has_scratch<gpu::Workspace &> && has_preconditioned<gpu::Workspace &>);
+static_assert(!has_residual<gpu::Workspace> && !has_direction<gpu::Workspace> && !has_product<gpu::Workspace> &&
+              !has_scratch<gpu::Workspace> && !has_preconditioned<gpu::Workspace>);
+static_assert(!has_residual<const gpu::Workspace &> && !has_direction<const gpu::Workspace &> &&
+              !has_product<const gpu::Workspace &> && !has_scratch<const gpu::Workspace &> &&
+              !has_preconditioned<const gpu::Workspace &>);
+static_assert(!has_residual<const gpu::Workspace> && !has_direction<const gpu::Workspace> &&
+              !has_product<const gpu::Workspace> && !has_scratch<const gpu::Workspace> &&
+              !has_preconditioned<const gpu::Workspace>);
+// Temporary descriptors remain valid because they do not own their pointees.
+static_assert(has_data<gpu::VectorView> && has_data<const gpu::VectorView>);
+static_assert(has_data<gpu::ConstVectorView> && has_data<const gpu::ConstVectorView>);
+static_assert(has_data<gpu::DenseMatrixView> && has_data<const gpu::DenseMatrixView>);
+static_assert(has_data<gpu::CsrMatrixView> && has_data<const gpu::CsrMatrixView>);
 
 template <class View>
 constexpr bool lightweight_descriptor = std::is_trivially_copyable_v<View> && std::is_standard_layout_v<View> &&

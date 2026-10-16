@@ -74,10 +74,8 @@ cg::SolveInfo run(const Operator &A, const py::array &b, py::array &x, PythonWor
                   cg::DenseKernel kernel = cg::DenseKernel::native)
 {
     validate_operator_kernel(A, kernel);
-    validate_vector_array(b, false);
-    validate_vector_array(x, true);
-    const cg::ConstVectorView bv{static_cast<const double *>(b.data()), static_cast<std::size_t>(b.size())};
-    const cg::VectorView xv{static_cast<double *>(x.mutable_data()), static_cast<std::size_t>(x.size())};
+    const auto bv = as_const_vector_view(b);
+    const auto xv = as_mutable_vector_view(x);
     const cg::CpuBackend backend(threads, fused, kernel);
     WorkspaceUseGuard use(workspace);
     py::gil_scoped_release release;
@@ -88,10 +86,8 @@ cg::SolveInfo run_prepared(const cg::PreparedSolver &plan, const py::array &b, p
                            bool fused, const py::object &residual_refresh)
 {
     const auto options = parse_solver_options(rtol, atol, maxiter, algorithm, residual_refresh);
-    validate_vector_array(b, false);
-    validate_vector_array(x, true);
-    const cg::ConstVectorView bv{static_cast<const double *>(b.data()), static_cast<std::size_t>(b.size())};
-    const cg::VectorView xv{static_cast<double *>(x.mutable_data()), static_cast<std::size_t>(x.size())};
+    const auto bv = as_const_vector_view(b);
+    const auto xv = as_mutable_vector_view(x);
     WorkspaceUseGuard use(workspace);
     py::gil_scoped_release release;
     return plan.solve_into(bv, xv, workspace.value, options, fused);
@@ -106,16 +102,17 @@ cg::DenseMatrix snapshot_dense_matrix(const py::array &A)
     return {view.rows(), view.cols(), std::move(values)};
 }
 
-auto bind_prepared(py::module_ &m)
+void bind_prepared(py::module_ &m)
 {
     using Plan = cg::PreparedSolver;
-    return py::class_<Plan>(m, "PreparedSolver", R"doc(
+    py::class_<Plan>(m, "PreparedSolver", R"doc(
 An owning matrix snapshot with fixed thread, preconditioner and kernel settings.
 
 Notes
 -----
-Construct through ``cgpy.prepare`` to normalize a dense input or wrap a public
+Create through ``cgpy.prepare`` to normalize a dense input or wrap a public
 CsrMatrix. The prepared object owns its matrix and optional Jacobi inverse.
+Direct construction of this return type is unsupported.
 Each overlapping solve needs a separate workspace and output. All calls are
 synchronous, and native computation releases the GIL.
 )doc")
@@ -269,24 +266,26 @@ Examples
         .def_property_readonly(
             "capacity", [](const PythonWorkspace &w) { return w.value.capacity(); },
             "int: Allocated vector capacity, at least the current size.");
-    bind_prepared(m).def(
-        py::init(
-            [](py::object A, int threads, const std::string &preconditioner, const std::string &kernel)
+    bind_prepared(m);
+    m.def(
+        "prepare",
+        [](py::object A, int num_threads, const std::string &preconditioner, const std::string &kernel)
+        {
+            const auto selected = parse_dense_kernel(kernel);
+            const auto kind = parse_preconditioner_kind(preconditioner);
+            if (py::isinstance<cg::CsrMatrix>(A))
             {
-                const auto selected = parse_dense_kernel(kernel);
-                const auto kind = parse_preconditioner_kind(preconditioner);
-                if (py::isinstance<cg::CsrMatrix>(A))
-                {
-                    return cg::PreparedSolver(A.cast<const cg::CsrMatrix &>(), threads, kind, selected);
-                }
-                if (!py::isinstance<py::array>(A))
-                {
-                    throw py::type_error("A must be a NumPy array or CsrMatrix");
-                }
-                return cg::PreparedSolver(snapshot_dense_matrix(A.cast<py::array>()), threads, kind, selected);
-            }),
-        py::arg("A"), py::arg("num_threads") = 1, py::arg("preconditioner") = "none",
-        py::arg("dense_kernel") = "native");
+                return cg::PreparedSolver(A.cast<const cg::CsrMatrix &>(), num_threads, kind, selected);
+            }
+            if (!py::isinstance<py::array>(A))
+            {
+                throw py::type_error("A must be a NumPy array or CsrMatrix");
+            }
+            return cg::PreparedSolver(snapshot_dense_matrix(A.cast<py::array>()), num_threads, kind, selected);
+        },
+        py::arg("A"), py::kw_only(), py::arg("num_threads") = 1, py::arg("preconditioner") = "none",
+        py::arg("dense_kernel") = "native",
+        "Strict matrix snapshot factory. Use cgpy.prepare for the public normalization contract.");
     m.def(
         "solve_into",
         [](py::object A, const py::array &b, py::array x, PythonWorkspace &workspace, int threads, double rtol,

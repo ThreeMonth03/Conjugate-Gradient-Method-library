@@ -141,7 +141,7 @@ int CsrMatrix::device() const noexcept
 {
     return m_values.device();
 }
-CsrMatrixView CsrMatrix::view() const noexcept
+CsrMatrixView CsrMatrix::view() const & noexcept
 {
     return {m_indptr.get(), m_indices.get(), m_values.data(), m_rows, m_cols, nnz(), IndexType::int64, device()};
 }

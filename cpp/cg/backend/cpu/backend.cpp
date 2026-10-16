@@ -5,12 +5,12 @@
 namespace cg
 {
 
-CpuBackend::CpuBackend(int threads, bool fused, DenseKernel dense_kernel)
-    : m_threads(threads), m_fused(fused), m_dense_kernel(dense_kernel)
+CpuBackend::CpuBackend(int num_threads, bool fused, DenseKernel dense_kernel)
+    : m_num_threads(num_threads), m_fused(fused), m_dense_kernel(dense_kernel)
 {
-    if (threads < 1)
+    if (num_threads < 1)
     {
-        throw std::invalid_argument("threads must be a positive integer");
+        throw std::invalid_argument("num_threads must be a positive integer");
     }
     if (dense_kernel != DenseKernel::native && dense_kernel != DenseKernel::blas)
     {
@@ -22,12 +22,12 @@ CpuBackend::CpuBackend(int threads, bool fused, DenseKernel dense_kernel)
         {
             throw std::invalid_argument("BLAS dense kernel requires a BLAS-enabled build");
         }
-        if (threads != 1)
+        if (num_threads != 1)
         {
-            throw std::invalid_argument("BLAS dense kernel requires threads=1");
+            throw std::invalid_argument("BLAS dense kernel requires num_threads=1");
         }
     }
-    else if (threads > 1 && !openmp_enabled())
+    else if (num_threads > 1 && !openmp_enabled())
     {
         throw std::invalid_argument("multiple threads require an OpenMP build");
     }

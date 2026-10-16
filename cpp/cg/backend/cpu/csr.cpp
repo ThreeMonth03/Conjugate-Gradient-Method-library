@@ -47,7 +47,7 @@ void CpuBackend::apply(const CsrMatrix &A, ConstVectorView x, VectorView output)
     const auto indices = A.indices();
     const auto values = A.values();
 #ifdef _OPENMP
-#pragma omp parallel for schedule(static) num_threads(m_threads) if (m_threads > 1 && A.rows() >= 4096)
+#pragma omp parallel for schedule(static) num_threads(m_num_threads) if (m_num_threads > 1 && A.rows() >= 4096)
 #endif
     for (std::size_t row = 0; row < A.rows(); ++row)
     {
@@ -78,7 +78,7 @@ double CpuBackend::apply_and_dot(const CsrMatrix &A, ConstVectorView p, VectorVi
     double product = 0.0;
 #ifdef _OPENMP
 #pragma omp parallel for reduction(+ : product) schedule(static)                                                       \
-    num_threads(m_threads) if (m_threads > 1 && A.rows() >= 4096)
+    num_threads(m_num_threads) if (m_num_threads > 1 && A.rows() >= 4096)
 #endif
     for (std::size_t row = 0; row < A.rows(); ++row)
     {
@@ -115,7 +115,7 @@ double CpuBackend::residual_squared_norm(const CsrMatrix &A, ConstVectorView b, 
     double squared_norm = 0.0;
 #ifdef _OPENMP
 #pragma omp parallel for reduction(+ : squared_norm) schedule(static)                                                  \
-    num_threads(m_threads) if (m_threads > 1 && A.rows() >= 4096)
+    num_threads(m_num_threads) if (m_num_threads > 1 && A.rows() >= 4096)
 #endif
     for (std::size_t row = 0; row < A.rows(); ++row)
     {

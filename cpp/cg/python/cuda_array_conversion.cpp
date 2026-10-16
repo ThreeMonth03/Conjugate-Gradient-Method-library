@@ -7,15 +7,72 @@ namespace cg
 {
 namespace python
 {
+namespace
+{
+
+py::object required_field(const py::dict &interface, const char *name)
+{
+    if (!interface.contains(name))
+    {
+        throw std::invalid_argument(std::string("CUDA Array Interface requires '") + name + "'");
+    }
+    return interface[name];
+}
+
+template <typename T> T metadata_integer(py::handle value, const char *name)
+{
+    if (!PyIndex_Check(value.ptr()))
+    {
+        throw std::invalid_argument(std::string("CUDA ") + name + " must contain integers");
+    }
+    // Preserve exceptions raised by user-defined __index__ implementations.
+    const auto index = py::reinterpret_steal<py::object>(PyNumber_Index(value.ptr()));
+    if (!index)
+    {
+        throw py::error_already_set();
+    }
+    try
+    {
+        return index.cast<T>();
+    }
+    catch (const py::cast_error &)
+    {
+        throw std::invalid_argument(std::string("CUDA ") + name + " integer is out of range");
+    }
+}
+
+py::tuple metadata_tuple(py::handle value, const char *name)
+{
+    if (!py::isinstance<py::tuple>(value))
+    {
+        throw std::invalid_argument(std::string("CUDA ") + name + " must be a tuple");
+    }
+    return py::reinterpret_borrow<py::tuple>(value);
+}
+
+} // namespace
 
 DeviceArray device_array(py::object object, int ndim, const gpu::Context &context, bool writable, bool integer)
 {
-    if (!py::hasattr(object, "__cuda_array_interface__"))
+    py::object descriptor;
+    try
     {
+        descriptor = object.attr("__cuda_array_interface__");
+    }
+    catch (const py::error_already_set &error)
+    {
+        if (!error.matches(PyExc_AttributeError))
+        {
+            throw;
+        }
         throw std::invalid_argument("expected a device array with __cuda_array_interface__");
     }
-    const auto interface = object.attr("__cuda_array_interface__").cast<py::dict>();
-    const int version = interface["version"].cast<int>();
+    if (!py::isinstance<py::dict>(descriptor))
+    {
+        throw std::invalid_argument("CUDA Array Interface must be a dictionary");
+    }
+    const auto interface = py::reinterpret_borrow<py::dict>(descriptor);
+    const int version = metadata_integer<int>(required_field(interface, "version"), "version");
     if (version != 2 && version != 3)
     {
         throw std::invalid_argument("CUDA Array Interface version must be 2 or 3");
@@ -24,12 +81,23 @@ DeviceArray device_array(py::object object, int ndim, const gpu::Context &contex
     {
         throw std::invalid_argument("masked CUDA arrays are unsupported");
     }
-    const auto shape = interface["shape"].cast<std::vector<std::size_t>>();
-    if (shape.size() != static_cast<std::size_t>(ndim))
+    const auto dimensions = metadata_tuple(required_field(interface, "shape"), "shape");
+    if (dimensions.size() != static_cast<std::size_t>(ndim))
     {
         throw std::invalid_argument("CUDA array dimension mismatch");
     }
-    const auto typestr = interface["typestr"].cast<std::string>();
+    std::vector<std::size_t> shape;
+    shape.reserve(dimensions.size());
+    for (const auto dimension : dimensions)
+    {
+        shape.push_back(metadata_integer<std::size_t>(dimension, "shape"));
+    }
+    const auto dtype = required_field(interface, "typestr");
+    if (!py::isinstance<py::str>(dtype))
+    {
+        throw std::invalid_argument("CUDA typestr must be a string");
+    }
+    const auto typestr = dtype.cast<std::string>();
     const bool f64 = typestr == "<f8" || typestr == "=f8";
     const bool i32 = typestr == "<i4" || typestr == "=i4";
     const bool i64 = typestr == "<i8" || typestr == "=i8";
@@ -41,7 +109,7 @@ DeviceArray device_array(py::object object, int ndim, const gpu::Context &contex
     const std::size_t itemsize = i32 ? 4 : 8;
     if (interface.contains("strides") && !interface["strides"].is_none())
     {
-        const auto strides = interface["strides"].cast<std::vector<py::ssize_t>>();
+        const auto strides = metadata_tuple(interface["strides"], "strides");
         if (strides.size() != shape.size())
         {
             throw std::invalid_argument("CUDA strides must match dimensions");
@@ -49,7 +117,8 @@ DeviceArray device_array(py::object object, int ndim, const gpu::Context &contex
         std::size_t expected = itemsize;
         for (std::size_t i = shape.size(); i-- != 0;)
         {
-            if (shape[i] > 1 && (strides[i] < 0 || static_cast<std::size_t>(strides[i]) != expected))
+            const auto stride = metadata_integer<py::ssize_t>(strides[i], "strides");
+            if (shape[i] > 1 && (stride < 0 || static_cast<std::size_t>(stride) != expected))
             {
                 throw std::invalid_argument("CUDA arrays must be C-contiguous");
             }
@@ -60,12 +129,16 @@ DeviceArray device_array(py::object object, int ndim, const gpu::Context &contex
             expected *= shape[i];
         }
     }
-    const auto data = interface["data"].cast<py::tuple>();
-    if (data.size() != 2 || (writable && data[1].cast<bool>()))
+    const auto data = metadata_tuple(required_field(interface, "data"), "data");
+    if (data.size() != 2 || !py::isinstance<py::bool_>(data[1]))
+    {
+        throw std::invalid_argument("CUDA data must contain an address and readonly flag");
+    }
+    if (writable && data[1].cast<bool>())
     {
         throw std::invalid_argument("CUDA output must be writable");
     }
-    const auto address = data[0].cast<std::uintptr_t>();
+    const auto address = metadata_integer<std::uintptr_t>(data[0], "data address");
     std::size_t elements = 1;
     for (const auto dimension : shape)
     {
@@ -100,7 +173,7 @@ DeviceArray device_array(py::object object, int ndim, const gpu::Context &contex
     }
     if (version == 3 && interface.contains("stream") && !interface["stream"].is_none())
     {
-        const auto producer = interface["stream"].cast<std::uintptr_t>();
+        const auto producer = metadata_integer<std::uintptr_t>(interface["stream"], "stream");
         if (producer == 0)
         {
             throw std::invalid_argument("CUDA Array Interface producer stream cannot be zero");
@@ -116,7 +189,7 @@ DeviceArray device_array(py::object object, int ndim, const gpu::Context &contex
     return {std::move(object), reinterpret_cast<void *>(address), shape, itemsize, context.device(), typestr};
 }
 
-gpu::ConstVectorView as_vector_view(const DeviceArray &array)
+gpu::ConstVectorView as_const_vector_view(const DeviceArray &array)
 {
     return {static_cast<const double *>(array.data), array.shape[0], array.device};
 }
@@ -128,20 +201,5 @@ gpu::DenseMatrixView as_dense_matrix_view(const DeviceArray &array)
 {
     return {static_cast<const double *>(array.data), array.shape[0], array.shape[1], array.shape[1], array.device};
 }
-void validate_host_array(const py::array &array, int ndim)
-{
-    if (!array.dtype().is(py::dtype::of<double>()) || array.ndim() != ndim || !(array.flags() & py::array::c_style) ||
-        reinterpret_cast<std::uintptr_t>(array.data()) % alignof(double) != 0)
-    {
-        throw std::invalid_argument("host input must be aligned C-contiguous float64");
-    }
-}
-cg::DenseMatrixView as_host_matrix_view(const py::array &array)
-{
-    validate_host_array(array, 2);
-    return {static_cast<const double *>(array.data()), static_cast<std::size_t>(array.shape(0)),
-            static_cast<std::size_t>(array.shape(1))};
-}
-
 } // namespace python
 } // namespace cg

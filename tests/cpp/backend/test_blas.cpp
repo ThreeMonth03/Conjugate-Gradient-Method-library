@@ -62,7 +62,7 @@ TEST(BlasConfiguration, NativeRemainsDefaultAndBlasRequiresAnEnabledSingleThread
 {
     const cg::CpuBackend native;
     EXPECT_EQ(native.dense_kernel(), cg::DenseKernel::native);
-    EXPECT_EQ(native.threads(), 1);
+    EXPECT_EQ(native.num_threads(), 1);
     EXPECT_TRUE(native.fused());
     EXPECT_THROW(cg::CpuBackend(1, true, static_cast<cg::DenseKernel>(-1)), std::invalid_argument);
     EXPECT_THROW(cg::CpuBackend(0, true, cg::DenseKernel::blas), std::invalid_argument);

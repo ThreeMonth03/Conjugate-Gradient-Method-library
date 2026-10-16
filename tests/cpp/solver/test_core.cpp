@@ -20,6 +20,42 @@ namespace
 using cg::ConstVectorView;
 using cg::VectorView;
 
+template <class Owner> constexpr bool has_data = requires(Owner &&owner) { std::forward<Owner>(owner).data(); };
+template <class Owner> constexpr bool has_view = requires(Owner &&owner) { std::forward<Owner>(owner).view(); };
+template <class Owner>
+constexpr bool has_inverse_diagonal = requires(Owner &&owner) { std::forward<Owner>(owner).inverse_diagonal(); };
+template <class Owner> constexpr bool has_residual = requires(Owner &&owner) { std::forward<Owner>(owner).residual(); };
+template <class Owner>
+constexpr bool has_direction = requires(Owner &&owner) { std::forward<Owner>(owner).direction(); };
+template <class Owner> constexpr bool has_product = requires(Owner &&owner) { std::forward<Owner>(owner).product(); };
+template <class Owner> constexpr bool has_scratch = requires(Owner &&owner) { std::forward<Owner>(owner).scratch(); };
+template <class Owner>
+constexpr bool has_preconditioned = requires(Owner &&owner) { std::forward<Owner>(owner).preconditioned(); };
+
+static_assert(has_data<cg::DenseMatrix &> && has_data<const cg::DenseMatrix &>);
+static_assert(!has_data<cg::DenseMatrix> && !has_data<const cg::DenseMatrix>);
+static_assert(has_view<cg::DenseMatrix &> && has_view<const cg::DenseMatrix &>);
+static_assert(!has_view<cg::DenseMatrix> && !has_view<const cg::DenseMatrix>);
+static_assert(std::is_same_v<decltype(std::declval<cg::DenseMatrix &>().data()), double *>);
+static_assert(std::is_same_v<decltype(std::declval<const cg::DenseMatrix &>().data()), const double *>);
+static_assert(has_inverse_diagonal<cg::JacobiPreconditioner &> &&
+              has_inverse_diagonal<const cg::JacobiPreconditioner &>);
+static_assert(!has_inverse_diagonal<cg::JacobiPreconditioner> && !has_inverse_diagonal<const cg::JacobiPreconditioner>);
+static_assert(
+    std::is_same_v<decltype(std::declval<const cg::JacobiPreconditioner &>().inverse_diagonal()), cg::ConstVectorView>);
+static_assert(has_residual<cg::Workspace &> && has_direction<cg::Workspace &> && has_product<cg::Workspace &> &&
+              has_scratch<cg::Workspace &> && has_preconditioned<cg::Workspace &>);
+static_assert(!has_residual<cg::Workspace> && !has_direction<cg::Workspace> && !has_product<cg::Workspace> &&
+              !has_scratch<cg::Workspace> && !has_preconditioned<cg::Workspace>);
+static_assert(!has_residual<const cg::Workspace &> && !has_direction<const cg::Workspace &> &&
+              !has_product<const cg::Workspace &> && !has_scratch<const cg::Workspace &> &&
+              !has_preconditioned<const cg::Workspace &>);
+static_assert(!has_residual<const cg::Workspace> && !has_direction<const cg::Workspace> &&
+              !has_product<const cg::Workspace> && !has_scratch<const cg::Workspace> &&
+              !has_preconditioned<const cg::Workspace>);
+// Descriptors borrow their underlying storage, not the descriptor object.
+static_assert(has_data<cg::DenseMatrixView> && has_data<const cg::DenseMatrixView>);
+
 template <class View>
 constexpr bool writable_dense_metadata = requires(View view) { view.data = nullptr; } || requires(View view) {
     view.rows = std::size_t{1};
@@ -225,8 +261,8 @@ TEST(Backend, ValidatesThreadCountAndKeepsContextLocal)
     else
     {
         const cg::CpuBackend parallel(2);
-        EXPECT_EQ(first.threads(), 1);
-        EXPECT_EQ(parallel.threads(), 2);
+        EXPECT_EQ(first.num_threads(), 1);
+        EXPECT_EQ(parallel.num_threads(), 2);
     }
 }
 

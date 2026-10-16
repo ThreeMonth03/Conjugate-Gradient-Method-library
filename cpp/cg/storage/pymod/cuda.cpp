@@ -3,9 +3,9 @@
 #include <cg/python/cuda_array_conversion.hpp>
 #include <cg/python/module.hpp>
 #include <cg/storage/cuda/vector.hpp>
-#include <cg/storage/detail/validation.hpp>
 
 #include <memory>
+#include <optional>
 
 namespace cg
 {
@@ -46,12 +46,8 @@ void register_cuda_storage(py::module_ &m)
             "copy_from_host",
             [](gpu::Vector &value, const py::array &host, std::uintptr_t stream)
             {
-                validate_host_array(host, 1);
+                const auto source = as_const_vector_view(host);
                 const gpu::Context context(value.device(), stream);
-                cg::detail::validate_raw_vector(static_cast<const double *>(host.data()),
-                                                static_cast<std::size_t>(host.size()));
-                const cg::ConstVectorView source{static_cast<const double *>(host.data()),
-                                                 static_cast<std::size_t>(host.size())};
                 py::gil_scoped_release release;
                 value.upload(source, context);
             },
@@ -63,7 +59,7 @@ void register_cuda_storage(py::module_ &m)
                 const gpu::Context context(value.device(), stream);
                 const auto array = device_array(source, 1, context, false);
                 py::gil_scoped_release release;
-                value.copy_from_device(as_vector_view(array), context);
+                value.copy_from_device(as_const_vector_view(array), context);
             },
             py::arg("source"), py::arg("stream") = 0)
         .def(
@@ -71,7 +67,7 @@ void register_cuda_storage(py::module_ &m)
             [](const gpu::Vector &value, std::uintptr_t stream)
             {
                 py::array_t<double> output(value.size());
-                const cg::VectorView destination{output.mutable_data(), value.size()};
+                const auto destination = as_mutable_vector_view(output);
                 const gpu::Context context(value.device(), stream);
                 {
                     py::gil_scoped_release release;
@@ -80,6 +76,34 @@ void register_cuda_storage(py::module_ &m)
                 return output;
             },
             py::arg("stream") = 0);
+    m.def(
+        "_initial_output",
+        [](py::object b, py::object x0, int device, std::uintptr_t stream)
+        {
+            const gpu::Context context(device, stream);
+            const auto rhs = device_array(b, 1, context, false);
+            std::optional<DeviceArray> initial;
+            if (!x0.is_none())
+            {
+                initial = device_array(x0, 1, context, false);
+                if (initial->shape != rhs.shape)
+                {
+                    throw std::invalid_argument("CUDA initial guess must match the right-hand side size");
+                }
+            }
+            py::gil_scoped_release release;
+            auto output = std::make_unique<gpu::Vector>(rhs.shape[0], context);
+            if (initial)
+            {
+                output->copy_from_device(as_const_vector_view(*initial), context);
+            }
+            else
+            {
+                output->fill(0.0, context);
+            }
+            return output;
+        },
+        py::arg("b"), py::arg("x0"), py::arg("device"), py::arg("stream"));
 }
 
 } // namespace python

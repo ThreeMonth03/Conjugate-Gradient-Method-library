@@ -19,7 +19,7 @@ void register_cuda_matrix(py::module_ &m)
             "from_host",
             [](const py::array &host, int device, std::uintptr_t stream)
             {
-                const auto source = as_host_matrix_view(host);
+                const auto source = as_dense_matrix_view(host);
                 const gpu::Context context(device, stream);
                 py::gil_scoped_release release;
                 auto result = std::make_unique<gpu::DenseMatrix>(source, context);
