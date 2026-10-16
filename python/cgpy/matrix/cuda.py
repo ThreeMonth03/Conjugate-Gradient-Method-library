@@ -24,8 +24,16 @@ class DenseMatrix:
 
     _native: _cuda.DenseMatrix
 
-    def __init__(self) -> None:
-        raise TypeError("use DenseMatrix.from_host or DenseMatrix.from_device")
+    if typing.TYPE_CHECKING:
+
+        def __init__(self, _factory_only: typing.Never, /) -> None: ...
+
+    else:
+
+        def __init__(self) -> None:
+            raise TypeError(
+                "use DenseMatrix.from_host or DenseMatrix.from_device"
+            )
 
     @classmethod
     def from_host(
@@ -78,8 +86,14 @@ class CsrMatrix:
 
     _native: _cuda.CsrMatrix
 
-    def __init__(self) -> None:
-        raise TypeError("use CsrMatrix.from_host or CsrMatrix.from_device")
+    if typing.TYPE_CHECKING:
+
+        def __init__(self, _factory_only: typing.Never, /) -> None: ...
+
+    else:
+
+        def __init__(self) -> None:
+            raise TypeError("use CsrMatrix.from_host or CsrMatrix.from_device")
 
     @classmethod
     def from_host(

@@ -32,8 +32,14 @@ class PreparedSolver:
 
     _native: _cuda.PreparedSolver
 
-    def __init__(self) -> None:
-        raise TypeError("use prepare or prepare_host")
+    if typing.TYPE_CHECKING:
+
+        def __init__(self, _factory_only: typing.Never, /) -> None: ...
+
+    else:
+
+        def __init__(self) -> None:
+            raise TypeError("use prepare or prepare_host")
 
     @property
     def size(self) -> int:
