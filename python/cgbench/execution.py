@@ -15,6 +15,7 @@ class Outcome:
     iterations: int
     matvecs: int
     residual_norm: float
+    restarts: int | None = None
 
     @property
     def converged(self):

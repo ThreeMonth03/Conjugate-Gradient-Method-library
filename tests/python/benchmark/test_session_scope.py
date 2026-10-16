@@ -349,6 +349,7 @@ def test_native_session_adapter_reuses_session_but_delegates_fresh_calls(
                 iterations=2,
                 matvecs=4,
                 residual_norm=0.0,
+                restarts=0,
             )
 
     def prepare(*args, **kwargs):

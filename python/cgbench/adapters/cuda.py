@@ -13,6 +13,7 @@ def _host_outcome(outcome, x):
         outcome.iterations,
         outcome.matvecs,
         outcome.residual_norm,
+        outcome.restarts,
     )
 
 
@@ -130,6 +131,7 @@ class CudaNativeExecutor:
             info.iterations,
             info.matvecs,
             info.residual_norm,
+            info.restarts,
         )
 
     def host_outcome(self, outcome):

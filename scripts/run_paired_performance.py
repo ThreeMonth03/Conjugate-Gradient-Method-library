@@ -112,6 +112,7 @@ def _worker() -> None:
                     "elapsed_ns": elapsed,
                     "iterations": outcome.iterations,
                     "matvecs": outcome.matvecs,
+                    "restarts": getattr(outcome, "restarts", None),
                     "solver_status": outcome.status,
                 }
             elif operation == "verify":
@@ -157,6 +158,8 @@ def _prepare_job(workers: dict, job: dict) -> tuple[dict, dict]:
     reference = preparation["baseline"]
     expected = {
         **job,
+        "restarts": reference.get("restarts"),
+        "restart_parity_verified": reference.get("restarts") is not None,
         **{
             key: reference[key]
             for key in (
@@ -179,6 +182,17 @@ def _verify_work(job: dict, response: dict, *, require_hash=False) -> None:
     if any(response[key] != job[key] for key in keys):
         raise ValueError(
             f"{job['case']['name']}: input or numerical work differs"
+        )
+    restarts = response.get("restarts")
+    if restarts is not None and (
+        type(restarts) is not int
+        or restarts < 0
+        or restarts > response["iterations"]
+    ):
+        raise ValueError(f"{job['case']['name']}: invalid restart count")
+    if restarts != job.get("restarts"):
+        raise ValueError(
+            f"{job['case']['name']}: restart count or availability differs"
         )
     if response["solver_status"] != "converged":
         raise ValueError(f"{job['case']['name']}: solve did not converge")
@@ -313,6 +327,7 @@ def main(argv: list[str] | None = None) -> int:
             "bootstrap_seed": options.seed,
         },
         "max_regression": options.max_regression,
+        "restart_parity_verified": True,
         "spec": spec,
         "pythonpaths": {
             "baseline": options.baseline_pythonpath,
@@ -431,6 +446,14 @@ def main(argv: list[str] | None = None) -> int:
                     "verdict": verdict,
                 }
             )
+            if not job["restart_parity_verified"]:
+                report["restart_parity_verified"] = False
+                limitation = (
+                    "Restart parity is unverified for unknown legacy counts; "
+                    "matching iterations/matvecs does not establish full numerical-work parity."
+                )
+                if limitation not in report["limitations"]:
+                    report["limitations"].append(limitation)
             _write_report(report, options.output)
             print(
                 f"{job['suite']}/{job['scope']}/{job['case']['name']}/"

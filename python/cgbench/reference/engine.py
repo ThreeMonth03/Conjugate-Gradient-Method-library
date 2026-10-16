@@ -96,6 +96,7 @@ class ReferenceExecutor:
         tolerance = max(self.options["atol"], self.options["rtol"] * b_norm)
         matvecs = 0
         iterations = 0
+        restarts = 0
 
         def true_residual():
             nonlocal matvecs
@@ -110,7 +111,7 @@ class ReferenceExecutor:
             # gate explicitly downloads it. CPU exports retain their behavior.
             output = ops.outcome_x(x)
             return execution.Outcome(
-                output, status, iterations, matvecs, residual_norm
+                output, status, iterations, matvecs, residual_norm, restarts
             )
 
         def finish(status):
@@ -210,6 +211,7 @@ class ReferenceExecutor:
                         if not math.isfinite(rho) or rho < sys.float_info.min:
                             return result("non_finite", rho_next)
                         ops.initialize_direction(z, direction, False)
+                    restarts += 1
                     continue
                 if (
                     not math.isfinite(rho_next)

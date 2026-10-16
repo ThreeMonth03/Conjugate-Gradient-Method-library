@@ -249,6 +249,13 @@ def main():
                 synchronize()
                 elapsed.append(time.perf_counter_ns() - start)
     after = gate()
+    if any(
+        before.get(key) != after.get(key)
+        for key in ("iterations", "matvecs", "restarts")
+    ):
+        raise RuntimeError(
+            "iterations/matvecs/restarts changed during profiling"
+        )
     if stage_identity(args.stage_identity) != identity:
         raise RuntimeError("stage identity changed during profiling")
     spec["cases"] = selected
@@ -266,6 +273,7 @@ def main():
         "dtype": "float64",
         "before": before,
         "after": after,
+        "restart_parity_verified": before.get("restarts") is not None,
         "adapter_setup": execute.benchmark_metadata(),
         "environment": artifacts.environment_metadata(
             device=args.device, cuda_device=args.cuda_device

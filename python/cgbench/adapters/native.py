@@ -86,6 +86,7 @@ class NativeExecutor:
             info.iterations,
             info.matvecs,
             info.residual_norm,
+            info.restarts,
         )
 
     def benchmark_metadata(self):
