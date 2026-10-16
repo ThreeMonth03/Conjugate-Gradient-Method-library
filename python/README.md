@@ -117,7 +117,7 @@ Host transfer is explicit. `cuda.prepare` accepts a device matrix; `prepare_host
 
 Calls finish on the selected borrowed stream before returning. Keep nondefault streams alive, and use a distinct workspace/output for each overlapping solve. External arrays must be contiguous float64, writable for output, disjoint and free from conflicting mutation. CUDA Array Interface v3 producer dependencies are honored; v2 producers need caller-established readiness or explicit synchronization. No call changes PyTorch's current stream or converts host pointers to device pointers.
 
-CUDA benchmark prepared/API scopes use resident inputs and exclude host upload and verification download. They measure completed wall time, including host dispatch and iteration scalar synchronization. Transfer/setup metadata is reported separately; neither scope measures end-to-end host-to-host performance.
+CUDA benchmark API, Session and prepared scopes use resident inputs and exclude host upload and verification download. API charges per-call output, workspace and requested Jacobi setup; Session reuses execution resources with fresh output and per-call Jacobi; prepared reuses output, workspace and Jacobi. Each measures completed wall time, including host dispatch and iteration scalar synchronization. Transfer/setup metadata is reported separately; these scopes do not measure end-to-end host-to-host performance.
 
 ## C++ core
 
