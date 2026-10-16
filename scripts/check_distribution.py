@@ -9,6 +9,7 @@ import sys
 import tarfile
 import tempfile
 import venv
+import zipfile
 
 
 def check_sdist(path):
@@ -53,6 +54,7 @@ def check_sdist(path):
         "cmake/CGCuda.cmake",
         "cmake/CGPython.cmake",
         "cmake/CGCudaToolchain.cmake",
+        "cmake/cgpyConfig.cmake.in",
         "cpp/cg/backend/cpu/blas.cpp",
         "cpp/cg/backend/cpu/detail/blas.hpp",
         "cpp/cg/backend/cuda/backend.cu",
@@ -109,6 +111,11 @@ def check_sdist(path):
         "scripts/run_paired_performance.py",
         "scripts/check_installed.py",
         "scripts/check_typing.py",
+        "scripts/check_native_consumer.py",
+        "examples/cpp/CMakeLists.txt",
+        "examples/cpp/main.cpp",
+        "examples/cpp/cuda.cpp",
+        "examples/cpp/checks.hpp",
         "tests/typing/valid.py",
         "tests/typing/invalid.py",
         "scripts/setup_cuda.py",
@@ -159,6 +166,16 @@ def check_sdist(path):
         f"Checked {len(names)} sdist paths; no local dependencies or research files.",
         flush=True,
     )
+
+
+def check_wheel(path):
+    """Keep the native development package out of Python wheels."""
+    with zipfile.ZipFile(path) as archive:
+        for name in archive.namelist():
+            if pathlib.Path(name).suffix in (".cmake", ".hpp", ".a"):
+                raise AssertionError(
+                    f"native development file in wheel: {name}"
+                )
 
 
 def main():
@@ -239,6 +256,7 @@ def main():
         wheel_files = list(wheels.glob("cgpy-*.whl"))
         if len(wheel_files) != 1:
             raise AssertionError(f"expected one wheel, found {wheel_files}")
+        check_wheel(wheel_files[0])
         installation = work / "installed"
         venv.EnvBuilder(with_pip=True).create(installation)
         python = installation / "bin/python"

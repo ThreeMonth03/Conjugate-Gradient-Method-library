@@ -1,7 +1,7 @@
 Installation
 ============
 
-Use CPython 3.12.x. The package metadata accepts ``>=3.12,<3.13`` and
+Python installations use CPython 3.12.x. The package metadata accepts ``>=3.12,<3.13`` and
 CMake enforces that range for Python builds. The default package uses the
 native CPU kernel and requires NumPy at runtime. CUDA is disabled in the
 default build and adds no NVIDIA runtime dependency to a CPU wheel. See :doc:`cuda` for explicit
@@ -42,6 +42,58 @@ Alternatively, ``.venv/bin/python -m pip wheel --cache-dir .cache/pip .`` uses
 pip's isolated build environment. Pip can download the declared build
 dependencies; use the explicit local toolchain above when reproducing this
 checkout's pinned development environment.
+
+Native C++ consumers
+--------------------
+
+Build and install the C++ library with CMake 3.24 or later and a C++20 compiler.
+This path does not locate Python or pybind11:
+
+.. code-block:: bash
+
+   cmake -S . -B build/native -DCMAKE_BUILD_TYPE=Release \
+       -DCG_BUILD_PYTHON=OFF -DBUILD_TESTING=OFF
+   cmake --build build/native --parallel 2
+   cmake --install build/native --prefix "$PWD/build/native-install" --component development
+   cmake -S examples/cpp -B build/consumer \
+       -DCMAKE_PREFIX_PATH="$PWD/build/native-install"
+   cmake --build build/consumer --parallel 2
+   ctest --test-dir build/consumer --output-on-failure
+
+The independent ``examples/cpp`` project consumes only the installation:
+
+.. code-block:: cmake
+
+   find_package(cgpy CONFIG REQUIRED)
+   add_executable(app main.cpp)
+   target_link_libraries(app PRIVATE cg::core)
+
+The imported target supplies C++20, public include directories and link
+dependencies. The example solves dense and CSR systems with CG and Jacobi
+PCG, reuses a prepared solver/workspace, and checks the solution and true
+residual independently. Its checks remain active in Release builds.
+
+Set ``CG_ENABLE_OPENMP=ON`` or ``CG_ENABLE_BLAS=ON`` when building the library;
+consumers inherit those dependencies. The BLAS installation retains the
+private provider archive and license, without requiring a system BLAS or
+the original build directory. Installations are relocatable: set
+``CMAKE_PREFIX_PATH`` to the new prefix after moving it. CMake metadata belongs
+to the ``development`` component and is not included in Python wheels.
+
+A CUDA-enabled installation additionally provides an explicit component:
+
+.. code-block:: cmake
+
+   find_package(cgpy CONFIG REQUIRED COMPONENTS CUDA)
+   target_link_libraries(app PRIVATE cg::cuda)
+
+Requesting CUDA locates Toolkit >=12.8 and <13 for its link dependencies;
+the consumer itself can remain a CXX-only project. A core-only request does
+not search for CUDA, even when the installation also contains that backend.
+Set ``CG_CONSUMER_CUDA=ON`` when configuring ``examples/cpp`` to build its CUDA
+example. Compilation and linking need no GPU; CTest explicitly skips CUDA
+numerics without a usable device. ``CG_CONSUMER_REQUIRE_CUDA=ON`` makes that
+absence a test failure.
 
 Optional OpenMP and dense BLAS
 ------------------------------

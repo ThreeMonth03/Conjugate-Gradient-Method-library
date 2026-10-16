@@ -29,10 +29,11 @@ sdist.include = [
     "/CMakeLists.txt", "/CMakePresets.json", "/Makefile", "/pyproject.toml",
     "/README.md", "/.python-version", "/.editorconfig",
     "/.gitignore", "/.clang-format", "/.clang-tidy", "/LICENSE*",
-    "/cmake/*.cmake", "/cpp/cg/**/*.hpp", "/cpp/cg/**/*.cpp", "/cpp/cg/**/*.cu", "/cpp/cg/**/*.cuh",
+    "/cmake/*.cmake", "/cmake/*.cmake.in", "/cpp/cg/**/*.hpp", "/cpp/cg/**/*.cpp", "/cpp/cg/**/*.cu", "/cpp/cg/**/*.cuh",
     "/python/cgpy/**/*.py", "/python/cgbench/**/*.py", "/python/README.md",
     "/python/cgpy/**/*.pyi", "/python/cgpy/py.typed", "/tests/typing/*.py",
     "/tests/python/**/*.py", "/tests/cpp/**/*.cpp", "/tests/cpp/**/*.hpp", "/scripts/*.py", "/examples/*.py",
+    "/examples/cpp/CMakeLists.txt", "/examples/cpp/*.cpp", "/examples/cpp/*.hpp",
     "/requirements/*.lock", "/requirements/README.md", "/docs/**/*.rst", "/docs/conf.py",
     "/docs/_static/*.css",
 ]

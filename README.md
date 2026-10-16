@@ -44,7 +44,9 @@ for sparse matrices, strict inputs and ownership rules.
 ## Build and contribute
 
 The [build guide](https://ThreeMonth03.github.io/Conjugate-Gradient-Method-library/build.html)
-covers optional OpenMP, BLAS and CUDA backends, tests and documentation. Follow the
+covers optional OpenMP, BLAS and CUDA backends, tests and documentation.
+[Native C++ installation](https://ThreeMonth03.github.io/Conjugate-Gradient-Method-library/install.html#native-c-consumers)
+includes a standalone CMake consumer. Follow the
 [coding conventions](https://ThreeMonth03.github.io/Conjugate-Gradient-Method-library/style.html)
 when contributing. The benchmark guide summarizes measured performance and
 limitations, with reproducible commands and detailed historical reports.

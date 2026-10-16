@@ -15,6 +15,12 @@ feature headers such as ``<cg/matrix/csr_matrix.hpp>`` or the CPU umbrella
 exports public headers into ``include/cg/``. Private implementation helpers
 live in ``detail/``; binding helpers stay in the source tree.
 
+The development installation exports ``cg::core`` through
+``find_package(cgpy CONFIG REQUIRED)``. The optional ``CUDA`` component exposes
+``cg::cuda`` and its SDK dependencies without making core-only consumers
+search for CUDA. External consumer checks move the installation prefix and
+build outside the checkout; see :doc:`install`.
+
 .. list-table:: Source responsibilities
    :header-rows: 1
    :widths: 32 68
