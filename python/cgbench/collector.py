@@ -70,7 +70,7 @@ def check_outcome(outcome, arrays, options):
     """Independently validate the true residual before admitting timing data."""
     import numpy as np
 
-    from . import numerics
+    from . import numerics, validation
 
     matrix, rhs, _initial = arrays
     x = np.asarray(outcome.x)
@@ -93,7 +93,7 @@ def check_outcome(outcome, arrays, options):
         and math.isfinite(true_norm)
         and true_norm <= threshold * rounding
     )
-    return {
+    result = {
         "eligible": bool(eligible),
         "reason": None
         if eligible
@@ -101,12 +101,19 @@ def check_outcome(outcome, arrays, options):
         "solver_status": outcome.status,
         "iterations": int(outcome.iterations),
         "matvecs": int(outcome.matvecs),
+        "restarts": outcome.restarts,
         "true_residual_norm": true_norm if math.isfinite(true_norm) else None,
         "reported_residual_norm": outcome.residual_norm
         if math.isfinite(outcome.residual_norm)
         else None,
         "residual_threshold": threshold,
     }
+    if eligible:
+        try:
+            validation.validate_converged_result(result)
+        except ValueError as error:
+            result.update(eligible=False, reason=str(error))
+    return result
 
 
 def _check_executor_outcome(execute, outcome, arrays, options):
@@ -218,6 +225,23 @@ def collect_case(case_spec, run_spec):
                 entry.update(after)
                 entry["status"] = "invalid"
                 entry["reason"] = "post-measurement check: " + entry["reason"]
+            elif any(
+                entry.get(key) != after.get(key)
+                for key in ("iterations", "matvecs", "restarts")
+            ):
+                entry["status"] = "invalid"
+                before_work = tuple(
+                    entry.get(key)
+                    for key in ("iterations", "matvecs", "restarts")
+                )
+                after_work = tuple(
+                    after.get(key)
+                    for key in ("iterations", "matvecs", "restarts")
+                )
+                entry["reason"] = (
+                    "post-measurement numerical work differs (iterations/matvecs/restarts): "
+                    f"{before_work} != {after_work}"
+                )
             else:
                 entry["round_elapsed_ns"] = elapsed[name]
     return {

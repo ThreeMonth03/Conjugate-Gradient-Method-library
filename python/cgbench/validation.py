@@ -32,6 +32,15 @@ def validate_converged_result(result):
         for name in ("iterations", "matvecs")
     ):
         raise ValueError("operation counts must be nonnegative integers")
+    restarts = result.get("restarts")
+    if restarts is not None and (
+        type(restarts) is not int
+        or restarts < 0
+        or restarts > result["iterations"]
+    ):
+        raise ValueError(
+            "restarts must be a nonnegative integer no greater than iterations, or None"
+        )
 
 
 def validate_execution_mode(options, device):

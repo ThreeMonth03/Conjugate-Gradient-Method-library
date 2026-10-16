@@ -258,6 +258,7 @@ def test_native_adapter_charges_device_reset_and_keeps_transfers_at_gates(
                 iterations=16,
                 matvecs=20,
                 residual_norm=0.0,
+                restarts=0,
             )
 
     def solve(matrix, b, x0, **kwargs):
@@ -273,6 +274,7 @@ def test_native_adapter_charges_device_reset_and_keeps_transfers_at_gates(
             iterations=16,
             matvecs=20,
             residual_norm=0.0,
+            restarts=0,
         )
 
     def prepare(matrix, **kwargs):

@@ -253,6 +253,7 @@ def summarize(data):
                     p95_ns=float(p95),
                     iterations=entry["iterations"],
                     matvecs=entry["matvecs"],
+                    restarts=entry.get("restarts"),
                     true_residual_norm=entry["true_residual_norm"],
                 )
             else:
@@ -265,7 +266,7 @@ def print_summary(data):
     rows = summarize(data)
     if data.get("metric") == "sparse_solver_comparison":
         print(
-            "case solver status median_ms p5_ms p95_ms iterations matvecs true_residual setup_ms factor_stored_bytes"
+            "case solver status median_ms p5_ms p95_ms iterations matvecs restarts true_residual setup_ms factor_stored_bytes"
         )
         for row in rows:
             if row["status"] != "measured":
@@ -274,6 +275,9 @@ def print_summary(data):
                 )
                 continue
             setup = row["setup"]
+            restarts = (
+                row["restarts"] if row["restarts"] is not None else "n/a"
+            )
             setup_ns = setup.get(
                 "factorization_setup_elapsed_ns",
                 setup.get("preconditioner_setup_elapsed_ns"),
@@ -282,7 +286,7 @@ def print_summary(data):
                 f"{setup_ns / 1e6:.6f}" if setup_ns is not None else "n/a"
             )
             print(
-                f"{row['case']} {row['implementation']} measured {row['median_ns'] / 1e6:.6f} {row['p5_ns'] / 1e6:.6f} {row['p95_ns'] / 1e6:.6f} {row['iterations']} {row['matvecs']} {row['true_residual_norm']:.6e} {setup_ms} {setup.get('factor_stored_bytes', 0)}"
+                f"{row['case']} {row['implementation']} measured {row['median_ns'] / 1e6:.6f} {row['p5_ns'] / 1e6:.6f} {row['p95_ns'] / 1e6:.6f} {row['iterations']} {row['matvecs']} {restarts} {row['true_residual_norm']:.6e} {setup_ms} {setup.get('factor_stored_bytes', 0)}"
             )
         print(
             "Solver strategies differ: compare verified solution time and disclosed setup; no implementation speedup ratio."
@@ -293,6 +297,12 @@ def print_summary(data):
         print(
             "Stored input/factor/preconditioner array bytes are not peak process memory. Percentiles summarize round-average latency."
         )
+        if any(
+            row.get("restarts") is None
+            for row in rows
+            if row["status"] == "measured"
+        ):
+            print("n/a restart counts are unknown, not zero.")
         return
     baseline = (
         "cuda-native"
@@ -310,11 +320,14 @@ def print_summary(data):
         else "native_speedup"
     )
     print(
-        "case implementation status median_ms p5_ms p95_ms iterations matvecs "
+        "case implementation status median_ms p5_ms p95_ms iterations matvecs restarts "
         + ratio_name
     )
     for row in rows:
         if row["status"] == "measured":
+            restarts = (
+                row["restarts"] if row["restarts"] is not None else "n/a"
+            )
             native_time = native.get(row["case"])
             speedup = (
                 f"{row['median_ns'] / native_time:.3f}x"
@@ -322,7 +335,7 @@ def print_summary(data):
                 else "n/a"
             )
             print(
-                f"{row['case']} {row['implementation']} measured {row['median_ns'] / 1e6:.6f} {row['p5_ns'] / 1e6:.6f} {row['p95_ns'] / 1e6:.6f} {row['iterations']} {row['matvecs']} {speedup}"
+                f"{row['case']} {row['implementation']} measured {row['median_ns'] / 1e6:.6f} {row['p5_ns'] / 1e6:.6f} {row['p95_ns'] / 1e6:.6f} {row['iterations']} {row['matvecs']} {restarts} {speedup}"
             )
         else:
             print(
@@ -334,3 +347,9 @@ def print_summary(data):
     print(
         f"{ratio_name} = this implementation's median / {baseline} median; >1 means {baseline} is faster."
     )
+    if any(
+        row.get("restarts") is None
+        for row in rows
+        if row["status"] == "measured"
+    ):
+        print("n/a restart counts are unknown, not zero.")

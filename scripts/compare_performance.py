@@ -26,6 +26,7 @@ class Measurement:
     iterations: int
     matvecs: int
     samples: tuple[float, ...]
+    restarts: int | None = None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -98,6 +99,7 @@ def _read_artifact(path: pathlib.Path) -> Artifact:
                 iterations=counts[0],
                 matvecs=counts[1],
                 samples=tuple(value / repetitions for value in elapsed),
+                restarts=result.get("restarts"),
             )
         if candidates != set(spec["implementations"]):
             raise ValueError(f"{path}: {name} has missing candidates")
@@ -126,6 +128,10 @@ def _verify_comparable(artifacts: list[Artifact]) -> None:
             ):
                 raise ValueError(
                     f"{artifact.path}: {key} numerical work differs"
+                )
+            if actual.restarts != expected.restarts:
+                raise ValueError(
+                    f"{artifact.path}: {key} restart count or availability differs"
                 )
 
 
@@ -228,6 +234,8 @@ def compare(
                 "implementation": key[1],
                 "iterations": reference.iterations,
                 "matvecs": reference.matvecs,
+                "restarts": reference.restarts,
+                "restart_parity_verified": reference.restarts is not None,
                 "baseline": old_summary,
                 "current": new_summary,
                 "ratio": ratio,
@@ -244,11 +252,15 @@ def compare(
         if "inconclusive" in verdicts
         else "supported_no_material_regression"
     )
+    restart_parity_verified = all(
+        case["restart_parity_verified"] for case in cases
+    )
     return {
         "schema_version": 1,
         "metric": "current_to_baseline_median_ns_per_call",
         "max_regression": max_regression,
         "ratio_limit": limit,
+        "restart_parity_verified": restart_parity_verified,
         "baseline_files": [str(artifact.path) for artifact in baseline],
         "current_files": [str(artifact.path) for artifact in current],
         "benchmark": baseline[0].signature,
@@ -266,7 +278,15 @@ def compare(
             "Run order, ABBA pairing, thermal state and background load are "
             "not recoverable from this artifact schema.",
             "Intervals are per case; simultaneous coverage is not adjusted.",
-        ],
+        ]
+        + (
+            []
+            if restart_parity_verified
+            else [
+                "Restart parity is unverified for unknown legacy/external counts; "
+                "matching iterations/matvecs does not establish full numerical-work parity."
+            ]
+        ),
         "cases": cases,
         "verdict": overall,
     }
@@ -305,6 +325,10 @@ def main(argv: list[str] | None = None) -> int:
             f"{case['verdict']}"
         )
     print(f"Overall: {report['verdict']}; report={options.output.resolve()}")
+    if not report["restart_parity_verified"]:
+        print(
+            "Restart parity is unverified: unknown counts do not establish full numerical-work parity."
+        )
     return int(report["verdict"] != "supported_no_material_regression")
 
 

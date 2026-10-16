@@ -117,6 +117,23 @@ Invalid answers are excluded and fail the run; missing optional candidates
 remain visible as ineligible. Matvec counts include initial and final
 residual evaluations.
 
+New native and same-policy reference results also record ``restarts``: the
+number of successful search-direction replacements after a true-residual
+checkpoint. Initial direction setup is not a restart. Convergence, iteration
+limits or numerical failure before direction replacement do not increment
+the count; the explicit algorithm reports zero. Counts reset on every solve,
+including prepared and Session reuse. Before/after gates require matching
+iterations, matvecs and restart counts, and profiler JSON records all three.
+
+Official SciPy Krylov solvers and direct LU report ``restarts=null`` because
+this native restart definition is unavailable; summaries show ``n/a``.
+Schema-1 artifacts without the optional field remain readable and are never
+rewritten or assigned a fabricated zero. Strict block and paired comparisons
+reject different known counts or known/unknown mixtures. When both sides are
+unknown, a legacy comparison remains available with
+``restart_parity_verified=false`` and an explicit limitation: matching
+iterations/matvecs alone does not establish full numerical-work parity.
+
 Each run starts a fresh process with native thread limits set before numeric
 imports. Warmups are untimed. A Williams schedule balances candidate
 positions and predecessor pairs; requested rounds are rounded up to a
