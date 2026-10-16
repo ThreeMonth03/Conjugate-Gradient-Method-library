@@ -182,9 +182,17 @@ class ReferenceExecutor:
                 norm_next = norm(rho_next, residual)
                 if not math.isfinite(norm_next):
                     return finish("non_finite")
+                candidate = norm_next <= tolerance
+                # Match the native engine: an unusable noncandidate squared
+                # residual fails before a scheduled checkpoint can recover it.
+                if not candidate and (
+                    not math.isfinite(rho_next)
+                    or rho_next < sys.float_info.min
+                ):
+                    return finish("non_finite")
                 refresh = self.options["residual_refresh"]
                 if (
-                    norm_next <= tolerance
+                    candidate
                     or (refresh and iterations % refresh == 0)
                     or iterations == self.options["maxiter"]
                 ):
@@ -213,11 +221,6 @@ class ReferenceExecutor:
                         ops.initialize_direction(z, direction, False)
                     restarts += 1
                     continue
-                if (
-                    not math.isfinite(rho_next)
-                    or rho_next < sys.float_info.min
-                ):
-                    return finish("non_finite")
                 if inverse is not None:
                     ops.precondition(inverse, residual, z)
                     rho_next = ops.dot(residual, z)
