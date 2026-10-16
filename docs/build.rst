@@ -37,6 +37,9 @@ outside the checkout. The consumer checks dense/CSR CG and PCG, reusable
 workspaces, true residuals and basic operation counts. Native, OpenMP and BLAS
 CI configurations run these checks. Consumer compile settings are checked for
 leaked library-only macros, OpenMP flags and CUDA SDK include directories.
+Small syntax-only probes verify the installed ``SolveInfo`` discard diagnostic
+and accepted explicit-discard/status-use forms. Only these probe commands use
+``-Werror``; project and imported-target warning settings remain unchanged.
 CUDA CI also compiles/links the optional consumer and reports device-dependent
 skips; the GPU job uses
 ``NATIVE_ARGS=--require-cuda``. ``NATIVE_BUILD_DIR`` overrides its build path.

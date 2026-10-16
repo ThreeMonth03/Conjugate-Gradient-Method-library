@@ -235,22 +235,29 @@ TEST_F(Cuda, RejectsShapePointerDeviceWorkspaceAndStorageAliasing)
     gpu::Vector b(hb, *context), x(2, *context);
     x.fill(0, *context);
     gpu::Workspace workspace(2, *context), wrong(3, *context);
-    EXPECT_THROW(gpu::solve_into(A.view(), b.view(), b.view(), workspace), std::invalid_argument);
-    EXPECT_THROW(gpu::solve_into(A.view(), b.view(), x.view(), wrong), std::invalid_argument);
-    EXPECT_THROW(gpu::solve_into(A.view(), b.view(), {x.data(), 1, 0}, workspace), std::invalid_argument);
-    EXPECT_THROW(gpu::solve_into(A.view(), {hb.data(), 2, 0}, x.view(), workspace), std::invalid_argument);
-    EXPECT_THROW(gpu::solve_into(A.view(), {b.data(), 2, 1}, x.view(), workspace), std::invalid_argument);
-    EXPECT_THROW(gpu::solve_into(A.view(), b.view(), workspace.residual(), workspace), std::invalid_argument);
+    EXPECT_THROW(static_cast<void>(gpu::solve_into(A.view(), b.view(), b.view(), workspace)), std::invalid_argument);
+    EXPECT_THROW(static_cast<void>(gpu::solve_into(A.view(), b.view(), x.view(), wrong)), std::invalid_argument);
+    EXPECT_THROW(static_cast<void>(gpu::solve_into(A.view(), b.view(), {x.data(), 1, 0}, workspace)),
+                 std::invalid_argument);
+    EXPECT_THROW(static_cast<void>(gpu::solve_into(A.view(), {hb.data(), 2, 0}, x.view(), workspace)),
+                 std::invalid_argument);
+    EXPECT_THROW(static_cast<void>(gpu::solve_into(A.view(), {b.data(), 2, 1}, x.view(), workspace)),
+                 std::invalid_argument);
+    EXPECT_THROW(static_cast<void>(gpu::solve_into(A.view(), b.view(), workspace.residual(), workspace)),
+                 std::invalid_argument);
     cg::CgOptions options;
     options.rtol = -1;
-    EXPECT_THROW(gpu::solve_into(A.view(), b.view(), x.view(), workspace, options), std::invalid_argument);
+    EXPECT_THROW(static_cast<void>(gpu::solve_into(A.view(), b.view(), x.view(), workspace, options)),
+                 std::invalid_argument);
     options.rtol = 1e-8;
     options.algorithm = static_cast<cg::Algorithm>(-1);
-    EXPECT_THROW(gpu::solve_into(A.view(), b.view(), x.view(), workspace, options), std::invalid_argument);
+    EXPECT_THROW(static_cast<void>(gpu::solve_into(A.view(), b.view(), x.view(), workspace, options)),
+                 std::invalid_argument);
     options.algorithm = cg::Algorithm::recurrence;
     {
         gpu::detail::WorkspaceUseGuard lease(workspace);
-        EXPECT_THROW(gpu::solve_into(A.view(), b.view(), x.view(), workspace, options), std::invalid_argument);
+        EXPECT_THROW(static_cast<void>(gpu::solve_into(A.view(), b.view(), x.view(), workspace, options)),
+                     std::invalid_argument);
         lease.complete();
     }
     EXPECT_EQ(gpu::solve_into(A.view(), b.view(), x.view(), workspace, options).status, cg::Status::converged);
@@ -284,7 +291,7 @@ TEST_F(Cuda, WorkspaceOwnsExecutionSettingsAndRejectsIncompatiblePlansBeforeWrit
                                            cg::PreconditionerKind::none, kernel);
             gpu::Workspace mismatched(2, *context, other, mode);
             x.fill(-7, *context);
-            EXPECT_THROW(plan.solve_into(b.view(), x.view(), mismatched), std::invalid_argument);
+            EXPECT_THROW(static_cast<void>(plan.solve_into(b.view(), x.view(), mismatched)), std::invalid_argument);
             x.download(actual, *context);
             EXPECT_EQ(actual, (std::vector<double>{-7, -7}));
         }
@@ -415,7 +422,7 @@ TEST_F(Cuda, CsrCgAndPcgMatchDenseAndRejectCublas)
         }
     }
     gpu::Workspace cublas_workspace(33, *context, gpu::DenseKernel::cublas);
-    EXPECT_THROW(gpu::solve_into(A, b.view(), x.view(), cublas_workspace), std::invalid_argument);
+    EXPECT_THROW(static_cast<void>(gpu::solve_into(A, b.view(), x.view(), cublas_workspace)), std::invalid_argument);
     gpu::detail::ExecutionResources cublas_resources(*context, gpu::DenseKernel::cublas);
     const gpu::detail::Backend backend(cublas_resources, true);
     EXPECT_THROW(backend.apply(A, b.view(), x.view()), std::invalid_argument);
@@ -547,9 +554,9 @@ TEST_F(Cuda, DeviceFailuresPreserveOutputCountsAndPermitWorkspaceReuse)
                 if (algorithm == cg::Algorithm::explicit_residual)
                 {
                     x_device.upload(initial, *context);
-                    EXPECT_THROW(
-                        gpu::solve_into(good.view(), b.view(), x_device.view(), device_work, options, fused, &M),
-                        std::invalid_argument);
+                    EXPECT_THROW(static_cast<void>(gpu::solve_into(good.view(), b.view(), x_device.view(), device_work,
+                                                                   options, fused, &M)),
+                                 std::invalid_argument);
                     std::vector<double> actual(2);
                     x_device.download(actual, *context);
                     EXPECT_EQ(actual, initial);
@@ -882,16 +889,17 @@ TEST_F(Cuda, OneShotPreconditionerPolicyRejectsInvalidOptionsBeforeSetup)
     options.algorithm = cg::Algorithm::explicit_residual;
     try
     {
-        gpu::solve_into(A.view(), b.view(), x.view(), workspace, options, true, cg::PreconditionerKind::jacobi);
+        static_cast<void>(
+            gpu::solve_into(A.view(), b.view(), x.view(), workspace, options, true, cg::PreconditionerKind::jacobi));
         FAIL() << "explicit CG must reject Jacobi before reading its diagonal";
     }
     catch (const std::invalid_argument &error)
     {
         EXPECT_STREQ(error.what(), "Jacobi preconditioning requires recurrence CG");
     }
-    EXPECT_THROW(
-        gpu::solve_into(A.view(), b.view(), x.view(), workspace, {}, true, static_cast<cg::PreconditionerKind>(-1)),
-        std::invalid_argument);
+    EXPECT_THROW(static_cast<void>(gpu::solve_into(A.view(), b.view(), x.view(), workspace, {}, true,
+                                                   static_cast<cg::PreconditionerKind>(-1))),
+                 std::invalid_argument);
     std::vector<double> output(2);
     x.download(output, *context);
     EXPECT_EQ(output, (std::vector<double>{0, 0}));
@@ -1049,7 +1057,8 @@ TEST_F(Cuda, OneShotJacobiValidationFailurePreservesOutputAndAllowsFreshSetupOnR
         const auto check = [&](const auto &bad, const auto &good)
         {
             x.fill(0, *context);
-            EXPECT_THROW(gpu::solve_into(bad, b.view(), x.view(), workspace, {}, true, cg::PreconditionerKind::jacobi),
+            EXPECT_THROW(static_cast<void>(gpu::solve_into(bad, b.view(), x.view(), workspace, {}, true,
+                                                           cg::PreconditionerKind::jacobi)),
                          std::invalid_argument);
             std::vector<double> output(3);
             x.download(output, *context);

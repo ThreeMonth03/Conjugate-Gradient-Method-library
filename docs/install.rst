@@ -73,6 +73,14 @@ dependencies. The example solves dense and CSR systems with CG and Jacobi
 PCG, reuses a prepared solver/workspace, and checks the solution and true
 residual independently. Its checks remain active in Release builds.
 
+The C++ ``SolveInfo`` result type is ``[[nodiscard]]``. Check ``info.status``
+before accepting the output: numerical failure and exhausted iterations return
+a status rather than throwing. Discarding the result can produce a compiler
+warning, or an error when the consumer enables ``-Werror``. An explicit
+``static_cast<void>(...)`` documents intentional discard. Saving the result
+alone does not establish that its status was checked. The imported targets
+leave the consumer's warning policy unchanged.
+
 Set ``CG_ENABLE_OPENMP=ON`` or ``CG_ENABLE_BLAS=ON`` when building the library;
 consumers inherit the necessary runtime link dependencies. Library-only
 OpenMP compiler flags and the BLAS build macro stay private. The BLAS

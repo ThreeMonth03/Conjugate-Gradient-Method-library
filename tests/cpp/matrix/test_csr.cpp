@@ -153,7 +153,7 @@ TEST(CSR, RectangularApplyIsAllowedButCGAndApplyDotRequireSquare)
     EXPECT_DOUBLE_EQ(y.data()[0], 11);
     EXPECT_DOUBLE_EQ(y.data()[1], 8);
     EXPECT_THROW(backend.apply_and_dot(A, x, y), std::invalid_argument);
-    EXPECT_THROW(cg::solve_into(A, b, y, workspace, backend), std::invalid_argument);
+    EXPECT_THROW(static_cast<void>(cg::solve_into(A, b, y, workspace, backend)), std::invalid_argument);
 }
 
 TEST(CSR, RejectsOverlappingOutputs)
@@ -164,11 +164,11 @@ TEST(CSR, RejectsOverlappingOutputs)
     const cg::CpuBackend backend;
     EXPECT_THROW(backend.apply(A, x, x), std::invalid_argument);
     EXPECT_THROW(backend.residual_squared_norm(A, b, x, b), std::invalid_argument);
-    EXPECT_THROW(cg::solve_into(A, b, b, workspace, backend), std::invalid_argument);
+    EXPECT_THROW(static_cast<void>(cg::solve_into(A, b, b, workspace, backend)), std::invalid_argument);
     // No write occurs: reject a view of the owner's coefficient storage first.
     cg::VectorView coefficients{const_cast<double *>(A.values().data()), A.nnz()};
     EXPECT_THROW(backend.apply(A, x, coefficients), std::invalid_argument);
-    EXPECT_THROW(cg::solve_into(A, b, coefficients, workspace, backend), std::invalid_argument);
+    EXPECT_THROW(static_cast<void>(cg::solve_into(A, b, coefficients, workspace, backend)), std::invalid_argument);
 }
 
 TEST(CSR, FusedOperationsMatchReferenceWithParallelRows)
