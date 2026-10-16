@@ -170,13 +170,8 @@ The backend exposes primitive operations and selected fused operations:
 matvec with ``p^T Ap``, solution/residual updates with residual reduction, and
 Jacobi application with ``r^T z``. Fusion changes traversal and summation order,
 not the CG recurrence. ``fused=False`` retains separate operations for testing
-and measurement. Native CPU dense matvec computes four rows together with
-four independent accumulators per row and uses the same kernel with either
-fusion setting. It retains each row's lane and column-tail accumulation order;
-remaining rows use a pair followed by a single row. Fused scalar reductions
-still add individual row contributions in order. OpenMP uses the same row
-blocks and existing activation heuristics; odd dimensions can change parallel
-partitions and rounding. Separate reductions can also change
+and measurement. Native CPU dense matvec uses the same optimized paired-row
+kernel with either fusion setting. Separate reductions can change
 floating-point rounding and iteration counts; both policies retain
 true-residual verification. Dense fused reductions support odd tails and
 padded row strides without fast-math or host-specific compiler flags.
