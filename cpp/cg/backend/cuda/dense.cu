@@ -70,7 +70,7 @@ void Backend::apply(DenseMatrixView A, ConstVectorView x, VectorView output) con
 {
     detail::validate_apply(A, x, output, m_resources.context);
     detail::DeviceGuard guard(m_resources.context.device());
-    if (m_kernel == DenseKernel::cublas)
+    if (m_resources.dense_kernel() == DenseKernel::cublas)
     {
         const auto limit = static_cast<std::size_t>(std::numeric_limits<int>::max());
         if (A.rows() > limit || A.cols() > limit || A.row_stride() > limit)
@@ -110,7 +110,7 @@ void Backend::apply_and_dot_into(DenseMatrixView A, ConstVectorView p, VectorVie
 {
     detail::same_size(p, ap, m_resources.context);
     detail::validate_apply(A, p, ap, m_resources.context);
-    if (!m_fused || m_kernel == DenseKernel::cublas)
+    if (!m_fused || m_resources.dense_kernel() == DenseKernel::cublas)
     {
         apply(A, p, ap);
         dot_into(p, ap, result);
@@ -139,7 +139,7 @@ void Backend::residual_squared_norm_into(DenseMatrixView A, ConstVectorView b, C
     detail::no_overlap(b, r);
     detail::validate_apply(A, x, r, m_resources.context);
     detail::DeviceGuard guard(m_resources.context.device());
-    if (m_fused && m_kernel == DenseKernel::native)
+    if (m_fused && m_resources.dense_kernel() == DenseKernel::native)
     {
         const auto blocks = detail::dense_blocks(A.rows());
         dense_kernel<<<blocks, detail::block_size, 0, detail::stream(m_resources.context)>>>(A, x, b, r, 2, b_minus_ax,

@@ -96,7 +96,7 @@ class PreparedSolver:
             Contiguous float64 device vectors. x is writable initial guess and
             output, disjoint from b. Reset x before a repeated comparison.
         workspace : Workspace
-            Matching size/device, unused by overlapping calls. Its stream
+            Matching size/device/kernel, unused by overlapping calls. Its stream
             determines execution and the version-2 producer readiness contract.
             Its execution_mode selects the native host/device scalar engine.
         rtol, atol : float

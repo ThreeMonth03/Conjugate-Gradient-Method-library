@@ -15,7 +15,7 @@ struct DeviceExecutionResources;
 class WorkspaceUseGuard
 {
     public:
-    WorkspaceUseGuard(Workspace &workspace, const Context &context);
+    explicit WorkspaceUseGuard(Workspace &workspace);
     ~WorkspaceUseGuard();
     WorkspaceUseGuard(const WorkspaceUseGuard &) = delete;
     WorkspaceUseGuard &operator=(const WorkspaceUseGuard &) = delete;
@@ -25,7 +25,6 @@ class WorkspaceUseGuard
 
     private:
     Workspace &m_workspace;
-    const Context &m_context;
     bool m_completed = false;
 };
 

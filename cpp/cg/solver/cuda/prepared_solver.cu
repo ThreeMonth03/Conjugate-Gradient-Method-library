@@ -93,11 +93,14 @@ SolveInfo PreparedSolver::solve_into(ConstVectorView b, VectorView x, Workspace 
     {
         throw std::invalid_argument("workspace device does not match prepared solver");
     }
-    const Context &context = workspace.execution_context();
+    if (workspace.dense_kernel() != m_kernel)
+    {
+        throw std::invalid_argument("workspace dense kernel does not match prepared solver");
+    }
     return std::visit(
         [&](const auto &matrix)
         {
-            return cg::cuda::solve_into(operator_view(matrix), b, x, workspace, context, options, fused, m_kernel,
+            return cg::cuda::solve_into(operator_view(matrix), b, x, workspace, options, fused,
                                         m_preconditioner ? &*m_preconditioner : nullptr);
         },
         m_matrix);

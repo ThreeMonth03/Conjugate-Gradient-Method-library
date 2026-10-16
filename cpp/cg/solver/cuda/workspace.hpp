@@ -17,13 +17,13 @@ enum class ExecutionMode
     device
 };
 
-class PreparedSolver;
 namespace detail
 {
 class WorkspaceUseGuard;
 }
-// One active solve per workspace. The workspace owns its reduction buffers,
-// inline host scalar, and optional cuBLAS resources, allocated before any solve.
+// One active solve per workspace. Its execution context, dense kernel, and
+// execution mode are fixed at construction. Reduction buffers, inline host
+// scalar, and optional cuBLAS resources are allocated before any solve.
 class Workspace
 {
     public:
@@ -37,6 +37,8 @@ class Workspace
     std::uintptr_t stream() const noexcept;
     DenseKernel dense_kernel() const noexcept;
     ExecutionMode execution_mode() const noexcept;
+    // Borrowed execution context; valid for this workspace's lifetime.
+    const Context &context() const noexcept;
     VectorView residual() noexcept;
     VectorView direction() noexcept;
     VectorView product() noexcept;
@@ -44,13 +46,11 @@ class Workspace
     VectorView preconditioned() noexcept;
 
     private:
-    const Context &execution_context() const noexcept;
     bool try_acquire() noexcept;
     void release() noexcept;
     struct Impl;
     std::unique_ptr<Impl> m_impl;
     friend class detail::WorkspaceUseGuard;
-    friend class PreparedSolver;
 };
 
 } // namespace cuda

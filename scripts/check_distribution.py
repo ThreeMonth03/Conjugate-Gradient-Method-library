@@ -72,6 +72,7 @@ def check_sdist(path):
         "cpp/cg/solver/prepared_solver.cpp",
         "cpp/cg/solver/solve_info.cpp",
         "cpp/cg/solver/detail/engine.hpp",
+        "cpp/cg/solver/detail/numerical_policy.hpp",
         "cpp/cg/cuda.hpp",
         "cpp/cg/runtime/cuda/context.cu",
         "cpp/cg/runtime/cuda/host_device.hpp",

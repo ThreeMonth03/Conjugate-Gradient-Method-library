@@ -3,7 +3,6 @@
 #include <cg/backend/cuda/detail/reduction.cuh>
 #include <cg/backend/cuda/detail/validation.hpp>
 #include <cg/runtime/cuda/detail/launch.hpp>
-#include <cfloat>
 #include <cmath>
 #include <limits>
 
@@ -15,6 +14,8 @@ namespace detail
 {
 namespace
 {
+
+constexpr double minimum_normal = std::numeric_limits<double>::min();
 
 __global__ void dot_kernel(ConstVectorView x, ConstVectorView y, double *partials)
 {
@@ -42,7 +43,7 @@ __global__ void finish_kernel(const double *partials, std::size_t count, double 
 
 __global__ void stable_norm_kernel(ConstVectorView x, const double *squared, double *result)
 {
-    if (squared != nullptr && isfinite(*squared) && *squared >= DBL_MIN)
+    if (squared != nullptr && isfinite(*squared) && *squared >= minimum_normal)
     {
         if (threadIdx.x == 0)
         {

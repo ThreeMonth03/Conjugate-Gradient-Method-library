@@ -315,22 +315,27 @@ def test_prepared_snapshot_and_workspace_reuse(
 
 
 @pytest.mark.parametrize("kernel", ["native", "cublas"])
-def test_workspace_backend_mismatch_rejects_before_writes(gpu, system, kernel):
+@pytest.mark.parametrize("execution_mode", ["host", "device"])
+def test_prepared_backend_mismatch_and_strict_workspace_selection(
+    gpu, system, kernel, execution_mode
+):
     matrix, rhs, truth = system
     plan = gpu.prepare_host(matrix, dense_kernel=kernel)
     operator = gpu.DenseMatrix.from_host(matrix)
     other = "cublas" if kernel == "native" else "native"
-    mismatched = gpu.Workspace(rhs.size, dense_kernel=other)
+    mismatched = gpu.Workspace(
+        rhs.size, dense_kernel=other, execution_mode=execution_mode
+    )
     b, x = gpu.Vector.from_host(rhs), plan.create_vector()
     with pytest.raises(ValueError, match="kernel"):
         plan.solve_into(b, x, workspace=mismatched)
     np.testing.assert_array_equal(x.to_host(), np.zeros_like(rhs))
-    with pytest.raises(ValueError, match="kernel"):
-        gpu.solve_into(
-            operator, b, x, workspace=mismatched, dense_kernel=kernel
-        )
-    np.testing.assert_array_equal(x.to_host(), np.zeros_like(rhs))
-    workspace = plan.create_workspace()
+    assert gpu.solve_into(
+        operator, b, x, workspace=mismatched, rtol=1e-10
+    ).converged
+    np.testing.assert_allclose(x.to_host(), truth, rtol=1e-7, atol=1e-8)
+    x.fill(0)
+    workspace = plan.create_workspace(execution_mode=execution_mode)
     assert plan.solve_into(b, x, workspace=workspace, rtol=1e-10).converged
     np.testing.assert_allclose(x.to_host(), truth, rtol=1e-7, atol=1e-8)
 
@@ -347,7 +352,7 @@ def test_unsupported_modes_layouts_aliases_and_workspaces_reject_before_writes(
         with pytest.raises(ValueError, match="dense_kernel"):
             gpu.prepare(A, dense_kernel=mode)
         with pytest.raises(ValueError, match="dense_kernel"):
-            gpu.solve_into(A, b, x, workspace=workspace, dense_kernel=mode)
+            gpu.Workspace(rhs.size, dense_kernel=mode)
     with pytest.raises(ValueError, match="CSR|native"):
         gpu.prepare(
             gpu.CsrMatrix.from_host(cpu_csr(matrix)), dense_kernel="cublas"

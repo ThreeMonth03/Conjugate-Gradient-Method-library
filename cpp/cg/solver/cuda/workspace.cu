@@ -21,19 +21,19 @@ std::size_t Workspace::size() const noexcept
 }
 int Workspace::device() const noexcept
 {
-    return m_impl->execution.context.device();
+    return context().device();
 }
 std::uintptr_t Workspace::stream() const noexcept
 {
-    return m_impl->execution.context.stream();
+    return context().stream();
 }
 DenseKernel Workspace::dense_kernel() const noexcept
 {
-    return m_impl->execution.kernel;
+    return m_impl->execution.dense_kernel();
 }
 ExecutionMode Workspace::execution_mode() const noexcept
 {
-    return m_impl->mode;
+    return m_impl->control ? ExecutionMode::device : ExecutionMode::host;
 }
 VectorView Workspace::residual() noexcept
 {
@@ -55,7 +55,7 @@ VectorView Workspace::preconditioned() noexcept
 {
     return m_impl->z;
 }
-const Context &Workspace::execution_context() const noexcept
+const Context &Workspace::context() const noexcept
 {
     return m_impl->execution.context;
 }
@@ -71,8 +71,7 @@ void Workspace::release() noexcept
 namespace detail
 {
 
-WorkspaceUseGuard::WorkspaceUseGuard(Workspace &workspace, const Context &context)
-    : m_workspace(workspace), m_context(context)
+WorkspaceUseGuard::WorkspaceUseGuard(Workspace &workspace) : m_workspace(workspace)
 {
     if (!workspace.try_acquire())
     {
@@ -85,7 +84,7 @@ WorkspaceUseGuard::~WorkspaceUseGuard()
     {
         try
         {
-            m_context.synchronize();
+            m_workspace.context().synchronize();
         }
         catch (...)
         {

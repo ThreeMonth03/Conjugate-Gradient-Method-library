@@ -159,6 +159,11 @@ def main():
                     output = plan.create_vector()
                     for _ in range(2):
                         output.fill(0.0)
+                        strict = cuda.solve_into(
+                            gpu_matrix, gpu_rhs, output, workspace=workspace
+                        )
+                        check_device_answer(output, strict)
+                        output.fill(0.0)
                         solved = plan.solve_into(
                             gpu_rhs, output, workspace=workspace
                         )

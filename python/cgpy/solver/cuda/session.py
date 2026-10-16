@@ -158,7 +158,6 @@ class Session:
                 fused=fused,
                 residual_refresh=residual_refresh,
                 preconditioner=preconditioner,
-                dense_kernel=self.dense_kernel,
             )
             return result.SolveResult(x, info)
         finally:

@@ -17,7 +17,7 @@ struct Workspace::Impl
 {
     Impl(std::size_t size, const Context &context, DenseKernel kernel, ExecutionMode mode)
         : storage(cg::detail::checked_product(size, 5), context), r(slice(0)), p(slice(1)), ap(slice(2)),
-          scratch(slice(3)), z(slice(4)), execution(context, kernel), mode(mode)
+          scratch(slice(3)), z(slice(4)), execution(context, kernel)
     {
         if (mode == ExecutionMode::device)
         {
@@ -28,7 +28,6 @@ struct Workspace::Impl
     Vector storage;
     VectorView r, p, ap, scratch, z;
     detail::ExecutionResources execution;
-    ExecutionMode mode;
     std::optional<detail::DeviceExecutionResources> control;
     std::atomic<bool> active{false};
 
