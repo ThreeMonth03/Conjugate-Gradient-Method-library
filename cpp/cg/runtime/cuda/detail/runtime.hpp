@@ -30,26 +30,14 @@ class DeviceGuard
         if (m_previous != device)
         {
             check(cudaSetDevice(device), "cudaSetDevice");
-            m_switched = true;
         }
     }
     DeviceGuard(const DeviceGuard &) = delete;
     DeviceGuard &operator=(const DeviceGuard &) = delete;
-    ~DeviceGuard() noexcept
-    {
-        // A guarded callback can change the current device even when entry
-        // needed no switch. Skip restoration only after verifying it is still
-        // unnecessary; a failed query retains the old best-effort cleanup.
-        int current = 0;
-        if (m_switched || cudaGetDevice(&current) != cudaSuccess || current != m_previous)
-        {
-            (void)cudaSetDevice(m_previous);
-        }
-    }
+    ~DeviceGuard() { (void)cudaSetDevice(m_previous); }
 
     private:
     int m_previous = 0;
-    bool m_switched = false;
 };
 inline cudaStream_t stream(const Context &context)
 {
