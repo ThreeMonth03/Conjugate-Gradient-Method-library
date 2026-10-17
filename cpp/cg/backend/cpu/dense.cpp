@@ -61,25 +61,7 @@ std::array<double, 2> row_pair_dot(ConstVectorView first, ConstVectorView second
     std::array<double, 4> second_sums{};
     const auto size = first.size();
     const auto bulk = size - size % 4;
-    const auto unrolled_bulk = size - size % 8;
     std::size_t j = 0;
-    // Schedule two four-column groups per backedge without adding accumulator
-    // chains: each lane still receives columns lane, lane+4, lane+8, ... .
-    for (; j < unrolled_bulk; j += 8)
-    {
-        for (std::size_t lane = 0; lane < 4; ++lane)
-        {
-            const double value = x[j + lane];
-            first_sums[lane] += first[j + lane] * value;
-            second_sums[lane] += second[j + lane] * value;
-        }
-        for (std::size_t lane = 0; lane < 4; ++lane)
-        {
-            const double value = x[j + 4 + lane];
-            first_sums[lane] += first[j + 4 + lane] * value;
-            second_sums[lane] += second[j + 4 + lane] * value;
-        }
-    }
     for (; j < bulk; j += 4)
     {
         for (std::size_t lane = 0; lane < 4; ++lane)
