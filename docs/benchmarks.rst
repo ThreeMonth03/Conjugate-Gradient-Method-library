@@ -61,6 +61,13 @@ keep fresh API, Session, prepared and workspace-only probes distinct;
 independent numerical checks and compiler evidence. Diagnostic durations are
 separate from the completed-solve A/B gate.
 
+The :doc:`CPU follow-up <benchmarks/cpu-decision-20261018>` rejects an
+eight-accumulator candidate before timing because numerical work changed,
+despite passing true-residual checks. It retains all engine and same-buffer
+provider/storage diagnostics. CPU 2048 prepared optimization remains open;
+the page-residency observations do not establish a THP cause or justify an
+allocator change.
+
 Measurement context
 -------------------
 

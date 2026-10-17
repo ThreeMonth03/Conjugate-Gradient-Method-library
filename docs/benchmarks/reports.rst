@@ -14,6 +14,7 @@ Existing report URLs remain unchanged.
    :maxdepth: 1
 
    Same-code calibration — eight process blocks per side and all uncertainty <confidence-20261018>
+   CPU dense decision — fixed-work rejection, same-call GEMV attribution and storage observations <cpu-decision-20261018>
 
 2026-10-17
 ----------
