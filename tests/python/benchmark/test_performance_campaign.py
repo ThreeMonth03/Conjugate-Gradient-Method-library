@@ -1,9 +1,12 @@
 """Exercise campaign provenance, fixed schedules and failure retention without timing."""
 
 import copy
+import importlib.util
 import json
 import os
 import pathlib
+import py_compile
+import shutil
 import signal
 import subprocess
 import sys
@@ -267,6 +270,67 @@ def test_schedule_balances_every_slot_and_reverses_configuration_order(
     for row in plan["runs"]:
         assert row["argv"][4:7] == ["-m", "cgbench", "run"]
         assert row["argv"][-2:] == ["--output", row["output"]]
+    prefixes = [row["pycache_prefix"] for row in plan["runs"]]
+    prefixes.extend(plan["comparator_pycache_prefixes"].values())
+    assert len(set(prefixes)) == 34
+    assert all(pathlib.Path(path).is_relative_to(_output) for path in prefixes)
+    assert "fresh per-child" in plan["policy"]["python_bytecode"]
+
+
+@pytest.mark.parametrize("declared_cache", [False, True])
+@pytest.mark.parametrize(
+    "cache_kind", ["source", "legacy", "orphan", "malformed"]
+)
+def test_plan_rejects_staged_source_less_bytecode(
+    declared, declared_cache, cache_kind
+):
+    source, input_path, output = declared
+    stage = source["stages"]["baseline"]
+    root = pathlib.Path(stage["package_root"])
+    relative = {
+        "source": "cgpy/__pycache__/__init__.cpython-312.pyc",
+        "legacy": "cgpy/old_module.pyc",
+        "orphan": "cgpy/__pycache__/old_module.cpython-312.pyc",
+        "malformed": "cgpy/__pycache__/old_module.pyc",
+    }[cache_kind]
+    cached = root / relative
+    cached.parent.mkdir(parents=True, exist_ok=True)
+    cached.write_bytes(b"unused cache; ordinary imports must use source")
+    if declared_cache:
+        for side in campaign.SIDES:
+            source["stages"][side]["files"][str(cached)] = campaign.sha(cached)
+    save(input_path, source)
+    if cache_kind == "source":
+        campaign.make_plan(input_path, output)
+    else:
+        with pytest.raises(ValueError, match="bytecode"):
+            campaign.make_plan(input_path, output)
+    assert not output.exists()
+
+
+@pytest.mark.parametrize("link_kind", ["directory", "file", "broken"])
+def test_plan_rejects_all_staged_symlinks(declared, link_kind):
+    source, input_path, output = declared
+    root = pathlib.Path(source["stages"]["baseline"]["package_root"])
+    target = input_path.parent / "external-payload"
+    if link_kind == "directory":
+        target.mkdir()
+        (target / "__init__.py").write_text(
+            "VALUE = 'external'\n", encoding="utf8"
+        )
+        (target / "legacy.pyc").write_bytes(b"untracked source-less bytecode")
+    elif link_kind == "file":
+        target.write_text("untracked external payload", encoding="utf8")
+    linked = root / "cgbench/linked_payload"
+    linked.symlink_to(target, target_is_directory=link_kind == "directory")
+    # In particular, rglob does not descend directory links, so required-file
+    # and bytecode checks alone would miss both external Python files above.
+    with pytest.raises(ValueError, match="staged symlinks"):
+        campaign.make_plan(input_path, output)
+    assert not output.exists()
+    assert linked.is_symlink() and linked.readlink() == target
+    if link_kind == "broken":
+        assert not target.exists()
 
 
 @pytest.mark.parametrize(
@@ -363,6 +427,16 @@ def test_complete_campaign_retains_all_controls_and_primary_verdict(
 ):
     plan, manifest, output = planned(declared)
     calls = install_children(monkeypatch, plan, verdict=verdict)
+    child = campaign.run_command
+    prefixes = []
+
+    def check_environment(*args, **kwargs):
+        env = kwargs["env"]
+        assert env["PYTHONDONTWRITEBYTECODE"] == "1"
+        prefixes.append(env["PYTHONPYCACHEPREFIX"])
+        return child(*args, **kwargs)
+
+    monkeypatch.setattr(campaign, "run_command", check_environment)
     previous_sigterm = signal.getsignal(signal.SIGTERM)
     assert campaign.execute(plan, manifest, output) == int(
         verdict != "supported_no_material_regression"
@@ -373,12 +447,21 @@ def test_complete_campaign_retains_all_controls_and_primary_verdict(
     assert saved["verdict"] == verdict
     assert len(saved["runs"]) == 32
     assert len(calls) == 34
+    assert len(set(prefixes)) == 34
+    assert set(prefixes) == {
+        *[row["pycache_prefix"] for row in plan["runs"]],
+        *plan["comparator_pycache_prefixes"].values(),
+    }
     assert len(saved["comparisons"]) == 2
     for row in saved["runs"]:
         assert row["status"] == "measured"
         assert row["sha256"] == campaign.sha(row["output"])
         assert "telemetry_before" in row and "telemetry_after" in row
     for comparison in saved["comparisons"]:
+        assert (
+            comparison["pycache_prefix"]
+            == plan["comparator_pycache_prefixes"][comparison["configuration"]]
+        )
         report = json.loads(pathlib.Path(comparison["output"]).read_text())
         assert (
             len(report["baseline_files"]) == len(report["current_files"]) == 8
@@ -649,14 +732,181 @@ def test_cuda_environment_is_explicit_without_host_mutation(monkeypatch):
     monkeypatch.setenv("CUBLAS_WORKSPACE_CONFIG", ":16:8")
     monkeypatch.setenv("PYTHONHOME", "/unrelated/python")
     monkeypatch.setenv("PYTHONSTARTUP", "/unrelated/startup.py")
+    monkeypatch.setenv("PYTHONPYCACHEPREFIX", "/unrelated/bytecode")
     env = campaign.environment(
-        {"package_root": "/local/stage"}, {"device": "cuda", "threads": 1}
+        {"package_root": "/local/stage"},
+        {"device": "cuda", "threads": 1},
+        pycache_prefix="/local/child.pycache",
     )
     assert env["CUBLAS_WORKSPACE_CONFIG"] == ":4096:8"
     assert "CUDA_LAUNCH_BLOCKING" not in env
     assert "PYTHONHOME" not in env and "PYTHONSTARTUP" not in env
+    assert env["PYTHONPYCACHEPREFIX"] == "/local/child.pycache"
+    assert env["PYTHONDONTWRITEBYTECODE"] == "1"
     assert all(env[name] == "1" for name in campaign.THREADS)
     assert campaign.os.environ["CUDA_LAUNCH_BLOCKING"] == "1"
+    assert campaign.os.environ["PYTHONPYCACHEPREFIX"] == "/unrelated/bytecode"
+
+
+@pytest.mark.parametrize("external_cache", [False, True])
+def test_public_launcher_and_worker_bypass_stale_timestamp_bytecode(
+    tmp_path, monkeypatch, external_cache
+):
+    # Keep the real stdlib-only CLI, launch path and spec parser. Stub only the
+    # numerical collector/metadata so this regression requires no solver build.
+    stage = tmp_path / "stage"
+    package = stage / "cgbench"
+    package.mkdir(parents=True)
+    sources = pathlib.Path(__file__).resolve().parents[3] / "python/cgbench"
+    for name in (
+        "__init__.py",
+        "__main__.py",
+        "cli.py",
+        "execution.py",
+        "validation.py",
+        "cases.py",
+    ):
+        shutil.copyfile(sources / name, package / name)
+    trace = tmp_path / "processes.jsonl"
+    monkeypatch.setenv("CG_CACHE_TEST_TRACE", str(trace))
+    (package / "artifacts.py").write_text(
+        "import json, os, pathlib, sys\n"
+        "from . import _cache_probe\n"
+        "assert not {'numpy', 'torch', 'cgpy'}.intersection(sys.modules)\n"
+        f"THREAD_VARIABLES = {campaign.THREADS!r}\n"
+        "record = {'command': sys.argv[1], 'value': _cache_probe.VALUE,\n"
+        "          'prefix': sys.pycache_prefix,\n"
+        "          'dont_write': sys.dont_write_bytecode}\n"
+        "with pathlib.Path(os.environ['CG_CACHE_TEST_TRACE']).open('a') as out:\n"
+        "    out.write(json.dumps(record) + '\\n')\n"
+        "def environment_metadata(**kwargs):\n"
+        "    return record\n"
+        "def write_artifact(data, output):\n"
+        "    pathlib.Path(output).write_text(json.dumps(data))\n"
+        "def print_summary(data):\n"
+        "    pass\n",
+        encoding="utf8",
+    )
+    (package / "collector.py").write_text(
+        "def collect_case(case, spec):\n    return {'results': []}\n",
+        encoding="utf8",
+    )
+    probe = package / "_cache_probe.py"
+    probe.write_text("VALUE = 'old'\n", encoding="utf8")
+    timestamp = 1_600_000_000
+    os.utime(probe, (timestamp, timestamp))
+    inherited = str(tmp_path / "external-bytecode") if external_cache else None
+    if external_cache:
+        monkeypatch.setenv("PYTHONPYCACHEPREFIX", inherited)
+    else:
+        monkeypatch.delenv("PYTHONPYCACHEPREFIX", raising=False)
+    with monkeypatch.context() as context:
+        context.setattr(sys, "pycache_prefix", inherited)
+        cached = pathlib.Path(importlib.util.cache_from_source(str(probe)))
+    cached.parent.mkdir(parents=True, exist_ok=True)
+    py_compile.compile(
+        str(probe),
+        cfile=str(cached),
+        doraise=True,
+        invalidation_mode=py_compile.PycInvalidationMode.TIMESTAMP,
+    )
+    old_cache = cached.read_bytes()
+    probe.write_text("VALUE = 'new'\n", encoding="utf8")
+    os.utime(probe, (timestamp, timestamp))
+    unsafe = dict(
+        os.environ, PYTHONPATH=str(stage), PYTHONDONTWRITEBYTECODE="1"
+    )
+    unsafe.pop("PYTHONHOME", None)
+    unsafe.pop("PYTHONSTARTUP", None)
+    # -B is deliberately present: it prevents writes, not stale-cache reads.
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-B",
+            "-c",
+            "from cgbench import _cache_probe; print(_cache_probe.VALUE)",
+        ],
+        cwd=tmp_path,
+        env=unsafe,
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=10,
+    )
+    assert result.stdout.strip() == "old"
+    prefix = tmp_path / "child.pycache"
+    env = campaign.environment(
+        {"package_root": str(stage)}, {"threads": 1}, pycache_prefix=prefix
+    )
+    output = tmp_path / "artifact.json"
+    assert (
+        campaign.run_command(
+            [
+                sys.executable,
+                "-m",
+                "cgbench",
+                "run",
+                "--suite",
+                "smoke",
+                "--output",
+                str(output),
+            ],
+            cwd=tmp_path,
+            env=env,
+            log=tmp_path / "child.log",
+            timeout=15,
+        )
+        == 0
+    )
+    records = [json.loads(row) for row in trace.read_text().splitlines()]
+    assert [row["command"] for row in records] == ["run", "_worker"]
+    assert all(
+        row["value"] == "new"
+        and row["prefix"] == str(prefix)
+        and row["dont_write"] is True
+        for row in records
+    )
+    assert json.loads(output.read_text())["environment"]["value"] == "new"
+    assert prefix.is_dir() and not any(prefix.iterdir())
+    assert cached.read_bytes() == old_cache
+    assert os.environ.get("PYTHONPYCACHEPREFIX") == inherited
+
+
+@pytest.mark.parametrize("existing", ["file", "directory"])
+def test_existing_cache_prefix_fails_once_and_preserves_evidence(
+    declared, monkeypatch, existing
+):
+    plan, manifest, output = planned(declared)
+    prefix = pathlib.Path(plan["runs"][0]["pycache_prefix"])
+
+    def telemetry():
+        if not prefix.exists():
+            if existing == "file":
+                prefix.write_text(
+                    "preexisting cache evidence", encoding="utf8"
+                )
+            else:
+                prefix.mkdir()
+        return {"unavailable": True}
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("an existing cache prefix must prevent Popen")
+
+    monkeypatch.setattr(campaign, "telemetry", telemetry)
+    monkeypatch.setattr(campaign.subprocess, "Popen", forbidden)
+    assert campaign.execute(plan, manifest, output) == 1
+    saved = json.loads((output / "manifest.json").read_text())
+    assert saved["status"] == saved["runs"][0]["status"] == "failed"
+    assert len(saved["runs"]) == 1
+    assert saved["runs"][0]["pycache_prefix"] == str(prefix)
+    assert "FileExistsError" in saved["failure"]
+    assert "telemetry_after" in saved["runs"][0]
+    assert set(saved["runs"][0]["retained_files"]) == {"log"}
+    assert prefix.exists()
+    if existing == "file":
+        assert prefix.read_text() == "preexisting cache evidence"
+    with pytest.raises(ValueError, match="pristine"):
+        campaign.prepare_output(plan, output, False)
 
 
 def test_missing_telemetry_is_explicit_and_never_synthesizes_zero(monkeypatch):
@@ -708,7 +958,7 @@ def test_timeout_terminates_the_launcher_and_worker_group(
         campaign.run_command(
             ["fake"],
             cwd=tmp_path,
-            env={},
+            env={"PYTHONPYCACHEPREFIX": str(tmp_path / "child.pycache")},
             log=tmp_path / "child.log",
             timeout=1,
         )
@@ -741,7 +991,7 @@ def test_exited_launcher_cleans_up_workers_only_on_failure(
         campaign.run_command(
             ["fake"],
             cwd=tmp_path,
-            env={},
+            env={"PYTHONPYCACHEPREFIX": str(tmp_path / "child.pycache")},
             log=tmp_path / "child.log",
             timeout=1,
         )
@@ -880,7 +1130,11 @@ def test_failed_real_launcher_cannot_leave_its_worker_running(
                     str(returncode),
                 ],
                 cwd=tmp_path,
-                env=dict(os.environ),
+                env=campaign.environment(
+                    {"package_root": str(tmp_path)},
+                    {"threads": 1},
+                    pycache_prefix=tmp_path / "child.pycache",
+                ),
                 log=tmp_path / "child.log",
                 timeout=10,
             )

@@ -12,6 +12,7 @@ import argparse
 import copy
 import datetime
 import hashlib
+import importlib.util
 import json
 import math
 import os
@@ -46,6 +47,7 @@ POLICY = {
     "bootstrap_samples": 10000,
     "seed": 20261018,
     "telemetry": "before/after each child; no continuous observer",
+    "python_bytecode": "fresh per-child cache prefix; writes disabled; staged source-less bytecode rejected",
     "no_retry_no_discard": True,
 }
 
@@ -104,11 +106,29 @@ def payload(stage):
             or sha(path) != digest
         ):
             raise ValueError(f"frozen stage file differs: {name}")
+    staged = []
+    for path in root.rglob("*"):
+        if path.is_symlink():
+            raise ValueError(f"staged symlinks are unsupported: {path}")
+        if path.is_file():
+            staged.append(path)
+    for path in staged:
+        if path.suffix != ".pyc":
+            continue
+        try:
+            source = pathlib.Path(importlib.util.source_from_cache(str(path)))
+        except ValueError as error:
+            raise ValueError(
+                f"legacy/source-less staged bytecode is unsupported: {path}"
+            ) from error
+        if not source.is_relative_to(root) or not source.is_file():
+            raise ValueError(
+                f"staged bytecode requires an in-stage Python source: {path}"
+            )
     required = {
         str(path)
-        for path in root.rglob("*")
-        if path.is_file()
-        and (
+        for path in staged
+        if (
             path.suffix in {".py", ".pyi", ".so", ".pyd"}
             or path.name == "py.typed"
         )
@@ -455,6 +475,7 @@ def make_plan(input_path, output):
                             "side": side,
                             "output": str(raw),
                             "log": str(raw.with_suffix(".log")),
+                            "pycache_prefix": str(raw.with_suffix(".pycache")),
                             "argv": [
                                 "taskset",
                                 "-c",
@@ -483,6 +504,10 @@ def make_plan(input_path, output):
             str(comparator): sha(comparator),
         },
         "comparator": str(comparator),
+        "comparator_pycache_prefixes": {
+            row["name"]: str(output / "reports" / (row["name"] + ".pycache"))
+            for row in configs
+        },
         "runs": runs,
     }
 
@@ -606,12 +631,18 @@ def telemetry():
     return result
 
 
-def environment(stage, spec):
+def environment(stage, spec, *, pycache_prefix):
+    prefix = pathlib.Path(pycache_prefix)
+    if not prefix.is_absolute() or prefix.resolve() != prefix:
+        raise ValueError(
+            "Python cache prefix must be an absolute resolved path"
+        )
     env = dict(
         os.environ,
         PYTHONPATH=stage["package_root"],
         PYTHONNOUSERSITE="1",
         PYTHONDONTWRITEBYTECODE="1",
+        PYTHONPYCACHEPREFIX=str(prefix),
         OMP_DYNAMIC="FALSE",
         MKL_DYNAMIC="FALSE",
     )
@@ -896,6 +927,9 @@ def terminate_group(process):
 def run_command(command, *, cwd, env, log, timeout):
     """Stop the complete group after failed, timed-out or interrupted children."""
     with pathlib.Path(log).open("x", encoding="utf8") as stream:
+        # -B disables writes, but existing timestamp caches can still execute
+        # stale code. A fresh prefix bypasses both adjacent and inherited caches.
+        pathlib.Path(env["PYTHONPYCACHEPREFIX"]).mkdir(mode=0o700)
         process = subprocess.Popen(
             command,
             cwd=cwd,
@@ -955,7 +989,11 @@ def compare_all(plan, manifest, output):
             command,
             cwd=output,
             env=environment(
-                plan["source"]["stages"]["current"], config["spec"]
+                plan["source"]["stages"]["current"],
+                config["spec"],
+                pycache_prefix=plan["comparator_pycache_prefixes"][
+                    config["name"]
+                ],
             ),
             log=target.with_suffix(".log"),
             timeout=plan["worker_timeout_seconds"],
@@ -1010,6 +1048,9 @@ def compare_all(plan, manifest, output):
                 "sha256": sha(target),
                 "verdict": report["verdict"],
                 "argv": command,
+                "pycache_prefix": plan["comparator_pycache_prefixes"][
+                    config["name"]
+                ],
             }
         )
         manifest["comparisons"] = reports
@@ -1078,7 +1119,11 @@ def execute_campaign(plan, manifest, output):
                 returncode = run_command(
                     run["argv"],
                     cwd=output,
-                    env=environment(stage, config["spec"]),
+                    env=environment(
+                        stage,
+                        config["spec"],
+                        pycache_prefix=run["pycache_prefix"],
+                    ),
                     log=run["log"],
                     timeout=plan["worker_timeout_seconds"],
                 )
