@@ -28,9 +28,9 @@ void validate_apply(DenseMatrixView A, ConstVectorView x, VectorView output)
     }
 }
 
-double reduce_row(const std::array<double, 8> &sums)
+double reduce_quad(const std::array<double, 4> &sums)
 {
-    return ((sums[0] + sums[1]) + (sums[2] + sums[3])) + ((sums[4] + sums[5]) + (sums[6] + sums[7]));
+    return (sums[0] + sums[1]) + (sums[2] + sums[3]);
 }
 
 double row_dot(ConstVectorView row, ConstVectorView x)
@@ -38,25 +38,27 @@ double row_dot(ConstVectorView row, ConstVectorView x)
     const auto size = row.size();
     // Eight independent chains shorten the dependency within each lane. The
     // balanced reduction changes rounding, without fast-math or a wider ISA.
-    std::array<double, 8> sums{};
+    std::array<double, 4> low_sums{};
+    std::array<double, 4> high_sums{};
     const auto bulk = size - size % 8;
     std::size_t j = 0;
     for (; j < bulk; j += 8)
     {
-        for (std::size_t lane = 0; lane < 8; ++lane)
+        for (std::size_t lane = 0; lane < 4; ++lane)
         {
-            sums[lane] += row[j + lane] * x[j + lane];
+            low_sums[lane] += row[j + lane] * x[j + lane];
+            high_sums[lane] += row[j + 4 + lane] * x[j + 4 + lane];
         }
     }
     if (size - j >= 4)
     {
         for (std::size_t lane = 0; lane < 4; ++lane)
         {
-            sums[lane] += row[j + lane] * x[j + lane];
+            low_sums[lane] += row[j + lane] * x[j + lane];
         }
         j += 4;
     }
-    double sum = reduce_row(sums);
+    double sum = reduce_quad(low_sums) + reduce_quad(high_sums);
     for (; j < size; ++j)
     {
         sum += row[j] * x[j];
@@ -68,18 +70,23 @@ double row_dot(ConstVectorView row, ConstVectorView x)
 // between two independent rows. Padding is never part of either row view.
 std::array<double, 2> row_pair_dot(ConstVectorView first, ConstVectorView second, ConstVectorView x)
 {
-    std::array<double, 8> first_sums{};
-    std::array<double, 8> second_sums{};
+    std::array<double, 4> first_low_sums{};
+    std::array<double, 4> first_high_sums{};
+    std::array<double, 4> second_low_sums{};
+    std::array<double, 4> second_high_sums{};
     const auto size = first.size();
     const auto bulk = size - size % 8;
     std::size_t j = 0;
     for (; j < bulk; j += 8)
     {
-        for (std::size_t lane = 0; lane < 8; ++lane)
+        for (std::size_t lane = 0; lane < 4; ++lane)
         {
-            const double value = x[j + lane];
-            first_sums[lane] += first[j + lane] * value;
-            second_sums[lane] += second[j + lane] * value;
+            const double low_value = x[j + lane];
+            const double high_value = x[j + 4 + lane];
+            first_low_sums[lane] += first[j + lane] * low_value;
+            second_low_sums[lane] += second[j + lane] * low_value;
+            first_high_sums[lane] += first[j + 4 + lane] * high_value;
+            second_high_sums[lane] += second[j + 4 + lane] * high_value;
         }
     }
     if (size - j >= 4)
@@ -87,12 +94,13 @@ std::array<double, 2> row_pair_dot(ConstVectorView first, ConstVectorView second
         for (std::size_t lane = 0; lane < 4; ++lane)
         {
             const double value = x[j + lane];
-            first_sums[lane] += first[j + lane] * value;
-            second_sums[lane] += second[j + lane] * value;
+            first_low_sums[lane] += first[j + lane] * value;
+            second_low_sums[lane] += second[j + lane] * value;
         }
         j += 4;
     }
-    std::array<double, 2> sums{reduce_row(first_sums), reduce_row(second_sums)};
+    std::array<double, 2> sums{reduce_quad(first_low_sums) + reduce_quad(first_high_sums),
+                               reduce_quad(second_low_sums) + reduce_quad(second_high_sums)};
     for (; j < size; ++j)
     {
         const double value = x[j];
