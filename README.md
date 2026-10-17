@@ -52,5 +52,10 @@ when contributing. The benchmark guide summarizes measured performance and
 limitations, with reproducible commands and detailed historical reports.
 The [complete mode baseline](https://ThreeMonth03.github.io/Conjugate-Gradient-Method-library/benchmarks/main-complete-20261017.html)
 covers standard/explicit algorithms, fusion settings and CPU/CUDA solve scopes
-at compiled revision `445275a`. [Historical reports](https://ThreeMonth03.github.io/Conjugate-Gradient-Method-library/benchmarks/reports.html)
+at compiled revision `445275a`. The subsequent
+[optimization evaluation](https://ThreeMonth03.github.io/Conjugate-Gradient-Method-library/benchmarks/main-optimization-20261017.html)
+records candidate decisions and complete controls, with separate
+[CUDA phase diagnostics](https://ThreeMonth03.github.io/Conjugate-Gradient-Method-library/benchmarks/main-cuda-phases-20261017.html)
+and [CPU GEMV diagnostics](https://ThreeMonth03.github.io/Conjugate-Gradient-Method-library/benchmarks/main-cpu-components-20261017.html).
+[Historical reports](https://ThreeMonth03.github.io/Conjugate-Gradient-Method-library/benchmarks/reports.html)
 retain earlier evaluations.

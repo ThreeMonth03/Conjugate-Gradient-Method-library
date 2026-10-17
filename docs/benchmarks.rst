@@ -45,6 +45,16 @@ studies, control regressions and exploratory intervals at their measured
 sources. Those historical results are separate from this complete baseline;
 :doc:`benchmarks/reports` preserves every earlier report URL.
 
+The subsequent :doc:`fixed A/B evaluation <benchmarks/main-optimization-20261017>`
+records the CUDA device-restoration and CPU dense scheduling candidates against
+the same compiled baseline, retaining every native and framework control and
+each adoption decision. Read its source pins before applying a candidate result
+to production. The :doc:`CUDA phase diagnostics <benchmarks/main-cuda-phases-20261017>`
+keep fresh API, Session, prepared and workspace-only probes distinct;
+:doc:`CPU GEMV diagnostics <benchmarks/main-cpu-components-20261017>` retain
+independent numerical checks and compiler evidence. Diagnostic durations are
+separate from the completed-solve A/B gate.
+
 Measurement context
 -------------------
 
