@@ -28,24 +28,35 @@ void validate_apply(DenseMatrixView A, ConstVectorView x, VectorView output)
     }
 }
 
+double reduce_row(const std::array<double, 8> &sums)
+{
+    return ((sums[0] + sums[1]) + (sums[2] + sums[3])) + ((sums[4] + sums[5]) + (sums[6] + sums[7]));
+}
+
 double row_dot(ConstVectorView row, ConstVectorView x)
 {
     const auto size = row.size();
-    // Independent accumulators let ordinary optimization vectorize the row
-    // without fast-math, architecture flags, or alignment stronger than double.
-    double sum0 = 0.0;
-    double sum1 = 0.0;
-    double sum2 = 0.0;
-    double sum3 = 0.0;
+    // Eight independent chains shorten the dependency within each lane. The
+    // balanced reduction changes rounding, without fast-math or a wider ISA.
+    std::array<double, 8> sums{};
+    const auto bulk = size - size % 8;
     std::size_t j = 0;
-    for (; j + 3 < size; j += 4)
+    for (; j < bulk; j += 8)
     {
-        sum0 += row[j] * x[j];
-        sum1 += row[j + 1] * x[j + 1];
-        sum2 += row[j + 2] * x[j + 2];
-        sum3 += row[j + 3] * x[j + 3];
+        for (std::size_t lane = 0; lane < 8; ++lane)
+        {
+            sums[lane] += row[j + lane] * x[j + lane];
+        }
     }
-    double sum = (sum0 + sum1) + (sum2 + sum3);
+    if (size - j >= 4)
+    {
+        for (std::size_t lane = 0; lane < 4; ++lane)
+        {
+            sums[lane] += row[j + lane] * x[j + lane];
+        }
+        j += 4;
+    }
+    double sum = reduce_row(sums);
     for (; j < size; ++j)
     {
         sum += row[j] * x[j];
@@ -53,16 +64,25 @@ double row_dot(ConstVectorView row, ConstVectorView x)
     return sum;
 }
 
-// Preserve the four-lane accumulation order of row_dot while sharing x loads
+// Use the same eight-lane accumulation as row_dot while sharing x loads
 // between two independent rows. Padding is never part of either row view.
 std::array<double, 2> row_pair_dot(ConstVectorView first, ConstVectorView second, ConstVectorView x)
 {
-    std::array<double, 4> first_sums{};
-    std::array<double, 4> second_sums{};
+    std::array<double, 8> first_sums{};
+    std::array<double, 8> second_sums{};
     const auto size = first.size();
-    const auto bulk = size - size % 4;
+    const auto bulk = size - size % 8;
     std::size_t j = 0;
-    for (; j < bulk; j += 4)
+    for (; j < bulk; j += 8)
+    {
+        for (std::size_t lane = 0; lane < 8; ++lane)
+        {
+            const double value = x[j + lane];
+            first_sums[lane] += first[j + lane] * value;
+            second_sums[lane] += second[j + lane] * value;
+        }
+    }
+    if (size - j >= 4)
     {
         for (std::size_t lane = 0; lane < 4; ++lane)
         {
@@ -70,9 +90,9 @@ std::array<double, 2> row_pair_dot(ConstVectorView first, ConstVectorView second
             first_sums[lane] += first[j + lane] * value;
             second_sums[lane] += second[j + lane] * value;
         }
+        j += 4;
     }
-    std::array<double, 2> sums{(first_sums[0] + first_sums[1]) + (first_sums[2] + first_sums[3]),
-                               (second_sums[0] + second_sums[1]) + (second_sums[2] + second_sums[3])};
+    std::array<double, 2> sums{reduce_row(first_sums), reduce_row(second_sums)};
     for (; j < size; ++j)
     {
         const double value = x[j];
