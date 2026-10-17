@@ -377,6 +377,8 @@ def make_plan(input_path, output):
             raise ValueError(
                 "preset, thread count, device or affinity differs"
             )
+        if affinity != sorted(affinity):
+            raise ValueError("affinity must be sorted in ascending CPU order")
         names = row["spec"]["implementations"]
         dense = all(
             case.get("storage", "dense") == "dense"

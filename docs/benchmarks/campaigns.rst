@@ -27,7 +27,9 @@ Both sides must use identical Python wrappers and reference implementations.
 Each configuration declares a unique safe ``name``, absolute ``python``
 interpreter, ``preset``, logical CPU ``affinity`` and full ``spec`` from a
 public benchmark artifact. Preserve its suite, ordered cases, implementations,
-scope, threads, seed, solver and sampling fields. CPU controls include
+scope, threads, seed, solver and sampling fields. ``affinity`` must contain
+unique logical CPU IDs in ascending order, for example ``[0, 2]``; unsorted
+inputs are rejected before the plan is frozen. CPU controls include
 ``numpy-out`` for dense or ``scipy-out`` for CSR, plus ``torch-eager-out``;
 CUDA retains ``torch-cuda-eager``.
 There is no CPU Session scope. CUDA fresh API, Session and prepared remain
