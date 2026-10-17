@@ -72,8 +72,10 @@ checks or cross-process environment comparison.
 Stages may retain ordinary ``__pycache__`` files whose Python sources are also
 present and frozen. Legacy ``module.pyc`` files outside ``__pycache__`` and
 orphan caches without an in-stage source are rejected, including declared
-files. This policy covers source imports through Python's normal import
-machinery; it does not certify arbitrary dependency or dynamic import code.
+files. All staged symlinks, including directory and broken links, are rejected
+so linked packages cannot bypass the payload inventory. This policy covers
+source imports through Python's normal import machinery; it does not certify
+arbitrary dependency or dynamic import code.
 Older campaign evidence retains the tool and cache policy actually measured.
 
 Minimal A/A example

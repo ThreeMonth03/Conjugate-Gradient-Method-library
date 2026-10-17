@@ -106,7 +106,12 @@ def payload(stage):
             or sha(path) != digest
         ):
             raise ValueError(f"frozen stage file differs: {name}")
-    staged = [path for path in root.rglob("*") if path.is_file()]
+    staged = []
+    for path in root.rglob("*"):
+        if path.is_symlink():
+            raise ValueError(f"staged symlinks are unsupported: {path}")
+        if path.is_file():
+            staged.append(path)
     for path in staged:
         if path.suffix != ".pyc":
             continue

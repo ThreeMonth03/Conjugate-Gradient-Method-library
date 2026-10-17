@@ -308,6 +308,31 @@ def test_plan_rejects_staged_source_less_bytecode(
     assert not output.exists()
 
 
+@pytest.mark.parametrize("link_kind", ["directory", "file", "broken"])
+def test_plan_rejects_all_staged_symlinks(declared, link_kind):
+    source, input_path, output = declared
+    root = pathlib.Path(source["stages"]["baseline"]["package_root"])
+    target = input_path.parent / "external-payload"
+    if link_kind == "directory":
+        target.mkdir()
+        (target / "__init__.py").write_text(
+            "VALUE = 'external'\n", encoding="utf8"
+        )
+        (target / "legacy.pyc").write_bytes(b"untracked source-less bytecode")
+    elif link_kind == "file":
+        target.write_text("untracked external payload", encoding="utf8")
+    linked = root / "cgbench/linked_payload"
+    linked.symlink_to(target, target_is_directory=link_kind == "directory")
+    # In particular, rglob does not descend directory links, so required-file
+    # and bytecode checks alone would miss both external Python files above.
+    with pytest.raises(ValueError, match="staged symlinks"):
+        campaign.make_plan(input_path, output)
+    assert not output.exists()
+    assert linked.is_symlink() and linked.readlink() == target
+    if link_kind == "broken":
+        assert not target.exists()
+
+
 @pytest.mark.parametrize(
     "tamper",
     ["payload", "control", "duplicate", "preset", "affinity", "comparison"],
