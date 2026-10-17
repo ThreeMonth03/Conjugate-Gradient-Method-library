@@ -297,6 +297,33 @@ def test_invalid_input_cannot_start_children(declared, tamper):
     assert not output.exists()
 
 
+@pytest.mark.parametrize(
+    "affinity,accepted",
+    [
+        pytest.param([0, 2], True, id="sorted"),
+        pytest.param([2, 0], False, id="unsorted"),
+    ],
+)
+def test_affinity_order_is_validated_before_campaign_start(
+    declared, affinity, accepted
+):
+    source, input_path, output = declared
+    for config in source["configurations"]:
+        config["preset"] = "cpu-openmp"
+        config["spec"]["threads"] = 2
+        config["affinity"] = affinity
+    save(input_path, source)
+    if accepted:
+        plan = campaign.make_plan(input_path, output)
+        assert all(
+            run["argv"][:3] == ["taskset", "-c", "0,2"] for run in plan["runs"]
+        )
+    else:
+        with pytest.raises(ValueError, match="affinity must be sorted"):
+            campaign.make_plan(input_path, output)
+    assert not output.exists()
+
+
 def test_only_identical_pristine_plan_can_execute(declared):
     plan, manifest, output = planned(declared)
     assert campaign.prepare_output(plan, output, False) == manifest
