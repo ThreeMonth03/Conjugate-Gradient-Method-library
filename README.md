@@ -57,5 +57,10 @@ at compiled revision `445275a`.
 preserve a fixed 5% regression budget; the
 [same-code calibration](https://ThreeMonth03.github.io/Conjugate-Gradient-Method-library/benchmarks/confidence-20261018.html)
 keeps inconclusive results explicit.
+The latest [CPU evaluation](https://ThreeMonth03.github.io/Conjugate-Gradient-Method-library/benchmarks/cpu-decision-20261018.html)
+rejected its candidate before timing because iteration/matvec counts changed.
+The [CUDA evaluation](https://ThreeMonth03.github.io/Conjugate-Gradient-Method-library/benchmarks/cuda-terminal-20261018.html)
+was inconclusive under the 5% budget. Production behavior stays unchanged;
+expanded correctness and completion tests are retained.
 [Detailed reports](https://ThreeMonth03.github.io/Conjugate-Gradient-Method-library/benchmarks/reports.html)
 retain optimization decisions, CPU/CUDA diagnostics and earlier evaluations.
