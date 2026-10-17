@@ -13,6 +13,7 @@ Existing report URLs remain unchanged.
 .. toctree::
    :maxdepth: 1
 
+   Complete mode baseline — standard/explicit, fusion and CPU/CUDA scopes (compiled 445275a) <main-complete-20261017>
    Restart-aware optimization decisions — rejected variants, allocation ownership and launch evaluation <restart-optimization-20261017>
    Restart-aware baseline — all CPU/CUDA scopes, remaining losses and seventeen diagnostics <restart-baseline-20261017>
 

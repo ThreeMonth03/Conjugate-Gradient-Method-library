@@ -2,38 +2,48 @@ Benchmarks
 ==========
 
 Benchmarks measure completed time to an independently verified solution.
-The latest :doc:`2026-10-17 evaluation <benchmarks/restart-optimization-20261017>`
-retains adopted changes, rejected experiments, uncertainty and every framework
-control. Measurements describe their pinned source and harness, rather than
-an unmeasured later ``main``.
+The latest :doc:`complete mode baseline <benchmarks/main-complete-20261017>`
+measures compiled revision ``445275a`` across 134 configurations, 268 fresh
+processes and 3,096 eligible candidate/case outcomes. Its 1,548 table rows
+retain both forward/reverse process observations over 13 input fixtures.
 
 Results and remaining limitations
 ---------------------------------
 
-.. csv-table:: Restart-aware evaluation
+.. csv-table:: Complete mode baseline, 2026-10-17
    :class: benchmark-results
-   :header: "Comparison", "Observation", "Limit"
-   :widths: 30, 35, 35
+   :header: "Comparison", "Higher native medians / matched pairs", "Scope and limit"
+   :widths: 30, 25, 45
 
-   "Full CPU/CUDA baseline", "108 processes; 1,336 outcomes; 78 of 512 matching native/reference pairs have higher native medians", "Descriptive baseline; official SciPy/direct strategies have unknown restart counts"
-   "Fresh cuBLAS resource ownership", "One fewer allocation/free pair per API call after consolidating owned storage and borrowing scratch", "Follow-up wall-time batch is inconclusive; selected after an initial rejected variant"
-   "CPU four-row GEMV", "Rejected; production keeps the existing two-row kernel and retains stronger correctness tests", "Four native regressions; framework and unchanged BLAS controls also drifted"
-   "CUDA stable norm/control", "One fewer kernel launch per recurrence reaching control; memcpy/status-sync counts unchanged", "Prepared batch has one Torch control regression; separate three-scope batch is inconclusive"
-   "cuBLAS Jacobi fresh API, host/device", "All eight size/mode medians remain higher than matching Torch, ratio 1.11–1.46", "Session/prepared medians are lower; reuse results cannot replace the fresh contract"
+   "CPU dense: serial, OpenMP and BLAS", "93 / 384", "Native and native-BLAS versus NumPy/Torch; all algorithm, fusion and scope rows retained"
+   "CPU CSR: serial and OpenMP", "1 / 192", "The higher point is OpenMP explicit/unfused prepared Poisson-128 versus Torch; its ratio is 1.014"
+   "CUDA native dense and CSR", "0 / 288", "All measured native medians are lower than matched Torch; some explicit dense pairs perform different work"
+   "CUDA cuBLAS dense", "16 / 144", "All higher points are standard Jacobi fresh API: four sizes, both fusion flags and both execution modes; ratios 1.05–1.42"
+   "Sparse CG/PCG/direct strategies", "25 / 80", "Different solver strategies and unknown external restart counts; descriptive time-to-solution comparisons"
 
-The optimization studies retain all 176 fresh-process artifacts, 2,144 outcomes
-and 536 native/control strict rows. They use a fixed 5% regression budget and
-95% hierarchical intervals, without removing control drift or selecting a
-passing subset. Within-budget does not prove a speedup. Sequential follow-ups
-have unadjusted exploratory intervals. CPU component diagnostics and the 57
-CUDA captures are separate evidence, not additive wall-time attribution.
+These totals contain 1,088 matched native/reference pairs: 953 lower native
+medians and 135 higher. A pair identifies a fixture and configuration, not a
+unique matrix. The estimator is the median of two process medians; their
+range is descriptive, without confidence intervals, statistical-significance
+claims or an A/B adoption verdict. Every higher point remains in the full
+report. CUDA Session/prepared results cannot replace the fresh API contract.
 
-Matching native and same-policy references verify known iterations, matvecs
-and restarts. Official SciPy CG/PCG and direct methods retain unknown restart
-counts. Framework comparisons use the same accepted tolerance; Torch executes
-this project's eager recurrence, rather than an official Torch CG solver.
-The :doc:`full baseline <benchmarks/restart-baseline-20261017>` retains all
-remaining CPU, sparse-strategy and CUDA losses.
+Recorded iterations, matvecs, restarts and their knownness repeat across both
+processes for each candidate/configuration. No cross-scope/mode/preset work
+changes were observed within the same candidate, algorithm and
+preconditioner group. Across
+frameworks, 980 matched pairs have equal known I/M/R, 28 explicit dense pairs
+have different known work, and 80 strategy pairs have unknown restart parity.
+Official SciPy CG/PCG and SuperLU retain unknown restart counts rather than
+fabricated zeros. Work differences are not normalized into pure-kernel
+ratios. Torch executes this project's eager recurrence, not an official Torch
+CG solver; SuperLU is a general sparse direct solver.
+
+The :doc:`earlier optimization evaluation <benchmarks/restart-optimization-20261017>`
+retains the ownership variants, rejected four-row CPU experiment, launch
+studies, control regressions and exploratory intervals at their measured
+sources. Those historical results are separate from this complete baseline;
+:doc:`benchmarks/reports` preserves every earlier report URL.
 
 Measurement context
 -------------------
@@ -49,23 +59,35 @@ optimization or fast math. NumPy is 2.2.6; separate environments use Torch
 2.8.0+cpu and 2.8.0+cu128. The recorded CUDA driver is 610.88, driver API
 13030 and runtime 12080. Earlier reports retain their own environments.
 
-The public tags ``benchmarks/restart-baseline-20261017``,
-``benchmarks/cuda-borrowed-scratch-20261017``,
-``benchmarks/cpu-four-row-20261017`` (rejected) and
-``benchmarks/cuda-norm-control-20261017`` identify actual measured revisions.
-The complete report also preserves the rejected initial resource variant.
-A later reference numerical-range precedence fix was validated after timing;
-these framework times do not measure that new Python source.
+The public tag ``benchmarks/main-complete-20261017`` identifies actual compiled
+source ``445275a3994e342b06de4093889f3f814c8706c6``. The full report preserves
+compiled tree, staged binaries, Python harness, compiler controls and original
+raw/import/log identities. The reference numerical-range fix is included in
+this measured source. A later checkout or optimization is not covered merely
+because it shares the same package version.
 
 Scope and reproduction
 ----------------------
 
-FP64 inputs use rtol=1e-8, atol=1e-12, seed 20261017 and residual refresh every
-50 updates. Fresh ``api`` charges per-call output, workspace and requested
-Jacobi setup. CUDA ``session`` reuses execution resources with fresh output
-and per-call Jacobi. ``prepared`` reuses output, workspace and Jacobi.
-These scopes are compared separately. Backend, fusion and CUDA host/device
-execution are explicit choices; no automatic selection is used.
+The matrix contains 90 standard configurations and 44 explicit-none
+configurations. Both algorithms cover fused/separate execution, supported
+CPU native/BLAS and CUDA native/cuBLAS backends, and their declared scopes.
+Standard CG includes none/Jacobi; explicit recomputes the residual every
+iteration and supports no preconditioner. CPU covers API/prepared, CUDA covers
+API/Session/prepared with explicit host/device execution. CSR rejects BLAS
+and cuBLAS. The five sparse-strategy fixtures retain all six CG/PCG/LU aliases
+in API/prepared scopes with the standard algorithm.
+
+FP64 inputs use rtol=1e-8, atol=1e-12, maxiter=2000 and seed 20261017.
+Standard residual refresh is every 50 updates. Each artifact contains three
+warmups and 36 complete balanced Williams rounds, one solve per round, with
+all declared candidates. Configurations run forward and then in exact reverse.
+
+Fresh ``api`` charges per-call output, workspace and requested Jacobi setup.
+CUDA ``session`` reuses execution resources with fresh output and requested
+per-call Jacobi. ``prepared`` reuses output, workspace and setup. These scopes
+remain distinct; native host/device selection does not change Torch's control
+engine. Backend, algorithm, fusion and execution mode are explicit choices.
 
 CUDA inputs are resident. Completed wall timing includes dispatch, output
 reset, scalar/status synchronization and completion fences; uploads and
