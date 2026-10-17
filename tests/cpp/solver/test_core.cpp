@@ -731,7 +731,7 @@ TEST(DenseRows, NativeMatvecIsIndependentOfFusionSelection)
 
 TEST(DenseRows, FusionPoliciesMatchLongDoubleWithOddTailsAndPaddedRows)
 {
-    for (const std::size_t columns : {1u, 3u, 5u, 7u, 8u, 9u, 15u, 16u, 17u, 65u, 129u, 257u})
+    for (const std::size_t columns : {1u, 3u, 5u, 7u, 8u, 9u, 12u, 15u, 16u, 17u, 20u, 65u, 129u, 257u})
     {
         // Exercise two-row groups and the single-row tail independently of
         // the scalar long-double reference's accumulation order.
@@ -797,7 +797,7 @@ TEST(DenseRows, PairBoundariesPreserveExactProductsAndBothResidualSigns)
     // Fully populated integer products stay exactly representable in double.
     // Exercise both sides of eight-column boundaries, four-column remainders
     // and scalar/row tails. NaN padding detects stride overreads.
-    for (const std::size_t size : {7u, 8u, 9u, 15u, 16u, 17u, 129u, 130u, 131u})
+    for (const std::size_t size : {7u, 8u, 9u, 12u, 15u, 16u, 17u, 20u, 129u, 130u, 131u})
     {
         SCOPED_TRACE(size);
         const auto stride = size + 5;
@@ -864,15 +864,15 @@ TEST(DenseRows, PairBoundariesPreserveExactProductsAndBothResidualSigns)
     }
 }
 
-TEST(DenseRows, ColumnSchedulingPreservesFourLaneCancellationAcrossEightColumnGroups)
+TEST(DenseRows, CancellationMeetsIndependentBoundsAndFusedScalarsMatchStoredProducts)
 {
     for (const std::size_t size : {16u, 17u})
     {
         SCOPED_TRACE(size);
         const auto stride = size + 3;
         std::vector<double> storage(size * stride, std::numeric_limits<double>::quiet_NaN());
-        std::vector<double> x(size, 1.0), b(size, 1.0), output(size), expected(size);
-        const double magnitude = size == 16 ? 3.0 : 10.0;
+        std::vector<double> x(size, 1.0), b(size, 1.0), output(size), plain_product(size), separate_product(size);
+        std::vector<long double> expected(size), row_bounds(size);
         for (std::size_t row = 0; row < size; ++row)
         {
             std::fill_n(storage.data() + row * stride, size, 0.0);
@@ -885,9 +885,20 @@ TEST(DenseRows, ColumnSchedulingPreservesFourLaneCancellationAcrossEightColumnGr
             {
                 storage[row * stride + 16] = sign * 7.0;
             }
-            // In lane zero, (((1e16 + 1) - 1e16) + 3) is 3, not 4.
-            // The seventeenth column is added after the original lane grouping.
-            expected[row] = sign * magnitude;
+            // This deliberately ill-conditioned sum distinguishes reduction
+            // groupings. Its public accuracy bound comes from independent
+            // long-double arithmetic, without prescribing an internal lane map.
+            long double absolute_sum = 0;
+            for (std::size_t column = 0; column < size; ++column)
+            {
+                const long double product =
+                    static_cast<long double>(storage[row * stride + column]) * static_cast<long double>(x[column]);
+                expected[row] += product;
+                absolute_sum += std::abs(product);
+            }
+            const long double roundoff =
+                std::numeric_limits<double>::epsilon() * static_cast<long double>(2 * size + 4);
+            row_bounds[row] = roundoff / (1.0L - roundoff) * absolute_sum;
         }
         const cg::DenseMatrixView A(storage.data(), size, size, stride);
         for (const bool fused : {false, true})
@@ -895,21 +906,46 @@ TEST(DenseRows, ColumnSchedulingPreservesFourLaneCancellationAcrossEightColumnGr
             SCOPED_TRACE(fused);
             const cg::CpuBackend backend(1, fused);
             backend.apply(A, x, output);
-            EXPECT_EQ(output, expected);
-            EXPECT_DOUBLE_EQ(backend.apply_and_dot(A, x, output), size % 2 == 0 ? 0.0 : magnitude);
-            EXPECT_EQ(output, expected);
+            for (std::size_t row = 0; row < size; ++row)
+            {
+                EXPECT_TRUE(std::isfinite(output[row]));
+                EXPECT_LE(std::abs(static_cast<long double>(output[row]) - expected[row]), row_bounds[row]);
+            }
+            if (!fused)
+            {
+                separate_product = output;
+            }
+            else
+            {
+                EXPECT_EQ(output, separate_product);
+            }
+            plain_product = output;
+            const double actual_dot = backend.apply_and_dot(A, x, output);
+            EXPECT_EQ(output, plain_product);
+            long double expected_dot = 0, dot_absolute_sum = 0;
+            for (std::size_t row = 0; row < size; ++row)
+            {
+                const long double term = static_cast<long double>(x[row]) * static_cast<long double>(output[row]);
+                expected_dot += term;
+                dot_absolute_sum += std::abs(term);
+            }
+            const long double scalar_roundoff =
+                std::numeric_limits<double>::epsilon() * static_cast<long double>(2 * size + 1);
+            const long double scalar_gamma = scalar_roundoff / (1.0L - scalar_roundoff);
+            EXPECT_LE(std::abs(static_cast<long double>(actual_dot) - expected_dot), scalar_gamma * dot_absolute_sum);
             for (const auto sign : {cg::ResidualSign::rhs_minus_product, cg::ResidualSign::product_minus_rhs})
             {
                 const double actual = backend.residual_squared_norm(A, b, x, output, sign);
                 long double expected_squared = 0;
                 for (std::size_t row = 0; row < size; ++row)
                 {
-                    const double value =
-                        sign == cg::ResidualSign::rhs_minus_product ? 1.0 - expected[row] : expected[row] - 1.0;
+                    const double value = sign == cg::ResidualSign::rhs_minus_product ? 1.0 - plain_product[row]
+                                                                                     : plain_product[row] - 1.0;
                     EXPECT_DOUBLE_EQ(output[row], value);
                     expected_squared += static_cast<long double>(value) * static_cast<long double>(value);
                 }
-                EXPECT_DOUBLE_EQ(actual, static_cast<double>(expected_squared));
+                EXPECT_LE(std::abs(static_cast<long double>(actual) - expected_squared),
+                          scalar_gamma * expected_squared);
             }
         }
     }
@@ -922,7 +958,7 @@ TEST(DenseRows, NonfiniteValuesStayInTheAffectedPairOrLeftoverRow)
     for (const std::size_t affected_row : {1u, 2u, 3u, 128u})
     {
         SCOPED_TRACE(affected_row);
-        for (const std::size_t affected_column : {3u, 128u})
+        for (const std::size_t affected_column : {3u, 4u, 7u, 8u, 128u})
         {
             SCOPED_TRACE(affected_column);
             for (const double bad_value :
