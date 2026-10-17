@@ -58,6 +58,24 @@ resumed or overwritten. Partial raw output and logs remain available on
 failure. Changes to a frozen input, package, tool or interpreter invalidate
 the campaign rather than silently changing its meaning.
 
+Each benchmark launch and comparator invocation has a declared, fresh empty
+``.pycache`` directory beside its log. The runner overrides inherited
+``PYTHONPYCACHEPREFIX`` and sets ``PYTHONDONTWRITEBYTECODE=1``; the public
+launcher passes both settings to its worker. Disabling bytecode writes alone
+does not prevent Python from reading a stale timestamp cache. The fresh prefix
+causes ordinary source imports to bypass existing adjacent and external caches
+without changing the stage or the user's caches. Cache directories remain with
+the evidence, and an existing prefix fails the invocation rather than being
+reused or deleted. Their paths do not change the benchmark spec, numerical
+checks or cross-process environment comparison.
+
+Stages may retain ordinary ``__pycache__`` files whose Python sources are also
+present and frozen. Legacy ``module.pyc`` files outside ``__pycache__`` and
+orphan caches without an in-stage source are rejected, including declared
+files. This policy covers source imports through Python's normal import
+machinery; it does not certify arbitrary dependency or dynamic import code.
+Older campaign evidence retains the tool and cache policy actually measured.
+
 Minimal A/A example
 -------------------
 
