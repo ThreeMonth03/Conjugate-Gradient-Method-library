@@ -702,7 +702,7 @@ TEST(FusedOperations, MatchesReferenceDenseReductionAndResidual)
 TEST(DenseRows, NativeMatvecIsIndependentOfFusionSelection)
 {
     // Cancellation makes different GEMV accumulation policies observable.
-    // Include a four-row block, a pair, a single row and poisoned padding.
+    // Include three row pairs, a single row and poisoned padding.
     constexpr std::size_t rows = 7, columns = 5, stride = 8;
     const std::array<double, 3 * columns> values{1e16, 1, -1e16, 1, 4, -1e16, 1, 1e16, 1, -3, 1e16, 1, -1e16, 1, 7};
     // The two rounded pair sums cancel before adding the fifth-column tail.
@@ -731,10 +731,10 @@ TEST(DenseRows, NativeMatvecIsIndependentOfFusionSelection)
 
 TEST(DenseRows, FusionPoliciesMatchLongDoubleWithOddTailsAndPaddedRows)
 {
-    for (const std::size_t columns : {1u, 3u, 5u, 7u, 17u, 65u, 129u, 257u})
+    for (const std::size_t columns : {1u, 3u, 5u, 7u, 8u, 9u, 15u, 16u, 17u, 65u, 129u, 257u})
     {
-        // Exercise four-row bulk plus both pair and single tails independently
-        // of the scalar long-double reference's accumulation order.
+        // Exercise two-row groups and the single-row tail independently of
+        // the scalar long-double reference's accumulation order.
         const std::size_t rows = 7;
         const std::size_t stride = columns + 5;
         std::vector<double> storage(rows * stride, std::numeric_limits<double>::quiet_NaN());
@@ -795,9 +795,9 @@ TEST(DenseRows, FusionPoliciesPreserveNonfiniteMultiplicationBehavior)
 TEST(DenseRows, PairBoundariesPreserveExactProductsAndBothResidualSigns)
 {
     // Fully populated integer products stay exactly representable in double.
-    // Exercise four-row bulk followed by single, pair, and pair+single tails,
-    // along with 1/2/3 column tails. NaN padding detects stride overreads.
-    for (const std::size_t size : {129u, 130u, 131u})
+    // Exercise both sides of eight-column boundaries, four-column remainders
+    // and scalar/row tails. NaN padding detects stride overreads.
+    for (const std::size_t size : {7u, 8u, 9u, 15u, 16u, 17u, 129u, 130u, 131u})
     {
         SCOPED_TRACE(size);
         const auto stride = size + 5;
@@ -859,6 +859,57 @@ TEST(DenseRows, PairBoundariesPreserveExactProductsAndBothResidualSigns)
                     }
                     EXPECT_DOUBLE_EQ(actual_norm, static_cast<double>(expected_norm));
                 }
+            }
+        }
+    }
+}
+
+TEST(DenseRows, ColumnSchedulingPreservesFourLaneCancellationAcrossEightColumnGroups)
+{
+    for (const std::size_t size : {16u, 17u})
+    {
+        SCOPED_TRACE(size);
+        const auto stride = size + 3;
+        std::vector<double> storage(size * stride, std::numeric_limits<double>::quiet_NaN());
+        std::vector<double> x(size, 1.0), b(size, 1.0), output(size), expected(size);
+        const double magnitude = size == 16 ? 3.0 : 10.0;
+        for (std::size_t row = 0; row < size; ++row)
+        {
+            std::fill_n(storage.data() + row * stride, size, 0.0);
+            const double sign = row % 2 == 0 ? 1.0 : -1.0;
+            storage[row * stride] = sign * 1e16;
+            storage[row * stride + 4] = sign;
+            storage[row * stride + 8] = sign * -1e16;
+            storage[row * stride + 12] = sign * 3.0;
+            if (size == 17)
+            {
+                storage[row * stride + 16] = sign * 7.0;
+            }
+            // In lane zero, (((1e16 + 1) - 1e16) + 3) is 3, not 4.
+            // The seventeenth column is added after the original lane grouping.
+            expected[row] = sign * magnitude;
+        }
+        const cg::DenseMatrixView A(storage.data(), size, size, stride);
+        for (const bool fused : {false, true})
+        {
+            SCOPED_TRACE(fused);
+            const cg::CpuBackend backend(1, fused);
+            backend.apply(A, x, output);
+            EXPECT_EQ(output, expected);
+            EXPECT_DOUBLE_EQ(backend.apply_and_dot(A, x, output), size % 2 == 0 ? 0.0 : magnitude);
+            EXPECT_EQ(output, expected);
+            for (const auto sign : {cg::ResidualSign::rhs_minus_product, cg::ResidualSign::product_minus_rhs})
+            {
+                const double actual = backend.residual_squared_norm(A, b, x, output, sign);
+                long double expected_squared = 0;
+                for (std::size_t row = 0; row < size; ++row)
+                {
+                    const double value =
+                        sign == cg::ResidualSign::rhs_minus_product ? 1.0 - expected[row] : expected[row] - 1.0;
+                    EXPECT_DOUBLE_EQ(output[row], value);
+                    expected_squared += static_cast<long double>(value) * static_cast<long double>(value);
+                }
+                EXPECT_DOUBLE_EQ(actual, static_cast<double>(expected_squared));
             }
         }
     }
