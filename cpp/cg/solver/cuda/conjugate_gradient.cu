@@ -93,7 +93,8 @@ SolveInfo run(const Matrix &A, ConstVectorView b, VectorView x, Workspace &works
                    ? cg::detail::solve_explicit(A, b, x, workspace, backend, options, norm)
                    : cg::detail::solve_recurrence(A, b, x, workspace, backend, options, M, norm);
     }
-    context.synchronize();
+    // Every engine exit follows a completed scalar/status read, including
+    // initial and failure exits. No work is submitted after that read.
     use.complete();
     return info;
 }
