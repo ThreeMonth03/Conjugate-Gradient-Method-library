@@ -3,6 +3,7 @@
 #include <cg/cg.hpp>
 #include <cg/cuda.hpp>
 #include <cg/runtime/cuda/detail/launch.hpp>
+#include <cg/runtime/cuda/detail/runtime.hpp>
 #include <cg/solver/cuda/detail/workspace_use_guard.hpp>
 #include <cg/solver/cuda/prepared_solver.hpp>
 
@@ -126,6 +127,93 @@ TEST_F(Cuda, ReportsVersionsAndRejectsInvalidContextAndKernel)
     EXPECT_THROW(gpu::Context(-1), std::invalid_argument);
     EXPECT_THROW(gpu::Context{gpu::device_count()}, std::invalid_argument);
     EXPECT_THROW(gpu::detail::ExecutionResources(*context, static_cast<gpu::DenseKernel>(-1)), std::invalid_argument);
+}
+
+TEST_F(Cuda, DeviceGuardsPreserveSameDeviceAcrossNestingAndExceptionUnwind)
+{
+    int original = -1;
+    ASSERT_EQ(cudaGetDevice(&original), cudaSuccess);
+    const auto expect_device = [](int expected)
+    {
+        int selected = -1;
+        EXPECT_EQ(cudaGetDevice(&selected), cudaSuccess);
+        EXPECT_EQ(selected, expected);
+    };
+    struct Unwind
+    {
+    };
+    {
+        const gpu::detail::DeviceGuard outer(original);
+        expect_device(original);
+        {
+            const gpu::detail::DeviceGuard inner(original);
+            expect_device(original);
+        }
+        expect_device(original);
+        EXPECT_THROW(
+            {
+                const gpu::detail::DeviceGuard unwinding(original);
+                expect_device(original);
+                throw Unwind{};
+            },
+            Unwind);
+        expect_device(original);
+    }
+    expect_device(original);
+}
+
+TEST_F(Cuda, DeviceGuardsRestoreSwitchedAndCallbackChangedDevicesAcrossUnwind)
+{
+    const int count = gpu::device_count();
+    if (count < 2)
+    {
+        GTEST_SKIP() << "Device switching and callback restoration require at least two CUDA devices";
+    }
+    int original = -1;
+    ASSERT_EQ(cudaGetDevice(&original), cudaSuccess);
+    const int other = (original + 1) % count;
+    const auto expect_device = [](int expected)
+    {
+        int selected = -1;
+        EXPECT_EQ(cudaGetDevice(&selected), cudaSuccess);
+        EXPECT_EQ(selected, expected);
+    };
+    struct Unwind
+    {
+    };
+    {
+        const gpu::detail::DeviceGuard outer(other);
+        expect_device(other);
+        {
+            const gpu::detail::DeviceGuard inner(original);
+            expect_device(original);
+        }
+        expect_device(other);
+        EXPECT_THROW(
+            {
+                const gpu::detail::DeviceGuard unwinding(original);
+                expect_device(original);
+                throw Unwind{};
+            },
+            Unwind);
+        expect_device(other);
+        {
+            const gpu::detail::DeviceGuard same(other);
+            // CUDA Array Interface metadata callbacks can change selection
+            // inside a guard that needed no device switch at construction.
+            ASSERT_EQ(cudaSetDevice(original), cudaSuccess);
+        }
+        expect_device(other);
+        EXPECT_THROW(
+            {
+                const gpu::detail::DeviceGuard unwinding(other);
+                ASSERT_EQ(cudaSetDevice(original), cudaSuccess);
+                throw Unwind{};
+            },
+            Unwind);
+        expect_device(other);
+    }
+    expect_device(original);
 }
 
 TEST_F(Cuda, OwnsUploadsAndDeviceSnapshotsAndSupportsDeviceOnlyReset)
