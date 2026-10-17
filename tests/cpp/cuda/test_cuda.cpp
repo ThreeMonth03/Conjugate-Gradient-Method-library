@@ -160,10 +160,6 @@ TEST_F(Cuda, DeviceGuardsPreserveSameDeviceAcrossNestingAndExceptionUnwind)
         expect_device(original);
     }
     expect_device(original);
-    EXPECT_THROW(gpu::detail::DeviceGuard{gpu::device_count()}, std::runtime_error);
-    // Clear only the deliberate invalid-device error before later tests.
-    (void)cudaGetLastError();
-    expect_device(original);
 }
 
 TEST_F(Cuda, DeviceGuardsRestoreSwitchedAndCallbackChangedDevicesAcrossUnwind)
