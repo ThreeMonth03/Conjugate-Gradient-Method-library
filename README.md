@@ -50,5 +50,7 @@ includes a standalone CMake consumer. Follow the
 [coding conventions](https://ThreeMonth03.github.io/Conjugate-Gradient-Method-library/style.html)
 when contributing. The benchmark guide summarizes measured performance and
 limitations, with reproducible commands and detailed historical reports.
-The [2026-10-17 evaluation](https://ThreeMonth03.github.io/Conjugate-Gradient-Method-library/benchmarks/restart-optimization-20261017.html)
-records restart-aware comparisons, adopted changes and rejected experiments.
+The [complete mode baseline](https://ThreeMonth03.github.io/Conjugate-Gradient-Method-library/benchmarks/main-complete-20261017.html)
+covers standard/explicit algorithms, fusion settings and CPU/CUDA solve scopes
+at compiled revision `445275a`. [Historical reports](https://ThreeMonth03.github.io/Conjugate-Gradient-Method-library/benchmarks/reports.html)
+retain earlier evaluations.
