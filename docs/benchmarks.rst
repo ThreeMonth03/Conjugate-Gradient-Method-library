@@ -13,6 +13,17 @@ eight fresh process blocks per side at compiled revision ``84c88c9``. Its
 and zero confirmed regressions. This checks the measurement procedure;
 it does not establish an optimization speedup or replace the complete baseline.
 
+The subsequent :doc:`CUDA completion evaluation <benchmarks/cuda-terminal-20261018>`
+compares compiled baseline ``84c88c9`` with terminal-fence candidate ``32fd10a``
+over all 32 original CUDA configurations and 512 fresh process artifacts.
+Its 336 primary rows retain 117 results within the unchanged 5% budget,
+219 inconclusive and zero confirmed regressions. The complete candidate is
+inconclusive: production retains its final synchronization, while the expanded
+nondefault-stream completion tests are retained. Fresh API, Session and prepared
+results stay separate; no selected mode or framework-control correction rescues
+the adoption decision. The same-call traces confirm the removed fence and
+unchanged physical GPU work, but do not establish a completed-solve speedup.
+
 Results and remaining limitations
 ---------------------------------
 
