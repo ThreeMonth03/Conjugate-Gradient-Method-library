@@ -183,6 +183,16 @@ several process runs. Compare the new files using the staged package:
 Its bootstrap resamples artifact blocks and rounds within each block; few
 process runs provide limited evidence about process variance.
 
+For a fixed eight-process-block comparison with complementary ABBA/BAAB
+orders, immutable plans and boundary environment records, see
+:doc:`campaigns`. It launches the same public benchmark commands after builds
+finish and preserves the original 5% gate and all framework controls.
+
+.. toctree::
+   :hidden:
+
+   campaigns
+
 The paired runner generates fresh fixtures directly from a suite. Each case
 starts two fresh interpreters and keeps them for that case's adjacent solves,
 so previous cases cannot change its allocator history. It needs neither
