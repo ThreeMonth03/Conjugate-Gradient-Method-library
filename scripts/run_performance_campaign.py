@@ -870,8 +870,29 @@ def verify_frozen(plan):
         payload(stage)
 
 
+def terminate_group(process):
+    """Stop workers even when their launcher has already exited."""
+    try:
+        try:
+            os.killpg(process.pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            pass
+    finally:
+        # A dead launcher or interrupted grace period does not establish that
+        # all workers exited; they may have ignored SIGTERM.
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        process.wait()
+
+
 def run_command(command, *, cwd, env, log, timeout):
-    """Kill the complete launcher/worker process group on timeout or interruption."""
+    """Stop the complete group after failed, timed-out or interrupted children."""
     with pathlib.Path(log).open("x", encoding="utf8") as stream:
         process = subprocess.Popen(
             command,
@@ -882,22 +903,12 @@ def run_command(command, *, cwd, env, log, timeout):
             start_new_session=True,
         )
         try:
-            return process.wait(timeout=timeout)
+            returncode = process.wait(timeout=timeout)
+            if returncode:
+                terminate_group(process)
+            return returncode
         except BaseException:
-            try:
-                os.killpg(process.pid, signal.SIGTERM)
-            except ProcessLookupError:
-                pass
-            try:
-                process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                pass
-            # The launcher may exit before a worker that ignored SIGTERM.
-            try:
-                os.killpg(process.pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
-            process.wait()
+            terminate_group(process)
             raise
 
 
@@ -1004,7 +1015,25 @@ def compare_all(plan, manifest, output):
     return reports
 
 
+def interrupt_campaign(signum, _frame):
+    """Route SIGTERM through the same cleanup path as a keyboard interrupt."""
+    # Let the first interruption finish child cleanup and evidence writes.
+    signal.signal(signum, signal.SIG_IGN)
+    raise KeyboardInterrupt(
+        f"campaign interrupted by {signal.Signals(signum).name}"
+    )
+
+
 def execute(plan, manifest, output):
+    """Scope SIGTERM handling to campaign execution and restore the caller."""
+    previous_sigterm = signal.signal(signal.SIGTERM, interrupt_campaign)
+    try:
+        return execute_campaign(plan, manifest, output)
+    finally:
+        signal.signal(signal.SIGTERM, previous_sigterm)
+
+
+def execute_campaign(plan, manifest, output):
     """Execute a pristine campaign once, checkpointing any partial failure."""
     verify_frozen(plan)
     write_new(

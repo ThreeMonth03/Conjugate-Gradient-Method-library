@@ -2,9 +2,12 @@
 
 import copy
 import json
+import os
 import pathlib
 import signal
 import subprocess
+import sys
+import time
 
 import pytest
 
@@ -309,6 +312,21 @@ def test_only_identical_pristine_plan_can_execute(declared):
         campaign.prepare_output(plan, output, False)
 
 
+def test_existing_execution_claim_preserves_evidence_and_signal_handler(
+    declared,
+):
+    plan, manifest, output = planned(declared)
+    claim = output / "execution-claim.json"
+    campaign.write_new(claim, {"existing": "retained execution"})
+    before = (output / "manifest.json").read_bytes()
+    previous_sigterm = signal.getsignal(signal.SIGTERM)
+    with pytest.raises(FileExistsError):
+        campaign.execute(plan, manifest, output)
+    assert signal.getsignal(signal.SIGTERM) == previous_sigterm
+    assert (output / "manifest.json").read_bytes() == before
+    assert json.loads(claim.read_text()) == {"existing": "retained execution"}
+
+
 @pytest.mark.parametrize(
     "verdict",
     ["supported_no_material_regression", "inconclusive", "regression"],
@@ -318,9 +336,11 @@ def test_complete_campaign_retains_all_controls_and_primary_verdict(
 ):
     plan, manifest, output = planned(declared)
     calls = install_children(monkeypatch, plan, verdict=verdict)
+    previous_sigterm = signal.getsignal(signal.SIGTERM)
     assert campaign.execute(plan, manifest, output) == int(
         verdict != "supported_no_material_regression"
     )
+    assert signal.getsignal(signal.SIGTERM) == previous_sigterm
     saved = json.loads((output / "manifest.json").read_text())
     assert saved["status"] == "complete"
     assert saved["verdict"] == verdict
@@ -345,7 +365,9 @@ def test_complete_campaign_retains_all_controls_and_primary_verdict(
         campaign.prepare_output(plan, output, False)
 
 
-@pytest.mark.parametrize("failure", ["returncode", "timeout", "interrupt"])
+@pytest.mark.parametrize(
+    "failure", ["returncode", "timeout", "interrupt", "sigterm"]
+)
 def test_child_failures_retain_partial_evidence_without_retry(
     declared, monkeypatch, failure
 ):
@@ -361,20 +383,26 @@ def test_child_failures_retain_partial_evidence_without_retry(
             raise subprocess.TimeoutExpired(command, timeout)
         if failure == "interrupt":
             raise KeyboardInterrupt()
+        if failure == "sigterm":
+            signal.getsignal(signal.SIGTERM)(signal.SIGTERM, None)
         return 9
 
     monkeypatch.setattr(campaign, "run_command", child)
     monkeypatch.setattr(campaign, "telemetry", lambda: {"unavailable": True})
-    if failure == "interrupt":
+    previous_sigterm = signal.getsignal(signal.SIGTERM)
+    if failure in {"interrupt", "sigterm"}:
         with pytest.raises(KeyboardInterrupt):
             campaign.execute(plan, manifest, output)
     else:
         assert campaign.execute(plan, manifest, output) == 1
+    assert signal.getsignal(signal.SIGTERM) == previous_sigterm
     saved = json.loads((output / "manifest.json").read_text())
     assert saved["status"] == saved["runs"][0]["status"] == "failed"
     assert len(calls) == 1
     assert set(saved["runs"][0]["retained_files"]) == {"output", "log"}
     assert "telemetry_after" in saved["runs"][0]
+    if failure == "sigterm":
+        assert "SIGTERM" in saved["failure"]
     with pytest.raises(ValueError, match="pristine"):
         campaign.prepare_output(plan, output, False)
 
@@ -659,3 +687,199 @@ def test_timeout_terminates_the_launcher_and_worker_group(
         )
     assert (12345, signal.SIGTERM) in calls
     assert (12345, signal.SIGKILL) in calls
+
+
+@pytest.mark.parametrize("returncode", [0, 1, 9, -signal.SIGKILL])
+def test_exited_launcher_cleans_up_workers_only_on_failure(
+    tmp_path, monkeypatch, returncode
+):
+    calls = []
+
+    class Process:
+        pid = 12345
+
+        def wait(self, timeout=None):
+            calls.append(("wait", timeout))
+            return returncode
+
+    def launch(command, **kwargs):
+        assert kwargs["start_new_session"] is True
+        return Process()
+
+    monkeypatch.setattr(campaign.subprocess, "Popen", launch)
+    monkeypatch.setattr(
+        campaign.os, "killpg", lambda pid, signum: calls.append((pid, signum))
+    )
+    assert (
+        campaign.run_command(
+            ["fake"],
+            cwd=tmp_path,
+            env={},
+            log=tmp_path / "child.log",
+            timeout=1,
+        )
+        == returncode
+    )
+    assert calls == (
+        [("wait", 1)]
+        if returncode == 0
+        else [
+            ("wait", 1),
+            (12345, signal.SIGTERM),
+            ("wait", 5),
+            (12345, signal.SIGKILL),
+            ("wait", None),
+        ]
+    )
+
+
+def test_interrupted_child_grace_period_still_kills_workers(monkeypatch):
+    calls = []
+
+    class Process:
+        pid = 12345
+
+        def wait(self, timeout=None):
+            calls.append(("wait", timeout))
+            if timeout == 5:
+                raise KeyboardInterrupt("during cleanup")
+            return -9
+
+    monkeypatch.setattr(
+        campaign.os, "killpg", lambda pid, signum: calls.append((pid, signum))
+    )
+    with pytest.raises(KeyboardInterrupt, match="during cleanup"):
+        campaign.terminate_group(Process())
+    assert calls == [
+        (12345, signal.SIGTERM),
+        ("wait", 5),
+        (12345, signal.SIGKILL),
+        ("wait", None),
+    ]
+
+
+def test_sigterm_routes_running_child_through_cleanup_and_failed_evidence(
+    declared, monkeypatch
+):
+    plan, manifest, output = planned(declared)
+    calls = []
+
+    class Process:
+        pid = 12345
+
+        def wait(self, timeout=None):
+            calls.append(("wait", timeout))
+            if timeout == plan["worker_timeout_seconds"]:
+                signal.getsignal(signal.SIGTERM)(signal.SIGTERM, None)
+            assert signal.getsignal(signal.SIGTERM) == signal.SIG_IGN
+            return -9
+
+    def launch(command, **kwargs):
+        assert kwargs["start_new_session"] is True
+        kwargs["stdout"].write("retained interrupted child output\n")
+        return Process()
+
+    monkeypatch.setattr(campaign.subprocess, "Popen", launch)
+    monkeypatch.setattr(
+        campaign.os, "killpg", lambda pid, signum: calls.append((pid, signum))
+    )
+    monkeypatch.setattr(campaign, "telemetry", lambda: {"unavailable": True})
+    previous_sigterm = signal.getsignal(signal.SIGTERM)
+    with pytest.raises(KeyboardInterrupt, match="SIGTERM"):
+        campaign.execute(plan, manifest, output)
+    assert signal.getsignal(signal.SIGTERM) == previous_sigterm
+    assert calls == [
+        ("wait", plan["worker_timeout_seconds"]),
+        (12345, signal.SIGTERM),
+        ("wait", 5),
+        (12345, signal.SIGKILL),
+        ("wait", None),
+    ]
+    saved = json.loads((output / "manifest.json").read_text())
+    assert saved["status"] == saved["runs"][0]["status"] == "failed"
+    assert len(saved["runs"]) == 1
+    assert "SIGTERM" in saved["failure"]
+    assert set(saved["runs"][0]["retained_files"]) == {"log"}
+    assert "telemetry_after" in saved["runs"][0]
+    with pytest.raises(ValueError, match="pristine"):
+        campaign.prepare_output(plan, output, False)
+
+
+@pytest.mark.skipif(
+    os.name != "posix" or not pathlib.Path("/proc").is_dir(),
+    reason="process-group completion inspection requires POSIX /proc",
+)
+@pytest.mark.parametrize("returncode", [9, -signal.SIGKILL])
+def test_failed_real_launcher_cannot_leave_its_worker_running(
+    tmp_path, returncode
+):
+    worker = tmp_path / "worker.py"
+    ready = tmp_path / "worker.pid"
+    worker.write_text(
+        "import os, pathlib, signal, sys, time\n"
+        "signal.signal(signal.SIGTERM, signal.SIG_IGN)\n"
+        "ready = pathlib.Path(sys.argv[1])\n"
+        "temporary = ready.with_suffix('.tmp')\n"
+        "temporary.write_text(str(os.getpid()))\n"
+        "temporary.replace(ready)\n"
+        "while True:\n"
+        "    time.sleep(1)\n",
+        encoding="utf8",
+    )
+    launcher = tmp_path / "launcher.py"
+    launcher.write_text(
+        "import os, pathlib, signal, subprocess, sys, time\n"
+        "ready = pathlib.Path(sys.argv[2])\n"
+        "subprocess.Popen([sys.executable, sys.argv[1], str(ready)])\n"
+        "deadline = time.monotonic() + 5\n"
+        "while not ready.is_file():\n"
+        "    if time.monotonic() >= deadline:\n"
+        "        raise RuntimeError('worker did not start')\n"
+        "    time.sleep(0.01)\n"
+        "failure = int(sys.argv[3])\n"
+        "if failure < 0:\n"
+        "    os.kill(os.getpid(), -failure)\n"
+        "sys.exit(failure)\n",
+        encoding="utf8",
+    )
+    try:
+        assert (
+            campaign.run_command(
+                [
+                    sys.executable,
+                    str(launcher),
+                    str(worker),
+                    str(ready),
+                    str(returncode),
+                ],
+                cwd=tmp_path,
+                env=dict(os.environ),
+                log=tmp_path / "child.log",
+                timeout=10,
+            )
+            == returncode
+        )
+        pid = int(ready.read_text())
+        deadline = time.monotonic() + 2
+        while True:
+            try:
+                state = (
+                    pathlib.Path(f"/proc/{pid}/stat")
+                    .read_text()
+                    .rpartition(") ")[2]
+                    .split()[0]
+                )
+            except FileNotFoundError:
+                break
+            if state in {"Z", "X"}:
+                break
+            assert time.monotonic() < deadline, (
+                "orphaned worker is still running"
+            )
+            time.sleep(0.01)
+    finally:
+        if ready.is_file():
+            try:
+                os.kill(int(ready.read_text()), signal.SIGKILL)
+            except ProcessLookupError:
+                pass

@@ -7,6 +7,14 @@ its measured source and environment; filenames such as ``current`` and
 ``main`` identify historical baselines, not the current checkout.
 Existing report URLs remain unchanged.
 
+2026-10-18
+----------
+
+.. toctree::
+   :maxdepth: 1
+
+   Same-code calibration — eight process blocks per side and all uncertainty <confidence-20261018>
+
 2026-10-17
 ----------
 

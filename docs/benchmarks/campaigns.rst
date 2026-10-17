@@ -9,7 +9,8 @@ variance.
 
 ``scripts/run_performance_campaign.py`` orchestrates already built, frozen
 packages through the public ``cgbench run`` command. It never builds or
-installs dependencies. Prepare dependencies in the project's local virtual
+installs dependencies. This runner requires Linux/WSL, ``taskset`` and POSIX
+process groups. Prepare dependencies in the project's local virtual
 environments and finish builds, tests and profilers before starting a quiet
 campaign. Keep native, OpenMP, BLAS and CUDA builds in separate campaigns.
 
@@ -54,6 +55,71 @@ only that pristine plan. A started, failed or completed campaign cannot be
 resumed or overwritten. Partial raw output and logs remain available on
 failure. Changes to a frozen input, package, tool or interpreter invalidate
 the campaign rather than silently changing its meaning.
+
+Minimal A/A example
+-------------------
+
+With the local benchmark dependencies installed, the following creates a
+calibration input for CPU Jacobi prepared solves. Start from a clean committed
+checkout and keep that source fixed through the build and snapshot. The
+example refuses existing snapshot/input paths. It generates the spec through
+the same public parser used by ``make pyprof``; it does not inspect timings to
+select cases.
+
+.. code-block:: bash
+
+   make build PRESET=cpu-release BUILD_DIR="$PWD/build/campaign-source"
+   PYTHONPATH="$PWD/build/campaign-source/python" .venv/bin/python - <<'PY'
+   import hashlib
+   import json
+   import pathlib
+   import shutil
+   import subprocess
+   import sys
+   from cgbench.cli import benchmark_spec, parser
+
+   root = pathlib.Path.cwd()
+   subprocess.run(["git", "diff", "--quiet", "HEAD"], check=True)
+   stage = root / "build/campaign-stage"
+   stage.mkdir()
+   shutil.copytree(root / "build/campaign-source/python", stage / "python",
+                   ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+   shutil.copy2(root / "build/campaign-source/CMakeCache.txt", stage)
+   def git(ref):
+       return subprocess.check_output(["git", "rev-parse", ref], text=True).strip()
+   frozen = {
+       "package_root": str(stage / "python"),
+       "compiled_revision": git("HEAD"), "compiled_tree": git("HEAD^{tree}"),
+       "files": {str(p): hashlib.sha256(p.read_bytes()).hexdigest()
+                 for p in stage.rglob("*") if p.is_file()},
+   }
+   options = parser().parse_args([
+       "run", "--suite", "cpu-dense-f64-v1", "--scope", "prepared",
+       "--preconditioner", "jacobi", "--seed", "20261017",
+       "--warmups", "3", "--rounds", "36", "--repetitions", "1",
+   ])
+   spec = benchmark_spec(options)
+   spec["sampling"] = {"warmups": 3, "rounds": 36, "repetitions": 1}
+   plan = {
+       "schema_version": 1, "mode": "calibration",
+       "comparator": str(root / "scripts/compare_performance.py"),
+       "stages": {"baseline": frozen, "current": frozen},
+       "configurations": [{"name": "cpu-jacobi-prepared",
+                           "python": sys.executable, "preset": "cpu-release",
+                           "spec": spec, "affinity": [0]}],
+       "window_pause_seconds": 60, "worker_timeout_seconds": 600,
+   }
+   with (root / "build/campaign-input.json").open("x") as output:
+       json.dump(plan, output, indent=2)
+   PY
+
+Run the two campaign commands above after all preparation has finished. Choose
+an available logical CPU if CPU0 is outside the process's permitted affinity.
+For a comparison, build and snapshot each declared revision separately with
+matching compiler flags and backend settings; use ``mode="comparison"`` and
+the two actual source identities. Add each scope or fusion policy as its own
+configuration before freezing the plan. A calibration pass applies to its
+observations, rather than certifying future comparisons.
 
 Scheduling and interpretation
 -----------------------------

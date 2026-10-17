@@ -7,6 +7,12 @@ measures compiled revision ``445275a`` across 134 configurations, 268 fresh
 processes and 3,096 eligible candidate/case outcomes. Its 1,548 table rows
 retain both forward/reverse process observations over 13 input fixtures.
 
+The later :doc:`same-code calibration <benchmarks/confidence-20261018>` uses
+eight fresh process blocks per side at compiled revision ``84c88c9``. Its
+88 comparisons retain 33 rows within the original 5% budget, 55 inconclusive
+and zero confirmed regressions. This checks the measurement procedure;
+it does not establish an optimization speedup or replace the complete baseline.
+
 Results and remaining limitations
 ---------------------------------
 
